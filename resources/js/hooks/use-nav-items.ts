@@ -1,8 +1,4 @@
 import { type NavItem } from '@/types';
-import DashboardIcon from '@mui/icons-material/Dashboard';
-import ImportExportIcon from '@mui/icons-material/ImportExport';
-import MenuBookIcon from '@mui/icons-material/MenuBook';
-import SettingsIcon from '@mui/icons-material/Settings';
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -10,7 +6,7 @@ import { useTranslation } from 'react-i18next';
  * The full sidebar nav tree (unfiltered by permission) — moved out of
  * app-sidebar.tsx so resources/js/components/shell-search.tsx can build its
  * "App suggestions" (jump straight to a menu page) from the exact same data
- * the sidebar itself renders, instead of maintaining a second copy of this
+ * the sidebar itself renders (app-sidebar.tsx), instead of maintaining a second copy of this
  * tree that would drift out of sync with it.
  */
 export function useMainNavItems(): NavItem[] {
@@ -31,11 +27,11 @@ export function useMainNavItems(): NavItem[] {
                 // itself hides whatever the viewer has no permission for.
                 title: t('dashboard'),
                 url: '/dashboard',
-                icon: DashboardIcon,
+                icon: 'home',
             },
             {
                 title: t('catalog'),
-                icon: MenuBookIcon,
+                icon: 'course-book',
                 items: [
                     {
                         title: t('products'),
@@ -45,18 +41,18 @@ export function useMainNavItems(): NavItem[] {
                                 url: '/catalog/products',
                                 permission: 'products.list_products',
                                 // ไม่ใช่แค่ item เฉยๆ — group นี้มีลูกตัวเดียวชื่อซ้ำกับตัวเอง
-                                // เลยโดน unwrap() ใน nav-secondary.tsx ยุบทิ้ง เหลือแค่ item
-                                // ตัวในนี้ตัวเดียวที่ render จริงที่ depth 0 — iconName เลย
+                                // เลยโดน unwrap() ใน app-sidebar.tsx ยุบทิ้ง เหลือแค่ item
+                                // ตัวในนี้ตัวเดียวที่ render จริงที่ depth 0 — icon เลย
                                 // ต้องมาอยู่ตรงนี้ ไม่ใช่ที่ wrapper ข้างบน (ซึ่งจะถูกทิ้งไป)
-                                iconName: 'navProduct',
+                                icon: 'product',
                             },
                         ],
                     },
                     {
                         title: t('master'),
                         // group นี้มีลูกหลายตัว (ไม่ได้โดน unwrap()) เลยยัง render เป็น
-                        // node ของตัวเองที่ depth 0 จริงๆ — iconName ใส่ตรงนี้ได้เลย
-                        iconName: 'navMaster',
+                        // node ของตัวเองที่ depth 0 จริงๆ — icon ใส่ตรงนี้ได้เลย
+                        icon: 'database',
                         items: [
                             {
                                 title: t('categories'),
@@ -156,6 +152,10 @@ export function useMainNavItems(): NavItem[] {
                                 // แล้ว (marketplace_{platform}.list_marketplace_{platform} — ดู
                                 // routes/catalog.php) แทนที่จะแชร์ products.list_products เหมือนเดิม
                                 title: t('marketplace'),
+                                // SideNavigation รองรับแค่ 2 ชั้น (item > sub-item) — group ชั้นที่ 3
+                                // นี้เลยถูกยกขึ้นมาเป็น item ข้างๆ "มาสเตอร์" ตอน render (ดู
+                                // toSideNavTree ใน app-sidebar.tsx) จึงต้องมีไอคอนของตัวเอง
+                                icon: 'cart',
                                 items: (['shopee', 'lazada', 'tiktok', 'woocommerce'] as const).map((platform) => ({
                                     title: platform === 'woocommerce' ? 'WooCommerce' : platform.charAt(0).toUpperCase() + platform.slice(1),
                                     url: `/catalog/marketplace/${platform}`,
@@ -179,7 +179,7 @@ export function useMainNavItems(): NavItem[] {
                         title: t('attributes'),
                         // 3 ลูก ไม่โดน unwrap() (ดูคอมเมนต์ที่ "หมวดหมู่หลัก" ด้านบน) —
                         // ยัง render เป็น node ของตัวเองที่ depth 0 จริง
-                        iconName: 'navAttributes',
+                        icon: 'tag',
                         items: [
                             {
                                 title: t('attributes'),
@@ -223,8 +223,8 @@ export function useMainNavItems(): NavItem[] {
                                 url: '/catalog/management',
                                 permission: 'products.list_products',
                                 // ลูกตัวเดียวชื่อซ้ำ wrapper — โดน unwrap() เหมือน "สินค้า"
-                                // ด้านบน iconName เลยต้องมาอยู่ตรงนี้แทน
-                                iconName: 'navManagement',
+                                // ด้านบน icon เลยต้องมาอยู่ตรงนี้แทน
+                                icon: 'action-settings',
                                 // Neither of these has its own sidebar/tab entry
                                 // (product-translations is a Management-hub card;
                                 // marketplace-sync is only reachable via the
@@ -234,10 +234,7 @@ export function useMainNavItems(): NavItem[] {
                                 // matching its URL, so findActiveGroup falls back
                                 // to Dashboard and the whole secondary sidebar
                                 // collapses instead of staying on "จัดการ".
-                                matchUrls: [
-                                    '/catalog/product-translations',
-                                    '/catalog/categories/marketplace-sync',
-                                ],
+                                matchUrls: ['/catalog/product-translations', '/catalog/categories/marketplace-sync'],
                             },
                         ],
                     },
@@ -245,37 +242,37 @@ export function useMainNavItems(): NavItem[] {
             },
             {
                 title: t('importExport'),
-                icon: ImportExportIcon,
+                icon: 'direction-arrows',
                 items: [
                     {
                         title: t('imports'),
                         url: '/import-export/imports',
                         permission: 'import_configs.list_import_configs',
-                        iconName: 'navImport',
+                        icon: 'download-from-cloud',
                     },
                     {
                         title: t('exports'),
                         url: '/import-export/exports',
                         permission: 'export_configs.list_export_configs',
-                        iconName: 'navExport',
+                        icon: 'upload-to-cloud',
                     },
                     {
                         title: t('jobTracker'),
                         url: '/import-export/jobs',
                         permission: 'job_trackers.list_job_trackers',
-                        iconName: 'navJobTracker',
+                        icon: 'task',
                     },
                     {
                         title: t('wooConvert'),
                         url: '/import-export/woo-convert',
                         permission: 'woo_conversions.list_woo_conversions',
-                        iconName: 'navWooConvert',
+                        icon: 'switch-classes',
                     },
                 ],
             },
             {
                 title: t('system'),
-                icon: SettingsIcon,
+                icon: 'settings',
                 items: [
                     {
                         title: t('channels'),
@@ -285,55 +282,55 @@ export function useMainNavItems(): NavItem[] {
                         // the whole sidebar lose its highlighted section.
                         matchUrls: ['/catalog/sales-platforms'],
                         permission: 'channels.list_channels',
-                        iconName: 'navChannels',
+                        icon: 'chain-link',
                     },
                     {
                         title: t('users'),
                         url: '/system/user',
                         permission: 'users.list_users',
-                        iconName: 'navUsers',
+                        icon: 'employee',
                     },
                     {
                         title: t('userGroups'),
                         url: '/system/userGroup',
                         permission: 'user_groups.list_user_groups',
-                        iconName: 'navUserGroups',
+                        icon: 'group',
                     },
                     // {
                     //     title: t('departments'),
                     //     url: '/system/department',
                     //     permission: 'departments.list_departments',
-                    //     iconName: 'navDepartments',
+                    //     icon: 'building',
                     // },
                     // {
                     //     title: t('jobPositions'),
                     //     url: '/system/jobPosition',
                     //     permission: 'job_positions.list_job_positions',
-                    //     iconName: 'navJobPositions',
+                    //     icon: 'badge',
                     // },
                     {
                         title: t('roles'),
                         url: '/system/roles',
                         permission: 'roles.list_roles',
-                        iconName: 'navRoles',
+                        icon: 'role',
                     },
                     {
                         title: t('locales'),
                         url: '/system/locales',
                         permission: 'locales.list_locales',
-                        iconName: 'navLocales',
+                        icon: 'globe',
                     },
                     {
                         title: t('translationProviders'),
                         url: '/system/translationProviders',
                         permission: 'translation_providers.list_translation_providers',
-                        iconName: 'navTranslationProviders',
+                        icon: 'translate',
                     },
                     {
                         title: t('activityLogs'),
                         url: '/system/activity-logs',
                         permission: 'activity_logs.list_activity_logs',
-                        iconName: 'navActivityLogs',
+                        icon: 'history',
                     },
                 ],
             },

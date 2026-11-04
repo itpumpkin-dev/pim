@@ -1,0 +1,44 @@
+.frame {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    flex-shrink: 0;
+    border: 1px solid var(--sapGroup_ContentBorderColor);
+    background: var(--sapNeutralBackground);
+}
+
+.clickable {
+    cursor: zoom-in;
+    transition: box-shadow 0.15s ease;
+}
+
+.clickable:hover {
+    box-shadow: 0 0 0 2px var(--sapBrandColor);
+}
+
+.clickable:focus-visible {
+    outline: 2px solid var(--sapContent_FocusColor);
+    outline-offset: 1px;
+}
+
+.thumb {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.dialogClose {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.5rem;
+    z-index: 1;
+}
+
+.previewImage {
+    display: block;
+    max-width: 100%;
+    max-height: 80vh;
+    object-fit: contain;
+    margin: 0 auto;
+}

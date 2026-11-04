@@ -1,0 +1,58 @@
+.page {
+    min-height: 100vh;
+    display: grid;
+    grid-template-columns: 1fr;
+    background: var(--sapBackgroundColor);
+}
+
+.formColumn {
+    display: flex;
+    flex-direction: column;
+    padding: 2rem 1.5rem;
+}
+
+.brandLink {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    text-decoration: none;
+    color: var(--sapTextColor);
+}
+
+.brandName {
+    font-family: var(--sapFontHeaderFamily);
+    font-size: var(--sapFontHeader5Size);
+    font-weight: 600;
+}
+
+.brandAccent {
+    font-weight: 800;
+    color: var(--sapBrandColor);
+}
+
+.heroPanel {
+    display: none;
+    position: relative;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    background: var(--sapGroup_ContentBackground);
+    color: var(--sapTextColor);
+    border-left: 1px solid var(--sapGroup_ContentBorderColor);
+}
+
+@media (min-width: 600px) {
+    .formColumn {
+        padding: 3rem;
+    }
+}
+
+@media (min-width: 900px) {
+    .page {
+        grid-template-columns: 1fr 1fr;
+    }
+
+    .heroPanel {
+        display: flex;
+    }
+}

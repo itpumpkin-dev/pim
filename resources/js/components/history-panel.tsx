@@ -1,25 +1,13 @@
-import { useEffect, useState } from 'react';
-import { FIORI } from '@/lib/fiori-style';
 import { FioriResponsiveColumn, FioriResponsiveTable } from '@/components/fiori-responsive-table';
-import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined';
-import CalendarTodayOutlinedIcon from '@mui/icons-material/CalendarTodayOutlined';
-import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
-import ChevronRightIcon from '@mui/icons-material/ChevronRight';
-import CloseIcon from '@mui/icons-material/Close';
-import {
-    Box,
-    Chip,
-    Divider,
-    IconButton,
-    MenuItem,
-    Paper,
-    Select,
-    Stack,
-    Typography,
-    Dialog,
-    DialogContent,
-    DialogTitle,
-} from '@mui/material';
+import '@ui5/webcomponents-icons/dist/appointment-2.js';
+import '@ui5/webcomponents-icons/dist/decline.js';
+import '@ui5/webcomponents-icons/dist/show.js';
+import '@ui5/webcomponents-icons/dist/slim-arrow-left.js';
+import '@ui5/webcomponents-icons/dist/slim-arrow-right.js';
+import { Bar, Button, Dialog, Icon, Option, Select, Tag, Text, Title } from '@ui5/webcomponents-react';
+import { useEffect, useState } from 'react';
+
+import styles from './history-panel.module.css';
 
 interface HistoryDiffRow {
     key: string;
@@ -64,6 +52,8 @@ function formatDateTime(value: string | null): { display: string; relative: stri
 
     return { display, relative };
 }
+
+const PER_PAGE_OPTIONS = [10, 25, 50];
 
 /**
  * Version-history table + "History Preview" diff modal, fed by any backend
@@ -110,17 +100,11 @@ export function HistoryPanel({ historyUrl }: { historyUrl: string }) {
             render: (entry) => {
                 const { display, relative } = formatDateTime(entry.created_at);
                 return (
-                    <Stack direction="row" alignItems="center" spacing={1}>
-                        <CalendarTodayOutlinedIcon sx={{ fontSize: 16, color: '#f59e0b' }} />
-                        <Typography variant="body2" sx={{ color: '#f59e0b' }}>
-                            {display}
-                        </Typography>
-                        {relative && (
-                            <Typography variant="body2" color="text.secondary">
-                                ({relative})
-                            </Typography>
-                        )}
-                    </Stack>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                        <Icon name="appointment-2" style={{ width: '1rem', height: '1rem', color: 'var(--sapCriticalColor)' }} />
+                        <span style={{ color: 'var(--sapCriticalTextColor)' }}>{display}</span>
+                        {relative && <span style={{ color: 'var(--sapContent_LabelColor)' }}>({relative})</span>}
+                    </span>
                 );
             },
         },
@@ -135,14 +119,16 @@ export function HistoryPanel({ historyUrl }: { historyUrl: string }) {
             header: 'User',
             priority: 'high',
             render: (entry) => (
-                <Stack direction="row" alignItems="center" spacing={1}>
-                    <Typography sx={{ color: 'primary.main' }}>{entry.user}</Typography>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <span style={{ color: 'var(--sapLinkColor)' }}>{entry.user}</span>
                     {/* ค่าที่งานแปลอัตโนมัติเขียน (AutoTranslateProductValueJob) — แยกให้เห็นจาก
                         การแก้ไขที่คนพิมพ์เอง ผู้ใช้ที่แสดงคือคนที่สั่งแปล */}
                     {entry.event === 'attribute_values_auto_translated' && (
-                        <Chip label="AI translated" size="small" sx={{ height: 20, fontSize: 11, bgcolor: '#ede9fe', color: '#6d28d9' }} />
+                        <Tag design="Set2" colorScheme="5" hideStateIcon>
+                            AI translated
+                        </Tag>
                     )}
-                </Stack>
+                </span>
             ),
         },
         {
@@ -151,9 +137,7 @@ export function HistoryPanel({ historyUrl }: { historyUrl: string }) {
             priority: 'always',
             align: 'right',
             render: (entry) => (
-                <IconButton size="small" sx={{ color: '#64748b' }} onClick={() => setPreviewEntry(entry)}>
-                    <VisibilityOutlinedIcon fontSize="small" />
-                </IconButton>
+                <Button design="Transparent" icon="show" tooltip="View" accessibleName="View" onClick={() => setPreviewEntry(entry)} />
             ),
         },
     ];
@@ -167,107 +151,110 @@ export function HistoryPanel({ historyUrl }: { historyUrl: string }) {
             key: 'key',
             header: 'Key',
             priority: 'always',
-            render: (row) => <Typography sx={{ color: '#334155' }}>{row.key}</Typography>,
+            render: (row) => <span style={{ color: 'var(--sapTextColor)' }}>{row.key}</span>,
         },
         {
             key: 'old',
-            header: <Typography component="span" sx={{ fontWeight: 700, color: '#dc2626' }}>Old Value</Typography>,
+            header: <span style={{ fontWeight: 700, color: 'var(--sapNegativeTextColor)' }}>Old Value</span>,
+            popinText: 'Old Value',
             priority: 'high',
-            render: (row) => <Typography sx={{ color: '#dc2626' }}>{formatValue(row.old)}</Typography>,
+            render: (row) => <span style={{ color: 'var(--sapNegativeTextColor)' }}>{formatValue(row.old)}</span>,
         },
         {
             key: 'new',
-            header: <Typography component="span" sx={{ fontWeight: 700, color: 'primary.main' }}>New Value</Typography>,
+            header: <span style={{ fontWeight: 700, color: 'var(--sapLinkColor)' }}>New Value</span>,
+            popinText: 'New Value',
             priority: 'high',
-            render: (row) => (
-                <Typography sx={{ color: 'primary.main', fontWeight: 600 }}>{formatValue(row.new)}</Typography>
-            ),
+            render: (row) => <span style={{ color: 'var(--sapLinkColor)', fontWeight: 600 }}>{formatValue(row.new)}</span>,
         },
     ];
 
     return (
-        <Box sx={{ px: { xs: 2, md: 4 } }}>
-            <Stack direction="row" justifyContent="flex-end" alignItems="center" spacing={1.5} sx={{ mb: 2 }}>
+        <div className={styles.panel}>
+            <div className={styles.pager}>
                 <Select
-                    value={perPage}
+                    accessibleName="Per Page"
+                    style={{ width: '5rem' }}
                     onChange={(e) => {
-                        setPerPage(Number(e.target.value));
+                        setPerPage(Number(e.detail.selectedOption.value));
                         setPage(1);
                     }}
-                    size="small"
-                    sx={{ bgcolor: FIORI.surface, borderRadius: 1.5, minWidth: 60, height: 36 }}
                 >
-                    <MenuItem value={10}>10</MenuItem>
-                    <MenuItem value={25}>25</MenuItem>
-                    <MenuItem value={50}>50</MenuItem>
+                    {PER_PAGE_OPTIONS.map((n) => (
+                        <Option key={n} value={String(n)} selected={perPage === n}>
+                            {n}
+                        </Option>
+                    ))}
                 </Select>
-                <Typography variant="body2" color="text.secondary">
-                    Per Page
-                </Typography>
-                <Paper variant="outlined" sx={{ px: 1.5, py: 0.5, bgcolor: FIORI.surface, borderRadius: 1, display: 'flex', alignItems: 'center' }}>
-                    <Typography variant="body2">{page}</Typography>
-                </Paper>
-                <Typography variant="body2" color="text.secondary">
-                    of {lastPage}
-                </Typography>
-                <Stack direction="row" spacing={0.2}>
-                    <IconButton size="small" disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>
-                        <ChevronLeftIcon fontSize="small" />
-                    </IconButton>
-                    <IconButton size="small" disabled={page >= lastPage} onClick={() => setPage((p) => Math.min(lastPage, p + 1))}>
-                        <ChevronRightIcon fontSize="small" />
-                    </IconButton>
-                </Stack>
-            </Stack>
+                <Text style={{ color: 'var(--sapContent_LabelColor)' }}>Per Page</Text>
+                <span className={styles.pageBox}>{page}</span>
+                <Text style={{ color: 'var(--sapContent_LabelColor)' }}>of {lastPage}</Text>
+                <Button
+                    design="Transparent"
+                    icon="slim-arrow-left"
+                    accessibleName="Previous page"
+                    disabled={page <= 1}
+                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                />
+                <Button
+                    design="Transparent"
+                    icon="slim-arrow-right"
+                    accessibleName="Next page"
+                    disabled={page >= lastPage}
+                    onClick={() => setPage((p) => Math.min(lastPage, p + 1))}
+                />
+            </div>
 
             <FioriResponsiveTable
                 columns={columns}
                 rows={pagedEntries}
                 getRowKey={(entry) => entry.version}
+                loading={loading}
                 emptyMessage={loading ? null : 'No history found.'}
             />
 
-            <Dialog open={previewEntry !== null} onClose={() => setPreviewEntry(null)} maxWidth="sm" fullWidth>
-                <DialogTitle sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', pb: 1 }}>
-                    <Box>
-                        <Typography variant="h6" fontWeight={700}>
-                            History Preview
-                        </Typography>
-                        <Typography variant="body2" color="text.secondary">
-                            Quickly review your updates and changes.
-                        </Typography>
-                    </Box>
-                    <IconButton size="small" onClick={() => setPreviewEntry(null)}>
-                        <CloseIcon fontSize="small" />
-                    </IconButton>
-                </DialogTitle>
-                <Divider />
-                <DialogContent>
-                    {previewEntry && (
-                        <>
-                            <Stack spacing={0.75} sx={{ mb: 2.5 }}>
-                                <Typography variant="body2">
-                                    <b>Version :</b> {previewEntry.version}
-                                </Typography>
-                                <Typography variant="body2">
-                                    <b>Date/Time :</b> {formatDateTime(previewEntry.created_at).display}
-                                </Typography>
-                                <Typography variant="body2">
-                                    <b>User :</b> {previewEntry.user}
-                                </Typography>
-                            </Stack>
+            <Dialog
+                open={previewEntry !== null}
+                onClose={() => setPreviewEntry(null)}
+                style={{ width: 'min(600px, calc(100vw - 2rem))' }}
+                header={
+                    <Bar
+                        startContent={
+                            <div style={{ padding: '0.5rem 0' }}>
+                                <Title level="H5" size="H5">
+                                    History Preview
+                                </Title>
+                                <Text style={{ color: 'var(--sapContent_LabelColor)' }}>Quickly review your updates and changes.</Text>
+                            </div>
+                        }
+                        endContent={<Button design="Transparent" icon="decline" accessibleName="Close" onClick={() => setPreviewEntry(null)} />}
+                    />
+                }
+            >
+                {previewEntry && (
+                    <>
+                        <div className={styles.meta}>
+                            <span>
+                                <b>Version :</b> {previewEntry.version}
+                            </span>
+                            <span>
+                                <b>Date/Time :</b> {formatDateTime(previewEntry.created_at).display}
+                            </span>
+                            <span>
+                                <b>User :</b> {previewEntry.user}
+                            </span>
+                        </div>
 
-                            <FioriResponsiveTable
-                                size="small"
-                                columns={diffColumns}
-                                rows={previewEntry.diff}
-                                getRowKey={(row) => row.key}
-                                emptyMessage="No changes recorded."
-                            />
-                        </>
-                    )}
-                </DialogContent>
+                        <FioriResponsiveTable
+                            size="small"
+                            columns={diffColumns}
+                            rows={previewEntry.diff}
+                            getRowKey={(row) => row.key}
+                            emptyMessage="No changes recorded."
+                        />
+                    </>
+                )}
             </Dialog>
-        </Box>
+        </div>
     );
 }

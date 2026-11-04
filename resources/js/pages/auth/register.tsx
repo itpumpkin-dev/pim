@@ -1,10 +1,13 @@
 import { Head, useForm } from '@inertiajs/react';
-import { Box, Button, CircularProgress, Stack, TextField, Typography } from '@mui/material';
-import { FormEventHandler } from 'react';
+import { Button, FlexBox, Input, Label, Text } from '@ui5/webcomponents-react';
+import { FormEventHandler, type ReactNode } from 'react';
 
+import InputError from '@/components/input-error';
 import TextLink from '@/components/text-link';
 import AuthLayout from '@/layouts/auth-layout';
-import { fioriEmphasizedSx } from '@/lib/fiori-style';
+import field from './credential-field.module.css';
+
+const cx = (...names: Array<string | false | undefined>) => names.filter(Boolean).join(' ');
 
 interface RegisterForm {
     username: string;
@@ -14,6 +17,18 @@ interface RegisterForm {
     password: string;
     password_confirmation: string;
     [key: string]: string;
+}
+
+function Field({ id, label, error, children }: { id: string; label: string; error?: string; children: ReactNode }) {
+    return (
+        <FlexBox direction="Column" style={{ gap: '0.25rem', flex: 1, minWidth: 0 }}>
+            <Label for={id} required showColon={false}>
+                {label}
+            </Label>
+            {children}
+            <InputError message={error} />
+        </FlexBox>
+    );
 }
 
 export default function Register() {
@@ -33,130 +48,136 @@ export default function Register() {
         });
     };
 
+    const stateOf = (error?: string) => (error ? 'Negative' : 'None');
+
     return (
         <AuthLayout title="Create an account" description="Enter your details below to create your account">
             <Head title="Register" />
-            <Box component="form" onSubmit={submit} sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-                <Stack spacing={3}>
-                    <TextField
-                        id="username"
-                        type="text"
-                        label="Username"
-                        required
-                        autoFocus
-                        tabIndex={1}
-                        autoComplete="username"
-                        value={data.username}
-                        onChange={(e) => setData('username', e.target.value)}
-                        disabled={processing}
-                        placeholder="username"
-                        fullWidth
-                        error={Boolean(errors.username)}
-                        helperText={errors.username}
-                    />
-
-                    <Stack direction="row" spacing={2}>
-                        <TextField
-                            id="first_name"
+            <form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                <FlexBox direction="Column" style={{ gap: '1.5rem' }}>
+                    <Field id="username" label="Username" error={errors.username}>
+                        <input
+                            id="username"
+                            name="username"
+                            autoComplete="username"
                             type="text"
-                            label="First name"
                             required
-                            tabIndex={2}
-                            autoComplete="given-name"
-                            value={data.first_name}
-                            onChange={(e) => setData('first_name', e.target.value)}
+                            autoFocus
+                            tabIndex={1}
+                            value={data.username}
+                            onChange={(e) => setData('username', e.target.value)}
                             disabled={processing}
-                            placeholder="First name"
-                            fullWidth
-                            error={Boolean(errors.first_name)}
-                            helperText={errors.first_name}
+                            placeholder="username"
+                            aria-invalid={Boolean(errors.username)}
+                            className={cx(field.input, errors.username && field.invalid)}
                         />
+                    </Field>
 
-                        <TextField
-                            id="last_name"
-                            type="text"
-                            label="Last name"
+                    <FlexBox style={{ gap: '1rem' }}>
+                        <Field id="first_name" label="First name" error={errors.first_name}>
+                            <Input
+                                id="first_name"
+                                name="first_name"
+                                type="Text"
+                                required
+                                tabIndex={2}
+                                value={data.first_name}
+                                onInput={(e) => setData('first_name', e.target.value)}
+                                disabled={processing}
+                                placeholder="First name"
+                                style={{ width: '100%' }}
+                                valueState={stateOf(errors.first_name)}
+                            />
+                        </Field>
+
+                        <Field id="last_name" label="Last name" error={errors.last_name}>
+                            <Input
+                                id="last_name"
+                                name="last_name"
+                                type="Text"
+                                required
+                                tabIndex={3}
+                                value={data.last_name}
+                                onInput={(e) => setData('last_name', e.target.value)}
+                                disabled={processing}
+                                placeholder="Last name"
+                                style={{ width: '100%' }}
+                                valueState={stateOf(errors.last_name)}
+                            />
+                        </Field>
+                    </FlexBox>
+
+                    <Field id="email" label="Email address" error={errors.email}>
+                        <input
+                            id="email"
+                            name="email"
+                            autoComplete="email"
+                            type="email"
                             required
-                            tabIndex={3}
-                            autoComplete="family-name"
-                            value={data.last_name}
-                            onChange={(e) => setData('last_name', e.target.value)}
+                            tabIndex={4}
+                            value={data.email}
+                            onChange={(e) => setData('email', e.target.value)}
                             disabled={processing}
-                            placeholder="Last name"
-                            fullWidth
-                            error={Boolean(errors.last_name)}
-                            helperText={errors.last_name}
+                            placeholder="email@example.com"
+                            aria-invalid={Boolean(errors.email)}
+                            className={cx(field.input, errors.email && field.invalid)}
                         />
-                    </Stack>
+                    </Field>
 
-                    <TextField
-                        id="email"
-                        type="email"
-                        label="Email address"
-                        required
-                        tabIndex={4}
-                        autoComplete="email"
-                        value={data.email}
-                        onChange={(e) => setData('email', e.target.value)}
-                        disabled={processing}
-                        placeholder="email@example.com"
-                        fullWidth
-                        error={Boolean(errors.email)}
-                        helperText={errors.email}
-                    />
+                    <Field id="password" label="Password" error={errors.password}>
+                        <input
+                            id="password"
+                            name="password"
+                            autoComplete="new-password"
+                            type="password"
+                            required
+                            tabIndex={5}
+                            value={data.password}
+                            onChange={(e) => setData('password', e.target.value)}
+                            disabled={processing}
+                            placeholder="Password"
+                            aria-invalid={Boolean(errors.password)}
+                            className={cx(field.input, errors.password && field.invalid)}
+                        />
+                    </Field>
 
-                    <TextField
-                        id="password"
-                        type="password"
-                        label="Password"
-                        required
-                        tabIndex={5}
-                        autoComplete="new-password"
-                        value={data.password}
-                        onChange={(e) => setData('password', e.target.value)}
-                        disabled={processing}
-                        placeholder="Password"
-                        fullWidth
-                        error={Boolean(errors.password)}
-                        helperText={errors.password}
-                    />
-
-                    <TextField
-                        id="password_confirmation"
-                        type="password"
-                        label="Confirm password"
-                        required
-                        tabIndex={6}
-                        autoComplete="new-password"
-                        value={data.password_confirmation}
-                        onChange={(e) => setData('password_confirmation', e.target.value)}
-                        disabled={processing}
-                        placeholder="Confirm password"
-                        fullWidth
-                        error={Boolean(errors.password_confirmation)}
-                        helperText={errors.password_confirmation}
-                    />
+                    <Field id="password_confirmation" label="Confirm password" error={errors.password_confirmation}>
+                        <input
+                            id="password_confirmation"
+                            name="password_confirmation"
+                            autoComplete="new-password"
+                            type="password"
+                            required
+                            tabIndex={6}
+                            value={data.password_confirmation}
+                            onChange={(e) => setData('password_confirmation', e.target.value)}
+                            disabled={processing}
+                            placeholder="Confirm password"
+                            aria-invalid={Boolean(errors.password_confirmation)}
+                            className={cx(field.input, errors.password_confirmation && field.invalid)}
+                        />
+                    </Field>
 
                     <Button
-                        type="submit"
-                        variant="contained"
-                        fullWidth
+                        type="Submit"
+                        design="Emphasized"
                         tabIndex={7}
                         disabled={processing}
-                        startIcon={processing ? <CircularProgress size={16} color="inherit" /> : undefined}
-                        sx={{ ...fioriEmphasizedSx, py: 1.25 }}
+                        loading={processing}
+                        loadingDelay={0}
+                        style={{ width: '100%' }}
                     >
                         Create account
                     </Button>
-                </Stack>
+                </FlexBox>
 
-                <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center' }}>
+                <Text style={{ textAlign: 'center', color: 'var(--sapContent_LabelColor)' }}>
                     Already have an account?{' '}
                     <TextLink href={route('login')} tabIndex={8}>
                         Log in
                     </TextLink>
-                </Typography>
-            </Box>
+                </Text>
+            </form>
         </AuthLayout>
     );
 }

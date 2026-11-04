@@ -1,23 +1,18 @@
+import { FioriMessageBox } from '@/components/fiori-message-box';
+import { FioriResponsiveColumn, FioriResponsiveTable } from '@/components/fiori-responsive-table';
+import PagePagination from '@/components/import-export/page-pagination';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem, type SharedData } from '@/types';
 import { Head, router, usePage } from '@inertiajs/react';
-import SearchIcon from '@mui/icons-material/Search';
-import AddIcon from '@mui/icons-material/Add';
-import EditIcon from '@mui/icons-material/Edit';
-import DeleteIcon from '@mui/icons-material/Delete';
-import PlayArrowIcon from '@mui/icons-material/PlayArrow';
-import { Box, Button, CircularProgress, Divider, InputAdornment, Paper, TextField, Typography, IconButton, Pagination, Chip } from '@mui/material';
+import '@ui5/webcomponents-icons/dist/add.js';
+import '@ui5/webcomponents-icons/dist/delete.js';
+import '@ui5/webcomponents-icons/dist/edit.js';
+import '@ui5/webcomponents-icons/dist/play.js';
+import '@ui5/webcomponents-icons/dist/search.js';
+import { Button, Icon, Input, Tag, Title } from '@ui5/webcomponents-react';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FioriResponsiveColumn, FioriResponsiveTable } from '@/components/fiori-responsive-table';
-import { FioriMessageBox } from '@/components/fiori-message-box';
-import {
-    FIORI,
-    fioriCardSx,
-    fioriEmphasizedSx,
-    fioriIconButtonSx,
-    fioriSearchFieldSx,
-} from '@/lib/fiori-style';
+import styles from '../import-export.module.css';
 
 interface ImportConfigItem {
     id: number;
@@ -75,7 +70,7 @@ export default function ImportIndex({ configs, filters }: Props) {
         return () => clearTimeout(timeout);
     }, [search]);
 
-    const handlePageChange = (_: unknown, page: number) => {
+    const handlePageChange = (page: number) => {
         router.get('/import-export/imports', { search, page }, { preserveState: true });
     };
 
@@ -102,7 +97,7 @@ export default function ImportIndex({ configs, filters }: Props) {
             key: 'code',
             header: 'Code',
             priority: 'always',
-            render: (row) => <Typography sx={{ fontWeight: 600 }}>{row.code}</Typography>,
+            render: (row) => <span className={styles.mono}>{row.code}</span>,
         },
         {
             key: 'type',
@@ -122,15 +117,13 @@ export default function ImportIndex({ configs, filters }: Props) {
             priority: 'high',
             render: (row) =>
                 row.source_file_path ? (
-                    <Chip
-                        label={row.source_file_name ?? row.source_file_path.split('/').pop()}
-                        size="small"
-                        sx={{ borderRadius: '6px' }}
-                    />
+                    <Tag design="Neutral" hideStateIcon>
+                        {row.source_file_name ?? row.source_file_path.split('/').pop()}
+                    </Tag>
                 ) : (
-                    <Typography variant="body2" color="text.disabled" sx={{ fontStyle: 'italic' }}>
+                    <span style={{ fontStyle: 'italic', color: 'var(--sapContent_DisabledTextColor, var(--sapContent_LabelColor))' }}>
                         {t('noFileUploaded')}
-                    </Typography>
+                    </span>
                 ),
         },
         {
@@ -139,34 +132,47 @@ export default function ImportIndex({ configs, filters }: Props) {
             priority: 'always',
             align: 'right',
             render: (row) => (
-                <Box sx={{ display: 'flex', gap: 0.5, justifyContent: 'flex-end' }}>
+                <div style={{ display: 'flex', gap: '0.25rem', justifyContent: 'flex-end' }}>
                     {canRun && row.source_file_path && (
-                        <IconButton
-                            size="small"
-                            sx={fioriIconButtonSx}
-                            title={t('importNow')}
+                        <Button
+                            design="Transparent"
+                            icon="play"
+                            tooltip={t('importNow')}
+                            accessibleName={t('importNow')}
                             disabled={runningId === row.id}
+                            loading={runningId === row.id}
+                            loadingDelay={0}
                             onClick={() => {
                                 setRunningId(row.id);
-                                router.post(`/import-export/imports/${row.id}/run`, {}, {
-                                    onFinish: () => setRunningId(null),
-                                });
+                                router.post(
+                                    `/import-export/imports/${row.id}/run`,
+                                    {},
+                                    {
+                                        onFinish: () => setRunningId(null),
+                                    },
+                                );
                             }}
-                        >
-                            {runningId === row.id ? <CircularProgress size={18} color="inherit" /> : <PlayArrowIcon fontSize="small" />}
-                        </IconButton>
+                        />
                     )}
                     {canEdit && (
-                        <IconButton size="small" sx={fioriIconButtonSx} onClick={() => router.visit(`/import-export/imports/${row.id}/edit`)}>
-                            <EditIcon fontSize="small" />
-                        </IconButton>
+                        <Button
+                            design="Transparent"
+                            icon="edit"
+                            tooltip={tGrid('rowActions.edit')}
+                            accessibleName={tGrid('rowActions.edit')}
+                            onClick={() => router.visit(`/import-export/imports/${row.id}/edit`)}
+                        />
                     )}
                     {canDelete && (
-                        <IconButton size="small" sx={fioriIconButtonSx} onClick={() => setDeleteId(row.id)}>
-                            <DeleteIcon fontSize="small" />
-                        </IconButton>
+                        <Button
+                            design="Transparent"
+                            icon="delete"
+                            tooltip={tGrid('rowActions.delete')}
+                            accessibleName={tGrid('rowActions.delete')}
+                            onClick={() => setDeleteId(row.id)}
+                        />
                     )}
-                </Box>
+                </div>
             ),
         },
     ];
@@ -174,43 +180,34 @@ export default function ImportIndex({ configs, filters }: Props) {
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={t('importsTitle')} />
-            <Box sx={{ p: 4, bgcolor: FIORI.pageBg, minHeight: '100%' }}>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 2, mb: 3 }}>
-                    <Box>
-                        <Typography variant="h5" fontWeight={600} sx={{ color: FIORI.textPrimary }}>{t('importsTitle')}</Typography>
-                        <Typography variant="body2" sx={{ color: FIORI.textSecondary, mt: 0.25 }}>{tGrid('results', { count: configs.total })}</Typography>
-                    </Box>
+            <div className={styles.page}>
+                <div className={styles.header}>
+                    <div>
+                        <Title level="H3" size="H3" wrappingType="Normal">
+                            {t('importsTitle')}
+                        </Title>
+                        <div className={styles.secondaryText} style={{ marginTop: '0.125rem' }}>
+                            {tGrid('results', { count: configs.total })}
+                        </div>
+                    </div>
                     {canCreate && (
-                        <Button
-                            variant="contained"
-                            startIcon={<AddIcon />}
-                            onClick={() => router.visit('/import-export/imports/create')}
-                            sx={fioriEmphasizedSx}
-                        >
+                        <Button design="Emphasized" icon="add" onClick={() => router.visit('/import-export/imports/create')}>
                             {t('createImport')}
                         </Button>
                     )}
-                </Box>
+                </div>
 
-                <Paper elevation={0} sx={fioriCardSx}>
-                    <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center', p: 2 }}>
-                        <TextField
+                <div className={styles.card}>
+                    <div className={styles.toolbar}>
+                        <Input
                             value={search}
-                            onChange={(event) => setSearch(event.target.value)}
+                            onInput={(event) => setSearch(event.target.value)}
                             placeholder={t('searchImports')}
-                            size="small"
-                            sx={{ ...fioriSearchFieldSx, minWidth: 280 }}
-                            InputProps={{
-                                startAdornment: (
-                                    <InputAdornment position="start">
-                                        <SearchIcon sx={{ color: FIORI.textSecondary, fontSize: 20 }} />
-                                    </InputAdornment>
-                                ),
-                            }}
+                            showClearIcon
+                            icon={<Icon name="search" />}
+                            style={{ minWidth: 280, maxWidth: '100%' }}
                         />
-                    </Box>
-
-                    <Divider sx={{ borderColor: FIORI.border }} />
+                    </div>
 
                     <FioriResponsiveTable
                         variant="plain"
@@ -219,22 +216,10 @@ export default function ImportIndex({ configs, filters }: Props) {
                         getRowKey={(row) => row.id}
                         emptyMessage={t('noImportsFound')}
                     />
-                </Paper>
+                </div>
 
-                {configs.last_page > 1 && (
-                    <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
-                        <Pagination
-                            count={configs.last_page}
-                            page={configs.current_page}
-                            onChange={handlePageChange}
-                            sx={{
-                                '& .MuiPaginationItem-root': { borderRadius: '6px', color: FIORI.textPrimary },
-                                '& .Mui-selected': { bgcolor: `${FIORI.brand} !important`, color: '#fff' },
-                            }}
-                        />
-                    </Box>
-                )}
-            </Box>
+                {configs.last_page > 1 && <PagePagination count={configs.last_page} page={configs.current_page} onChange={handlePageChange} />}
+            </div>
 
             <FioriMessageBox
                 open={deleteId !== null}

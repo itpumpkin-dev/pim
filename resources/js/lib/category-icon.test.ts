@@ -1,24 +1,32 @@
 import { describe, expect, it } from 'vitest';
-import Inventory2OutlinedIcon from '@mui/icons-material/Inventory2Outlined';
-import ScienceIcon from '@mui/icons-material/Science';
-import { CATEGORY_ICONS, getCategoryIcon } from './category-icon';
+import { CATEGORY_ICON_NAMES, DEFAULT_CATEGORY_ICON_NAME, getCategoryIconName } from './category-icon';
 
-describe('getCategoryIcon', () => {
-    it('returns the mapped icon for a known category', () => {
-        expect(getCategoryIcon('เคมีภัณฑ์และกาว')).toBe(ScienceIcon);
+describe('getCategoryIconName', () => {
+    it('returns the mapped UI5 icon name for a known category', () => {
+        expect(getCategoryIconName('เคมีภัณฑ์และกาว')).toBe('lab');
     });
 
-    it('falls back to the generic Inventory2Outlined icon for an unmapped category', () => {
-        expect(getCategoryIcon('หมวดหมู่ที่ไม่รู้จัก')).toBe(Inventory2OutlinedIcon);
+    it('falls back to the generic inventory icon for an unmapped category', () => {
+        expect(DEFAULT_CATEGORY_ICON_NAME).toBe('inventory');
+        expect(getCategoryIconName('หมวดหมู่ที่ไม่รู้จัก')).toBe('inventory');
     });
 
     it('falls back for an empty string', () => {
-        expect(getCategoryIcon('')).toBe(Inventory2OutlinedIcon);
+        expect(getCategoryIconName('')).toBe('inventory');
     });
 
-    it('every entry in CATEGORY_ICONS resolves to itself through getCategoryIcon', () => {
-        for (const category of Object.keys(CATEGORY_ICONS)) {
-            expect(getCategoryIcon(category)).toBe(CATEGORY_ICONS[category]);
+    it('every entry in CATEGORY_ICON_NAMES resolves to itself through getCategoryIconName', () => {
+        for (const category of Object.keys(CATEGORY_ICON_NAMES)) {
+            expect(getCategoryIconName(category)).toBe(CATEGORY_ICON_NAMES[category]);
+        }
+    });
+
+    it('maps every one of the 19 seeded top-level categories to a non-empty icon name', () => {
+        const names = Object.values(CATEGORY_ICON_NAMES);
+        expect(names).toHaveLength(19);
+        for (const name of names) {
+            expect(typeof name).toBe('string');
+            expect(name.length).toBeGreaterThan(0);
         }
     });
 });

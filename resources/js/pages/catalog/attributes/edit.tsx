@@ -1,19 +1,18 @@
-import LocaleLabelFields from '@/components/catalog/locale-label-fields';
 import { AttributeOptionsPanel, type AttributeOptionItem } from '@/components/catalog/attribute-options-panel';
+import LocaleLabelFields from '@/components/catalog/locale-label-fields';
+import { FioriField, FioriFormErrorSummary, FioriFormGroup, FioriMessageStrip, ui5ValueState, valueStateOf } from '@/components/fiori-form';
 import { HistoryPanel } from '@/components/history-panel';
 import { useUnsavedChangesGuard } from '@/hooks/use-unsaved-changes-guard';
 import AppLayout from '@/layouts/app-layout';
+import { codeHintKey, normalizeCodeInput, type CodeEditState } from '@/lib/code-field';
 import { type BreadcrumbItem } from '@/types';
-import { Head, Link, router, useForm } from '@inertiajs/react';
-import ArrowBackIcon from '@mui/icons-material/ArrowBack';
-import SaveIcon from '@mui/icons-material/Save';
-import { Box, Button, Checkbox, CircularProgress, FormControl, FormControlLabel, MenuItem, Select, Stack, Tab, Tabs, TextField, Typography } from '@mui/material';
+import { Head, router, useForm } from '@inertiajs/react';
+import '@ui5/webcomponents-icons/dist/nav-back.js';
+import '@ui5/webcomponents-icons/dist/save.js';
+import { Button, CheckBox, FlexBox, Input, Option, Select, Tab, TabContainer, Title, Link as Ui5Link } from '@ui5/webcomponents-react';
 import type { FormEvent } from 'react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FioriField, FioriFormErrorSummary, FioriFormGroup, FioriMessageStrip, fioriFieldStateSx, valueStateOf } from '@/components/fiori-form';
-import { FIORI, fioriDefaultSx, fioriEmphasizedSx, fioriTabsSx } from '@/lib/fiori-style';
-import { type CodeEditState, codeHintKey, normalizeCodeInput } from '@/lib/code-field';
 
 const swatchTypeKeys: Record<string, string> = {
     text: 'swatchTypeText',
@@ -74,7 +73,16 @@ interface Props extends CodeEditState {
     canViewHistory?: boolean;
 }
 
-export default function AttributeEdit({ attribute, translations, options = [], masterSources = [], apiSources = [], canViewHistory = false, canEditCode = false, codeLocked = false }: Props) {
+export default function AttributeEdit({
+    attribute,
+    translations,
+    options = [],
+    masterSources = [],
+    apiSources = [],
+    canViewHistory = false,
+    canEditCode = false,
+    codeLocked = false,
+}: Props) {
     const { t } = useTranslation('catalog');
     const { t: tNav } = useTranslation('nav');
     const [tabIndex, setTabIndex] = useState(0);
@@ -122,9 +130,7 @@ export default function AttributeEdit({ attribute, translations, options = [], m
         translations: translations || {},
     });
     const skipNavigationGuardRef = useUnsavedChangesGuard(isDirty);
-    const [sourceType, setSourceType] = useState<SourceType>(
-        attribute.master_source ? 'master' : attribute.api_source_id ? 'api' : 'none',
-    );
+    const [sourceType, setSourceType] = useState<SourceType>(attribute.master_source ? 'master' : attribute.api_source_id ? 'api' : 'none');
 
     const showSwatchType = data.type === 'select' || data.type === 'multiselect';
 
@@ -151,8 +157,8 @@ export default function AttributeEdit({ attribute, translations, options = [], m
     const masterBound = data.master_source !== '';
     const apiBound = data.api_source_id !== '';
 
-    const submit = (event: FormEvent) => {
-        event.preventDefault();
+    const submit = (event?: FormEvent) => {
+        event?.preventDefault();
         skipNavigationGuardRef.current = true;
         put(`/catalog/attributes/${attribute.id}`, {
             onSuccess: () => router.visit('/catalog/attributes', { replace: true }),
@@ -165,204 +171,258 @@ export default function AttributeEdit({ attribute, translations, options = [], m
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={`${t('editAttributeTitle')}: ${attribute.code}`} />
-            <Box component="form" onSubmit={submit} sx={{ p: { xs: 2, md: 4 }, bgcolor: FIORI.pageBg, minHeight: '100%', width: '100%' }}>
+            <form
+                onSubmit={submit}
+                style={{
+                    padding: 'clamp(1rem, 3vw, 2rem)',
+                    background: 'var(--sapBackgroundColor)',
+                    minHeight: '100%',
+                    width: '100%',
+                    boxSizing: 'border-box',
+                }}
+            >
                 {canViewHistory && (
-                    <Tabs
-                        value={tabIndex}
-                        onChange={(_, v) => setTabIndex(v)}
-                        sx={{ ...fioriTabsSx, mb: 3 }}
-                    >
-                        <Tab label="General" />
-                        <Tab label="History" />
-                    </Tabs>
+                    <TabContainer collapsed onTabSelect={(event) => setTabIndex(event.detail.tabIndex)} style={{ marginBottom: '1.5rem' }}>
+                        <Tab text="General" selected={tabIndex === 0} />
+                        <Tab text="History" selected={tabIndex === 1} />
+                    </TabContainer>
                 )}
 
                 {tabIndex === 1 && canViewHistory && <HistoryPanel historyUrl={`/catalog/attributes/${attribute.id}/history`} />}
 
                 {tabIndex === 0 && (
-                <>
-                <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ sm: 'center' }} spacing={2} sx={{ mb: 3 }}>
-                    <Typography variant="h5" fontWeight={600} sx={{ color: FIORI.textPrimary }}>{t('editAttributeTitle')}</Typography>
-                    <Stack direction="row" spacing={1}>
-                        <Button component={Link} href="/catalog/attributes" variant="outlined" startIcon={<ArrowBackIcon />} sx={fioriDefaultSx}>{t('back')}</Button>
-                        <Button
-                            type="submit"
-                            variant="contained"
-                            disabled={processing}
-                            startIcon={processing ? <CircularProgress size={16} color="inherit" /> : <SaveIcon />}
-                            sx={{ ...fioriEmphasizedSx, px: 2.5 }}
-                        >
-                            {processing ? t('saving') : t('saveAttribute')}
-                        </Button>
-                    </Stack>
-                </Stack>
+                    <>
+                        <FlexBox justifyContent="SpaceBetween" alignItems="Center" wrap="Wrap" style={{ gap: '1rem', marginBottom: '1.5rem' }}>
+                            <Title level="H3">{t('editAttributeTitle')}</Title>
+                            <FlexBox style={{ gap: '0.5rem' }}>
+                                <Button icon="nav-back" onClick={() => router.visit('/catalog/attributes')}>
+                                    {t('back')}
+                                </Button>
+                                <Button design="Emphasized" icon="save" disabled={processing} onClick={() => submit()}>
+                                    {processing ? t('saving') : t('saveAttribute')}
+                                </Button>
+                            </FlexBox>
+                        </FlexBox>
 
-                <Stack spacing={2} sx={{ maxWidth: 760 }}>
-                    <FioriFormGroup title={t('generalTitle')}>
-                        <FioriField label={t('code')} htmlFor="attribute-code" hint={t(codeHintKey({ canEditCode, codeLocked }))} valueState={valueStateOf(errors.code)} message={errors.code}>
-                            <TextField
-                                id="attribute-code"
-                                fullWidth
-                                size="small"
-                                value={data.code}
-                                disabled={!canEditCode}
-                                onChange={(e) => setData('code', normalizeCodeInput(e.target.value))}
-                                inputProps={{ maxLength: 45 }}
-                                sx={fioriFieldStateSx(valueStateOf(errors.code))}
-                            />
-                        </FioriField>
+                        <FlexBox direction="Column" style={{ gap: '1rem', maxWidth: 760 }}>
+                            <FioriFormGroup title={t('generalTitle')}>
+                                <FioriField
+                                    label={t('code')}
+                                    htmlFor="attribute-code"
+                                    hint={t(codeHintKey({ canEditCode, codeLocked }))}
+                                    valueState={valueStateOf(errors.code)}
+                                    message={errors.code}
+                                >
+                                    <Input
+                                        id="attribute-code"
+                                        style={{ width: '100%' }}
+                                        value={data.code}
+                                        disabled={!canEditCode}
+                                        maxlength={45}
+                                        valueState={ui5ValueState(valueStateOf(errors.code))}
+                                        onInput={(e) => setData('code', normalizeCodeInput(e.target.value))}
+                                    />
+                                </FioriField>
 
-                        <FioriField label={t('typeLabel')} htmlFor="attribute-type" required valueState={valueStateOf(errors.type)} message={errors.type}>
-                            <FormControl fullWidth size="small" sx={fioriFieldStateSx(valueStateOf(errors.type))}>
-                                <Select id="attribute-type" value={data.type} onChange={(event) => handleTypeChange(event.target.value)}>
-                                    {attributeTypes.map((type) => <MenuItem key={type.value} value={type.value}>{type.label}</MenuItem>)}
-                                </Select>
-                            </FormControl>
-                        </FioriField>
-
-                        {showSwatchType && (
-                            <FioriField
-                                label={t('swatchTypeLabel')}
-                                htmlFor="attribute-swatch-type"
-                                required
-                                valueState={valueStateOf(errors.swatch_type)}
-                                message={errors.swatch_type}
-                            >
-                                <FormControl fullWidth size="small" sx={fioriFieldStateSx(valueStateOf(errors.swatch_type))}>
-                                    <Select id="attribute-swatch-type" value={data.swatch_type} onChange={(event) => setData('swatch_type', event.target.value)}>
-                                        {swatchTypes.map((type) => <MenuItem key={type.value} value={type.value}>{type.label}</MenuItem>)}
-                                    </Select>
-                                </FormControl>
-                            </FioriField>
-                        )}
-
-                        {showSwatchType && (
-                            <FioriField label={t('sourceTypeLabel')} htmlFor="attribute-source-type">
-                                <FormControl fullWidth size="small">
+                                <FioriField
+                                    label={t('typeLabel')}
+                                    htmlFor="attribute-type"
+                                    required
+                                    valueState={valueStateOf(errors.type)}
+                                    message={errors.type}
+                                >
                                     <Select
-                                        id="attribute-source-type"
-                                        value={sourceType}
-                                        onChange={(event) => handleSourceTypeChange(event.target.value as SourceType)}
+                                        id="attribute-type"
+                                        style={{ width: '100%' }}
+                                        value={data.type}
+                                        valueState={ui5ValueState(valueStateOf(errors.type))}
+                                        onChange={(event) => handleTypeChange(event.detail.selectedOption.value ?? '')}
                                     >
-                                        <MenuItem value="none">{t('sourceTypeNone')}</MenuItem>
-                                        <MenuItem value="master">{t('sourceTypeMaster')}</MenuItem>
-                                        <MenuItem value="api">{t('sourceTypeApi')}</MenuItem>
-                                    </Select>
-                                </FormControl>
-                            </FioriField>
-                        )}
-
-                        {showSwatchType && sourceType === 'master' && (
-                            <FioriField
-                                label={t('masterSourceLabel')}
-                                htmlFor="attribute-master-source"
-                                valueState={valueStateOf(errors.master_source)}
-                                message={errors.master_source}
-                                hint={t('masterSourceHint')}
-                            >
-                                <FormControl fullWidth size="small" sx={fioriFieldStateSx(valueStateOf(errors.master_source))}>
-                                    <Select
-                                        id="attribute-master-source"
-                                        displayEmpty
-                                        value={data.master_source}
-                                        onChange={(event) => setData('master_source', event.target.value)}
-                                    >
-                                        <MenuItem value="">{t('masterSourceNone')}</MenuItem>
-                                        {masterSources.map((source) => (
-                                            <MenuItem key={source.value} value={source.value}>
-                                                {t(source.labelKey)}
-                                            </MenuItem>
+                                        {attributeTypes.map((type) => (
+                                            <Option key={type.value} value={type.value}>
+                                                {type.label}
+                                            </Option>
                                         ))}
                                     </Select>
-                                </FormControl>
-                            </FioriField>
-                        )}
+                                </FioriField>
 
-                        {showSwatchType && sourceType === 'api' && (
-                            <FioriField
-                                label={t('apiSourceLabel')}
-                                htmlFor="attribute-api-source"
-                                valueState={valueStateOf(errors.api_source_id)}
-                                message={errors.api_source_id}
-                            >
-                                <Stack spacing={0.5}>
-                                    <FormControl fullWidth size="small" sx={fioriFieldStateSx(valueStateOf(errors.api_source_id))}>
+                                {showSwatchType && (
+                                    <FioriField
+                                        label={t('swatchTypeLabel')}
+                                        htmlFor="attribute-swatch-type"
+                                        required
+                                        valueState={valueStateOf(errors.swatch_type)}
+                                        message={errors.swatch_type}
+                                    >
                                         <Select
-                                            id="attribute-api-source"
-                                            displayEmpty
-                                            value={data.api_source_id}
-                                            onChange={(event) => setData('api_source_id', event.target.value)}
+                                            id="attribute-swatch-type"
+                                            style={{ width: '100%' }}
+                                            value={data.swatch_type}
+                                            valueState={ui5ValueState(valueStateOf(errors.swatch_type))}
+                                            onChange={(event) => setData('swatch_type', event.detail.selectedOption.value ?? '')}
                                         >
-                                            <MenuItem value="">{t('apiSourceSelectPlaceholder')}</MenuItem>
-                                            {apiSources.map((source) => (
-                                                <MenuItem key={source.id} value={String(source.id)}>
-                                                    {source.name}
-                                                </MenuItem>
+                                            {/* swatch_type เริ่มต้นเป็น '' — option ว่างนี้แทนสถานะ "ยังไม่ได้เลือก" (UI5 Select ต้องมี option ที่ตรงกับ value) */}
+                                            <Option value="" />
+                                            {swatchTypes.map((type) => (
+                                                <Option key={type.value} value={type.value}>
+                                                    {type.label}
+                                                </Option>
                                             ))}
                                         </Select>
-                                    </FormControl>
-                                    <Link href="/catalog/attributes/api-sources/create" style={{ fontSize: 13 }}>
-                                        {t('manageApiSources')}
-                                    </Link>
-                                </Stack>
-                            </FioriField>
-                        )}
-                    </FioriFormGroup>
+                                    </FioriField>
+                                )}
 
-                    <FioriFormGroup title={t('validationsTitle')}>
-                        <FioriField label="">
-                            <FormControlLabel control={<Checkbox checked={data.is_required} onChange={(event) => setData('is_required', event.target.checked)} />} label={t('isRequired')} />
-                        </FioriField>
-                    </FioriFormGroup>
+                                {showSwatchType && (
+                                    <FioriField label={t('sourceTypeLabel')} htmlFor="attribute-source-type">
+                                        <Select
+                                            id="attribute-source-type"
+                                            style={{ width: '100%' }}
+                                            value={sourceType}
+                                            onChange={(event) => handleSourceTypeChange((event.detail.selectedOption.value ?? 'none') as SourceType)}
+                                        >
+                                            <Option value="none">{t('sourceTypeNone')}</Option>
+                                            <Option value="master">{t('sourceTypeMaster')}</Option>
+                                            <Option value="api">{t('sourceTypeApi')}</Option>
+                                        </Select>
+                                    </FioriField>
+                                )}
 
-                    <FioriFormGroup title={t('configurationTitle')}>
-                        <FioriField label="">
-                            <Stack direction={{ xs: 'column', sm: 'row' }} flexWrap="wrap">
-                                <FormControlLabel control={<Checkbox checked={data.is_locale_based} onChange={(event) => setData('is_locale_based', event.target.checked)} />} label={t('valuePerLocale')} />
-                                <FormControlLabel control={<Checkbox checked={data.is_ai_translate} onChange={(event) => setData('is_ai_translate', event.target.checked)} />} label={t('aiTranslate')} />
-                                <FormControlLabel control={<Checkbox checked={data.is_channel_based} onChange={(event) => setData('is_channel_based', event.target.checked)} />} label={t('valuePerChannel')} />
-                                <FormControlLabel control={<Checkbox checked={data.is_filterable} onChange={(event) => setData('is_filterable', event.target.checked)} />} label={t('isFilterable')} />
-                            </Stack>
-                        </FioriField>
-                    </FioriFormGroup>
+                                {showSwatchType && sourceType === 'master' && (
+                                    <FioriField
+                                        label={t('masterSourceLabel')}
+                                        htmlFor="attribute-master-source"
+                                        valueState={valueStateOf(errors.master_source)}
+                                        message={errors.master_source}
+                                        hint={t('masterSourceHint')}
+                                    >
+                                        <Select
+                                            id="attribute-master-source"
+                                            style={{ width: '100%' }}
+                                            value={data.master_source}
+                                            valueState={ui5ValueState(valueStateOf(errors.master_source))}
+                                            onChange={(event) => setData('master_source', event.detail.selectedOption.value ?? '')}
+                                        >
+                                            <Option value="">{t('masterSourceNone')}</Option>
+                                            {masterSources.map((source) => (
+                                                <Option key={source.value} value={source.value}>
+                                                    {t(source.labelKey)}
+                                                </Option>
+                                            ))}
+                                        </Select>
+                                    </FioriField>
+                                )}
 
-                    <LocaleLabelFields
-                        title={t('labelTitle')}
-                        values={data.translations}
-                        onChange={(localeId, value) => setData('translations', { ...data.translations, [localeId]: value })}
-                    />
+                                {showSwatchType && sourceType === 'api' && (
+                                    <FioriField
+                                        label={t('apiSourceLabel')}
+                                        htmlFor="attribute-api-source"
+                                        valueState={valueStateOf(errors.api_source_id)}
+                                        message={errors.api_source_id}
+                                    >
+                                        <FlexBox direction="Column" style={{ gap: '0.25rem', width: '100%' }}>
+                                            <Select
+                                                id="attribute-api-source"
+                                                style={{ width: '100%' }}
+                                                value={data.api_source_id}
+                                                valueState={ui5ValueState(valueStateOf(errors.api_source_id))}
+                                                onChange={(event) => setData('api_source_id', event.detail.selectedOption.value ?? '')}
+                                            >
+                                                <Option value="">{t('apiSourceSelectPlaceholder')}</Option>
+                                                {apiSources.map((source) => (
+                                                    <Option key={source.id} value={String(source.id)}>
+                                                        {source.name}
+                                                    </Option>
+                                                ))}
+                                            </Select>
+                                            <Ui5Link
+                                                href="/catalog/attributes/api-sources/create"
+                                                onClick={(event) => {
+                                                    event.preventDefault();
+                                                    router.visit('/catalog/attributes/api-sources/create');
+                                                }}
+                                                style={{ fontSize: 'var(--sapFontSmallSize)' }}
+                                            >
+                                                {t('manageApiSources')}
+                                            </Ui5Link>
+                                        </FlexBox>
+                                    </FioriField>
+                                )}
+                            </FioriFormGroup>
 
-                    {showSwatchType && (
-                        <FioriFormGroup title={t('optionsTitle')}>
-                            {masterBound && (
-                                <FioriMessageStrip severity="information" sx={{ mb: 2 }}>
-                                    {t('masterSourceOptionsCustomizable', {
-                                        source: t(masterSources.find((s) => s.value === data.master_source)?.labelKey ?? data.master_source),
-                                    })}
-                                </FioriMessageStrip>
-                            )}
-                            {apiBound && (
-                                <FioriMessageStrip severity="information" sx={{ mb: 2 }}>
-                                    {t('apiSourceOptionsCustomizable', {
-                                        source: apiSources.find((s) => String(s.id) === data.api_source_id)?.name ?? t('apiSourceLabel'),
-                                    })}
-                                </FioriMessageStrip>
-                            )}
-                            <AttributeOptionsPanel
-                                attributeId={attribute.id}
-                                swatchType={data.swatch_type}
-                                options={options}
-                                isMasterBound={masterBound}
-                                isApiBound={apiBound}
+                            <FioriFormGroup title={t('validationsTitle')}>
+                                <FioriField label="">
+                                    <CheckBox
+                                        text={t('isRequired')}
+                                        checked={data.is_required}
+                                        onChange={(event) => setData('is_required', event.target.checked)}
+                                    />
+                                </FioriField>
+                            </FioriFormGroup>
+
+                            <FioriFormGroup title={t('configurationTitle')}>
+                                <FioriField label="">
+                                    <FlexBox wrap="Wrap" style={{ columnGap: '1rem' }}>
+                                        <CheckBox
+                                            text={t('valuePerLocale')}
+                                            checked={data.is_locale_based}
+                                            onChange={(event) => setData('is_locale_based', event.target.checked)}
+                                        />
+                                        <CheckBox
+                                            text={t('aiTranslate')}
+                                            checked={data.is_ai_translate}
+                                            onChange={(event) => setData('is_ai_translate', event.target.checked)}
+                                        />
+                                        <CheckBox
+                                            text={t('valuePerChannel')}
+                                            checked={data.is_channel_based}
+                                            onChange={(event) => setData('is_channel_based', event.target.checked)}
+                                        />
+                                        <CheckBox
+                                            text={t('isFilterable')}
+                                            checked={data.is_filterable}
+                                            onChange={(event) => setData('is_filterable', event.target.checked)}
+                                        />
+                                    </FlexBox>
+                                </FioriField>
+                            </FioriFormGroup>
+
+                            <LocaleLabelFields
+                                title={t('labelTitle')}
+                                values={data.translations}
+                                onChange={(localeId, value) => setData('translations', { ...data.translations, [localeId]: value })}
                             />
-                        </FioriFormGroup>
-                    )}
-                </Stack>
 
-                <FioriFormErrorSummary errors={errors} message={t('correctHighlightedFields')} sx={{ mt: 2, maxWidth: 760 }} />
-                </>
+                            {showSwatchType && (
+                                <FioriFormGroup title={t('optionsTitle')}>
+                                    {masterBound && (
+                                        <FioriMessageStrip severity="information" style={{ marginBottom: '1rem' }}>
+                                            {t('masterSourceOptionsCustomizable', {
+                                                source: t(masterSources.find((s) => s.value === data.master_source)?.labelKey ?? data.master_source),
+                                            })}
+                                        </FioriMessageStrip>
+                                    )}
+                                    {apiBound && (
+                                        <FioriMessageStrip severity="information" style={{ marginBottom: '1rem' }}>
+                                            {t('apiSourceOptionsCustomizable', {
+                                                source: apiSources.find((s) => String(s.id) === data.api_source_id)?.name ?? t('apiSourceLabel'),
+                                            })}
+                                        </FioriMessageStrip>
+                                    )}
+                                    <AttributeOptionsPanel
+                                        attributeId={attribute.id}
+                                        swatchType={data.swatch_type}
+                                        options={options}
+                                        isMasterBound={masterBound}
+                                        isApiBound={apiBound}
+                                    />
+                                </FioriFormGroup>
+                            )}
+                        </FlexBox>
+
+                        <FioriFormErrorSummary errors={errors} message={t('correctHighlightedFields')} style={{ marginTop: '1rem', maxWidth: 760 }} />
+                    </>
                 )}
-            </Box>
+            </form>
         </AppLayout>
     );
 }

@@ -1,8 +1,8 @@
-import { ListSubheader, MenuItem, Select } from '@mui/material';
-import { useTranslation } from 'react-i18next';
 import { AttributeMappingTable } from '@/components/catalog/attribute-mapping-table';
 import { CoverageStat } from '@/components/catalog/mapping-coverage-summary';
+import { MappingTargetSelect } from '@/components/catalog/marketplace-mapping-ui';
 import { MappingAttributeRow, useAttributeMapping } from '@/hooks/use-attribute-mapping';
+import { useTranslation } from 'react-i18next';
 
 type TargetField =
     | 'description'
@@ -35,7 +35,7 @@ const STRUCTURED_FIELDS: TargetField[] = ['name', 'price', 'image', 'qty', 'weig
 // ค่าของ target Select จะเป็น string ของ TargetField ธรรมดาสำหรับ target
 // ที่ตายตัวทุกตัว แต่ถ้าเป็นการ mapping ไป WooCommerce Product Attribute
 // ต้องแนบด้วยว่า *ตัวไหน* — เลยเข้ารหัสเป็น prefix นี้ + id (เช่น
-// "wc_attribute:7") เพื่อให้ MUI Select ตัวเดียวแทนทั้งสองแบบได้ โดยไม่ต้อง
+// "wc_attribute:7") เพื่อให้ Select ตัวเดียวแทนทั้งสองแบบได้ โดยไม่ต้อง
 // มี control ตัวที่สอง
 const WC_ATTRIBUTE_PREFIX = 'wc_attribute:';
 
@@ -64,7 +64,7 @@ export interface WooCommerceAttributeMappingPanelProps {
 // ชื่อฟิลด์เป็น snake_case (ตรงกับค่า target_field ฝั่ง backend) แต่ i18n key
 // ของแอปนี้เป็น camelCase — เลยต้อง map ตรงๆ แบบนี้ ไม่ใช้วิธีเดา
 // ว่า `t(field)` จะ resolve ได้เอง เพราะจะพังเงียบๆ กับ short_description
-// 'wc_attribute' ไม่มี label ตายตัวตรงนี้ — MenuItem ของมันจะแสดงชื่อจริงของ
+// 'wc_attribute' ไม่มี label ตายตัวตรงนี้ — Option ของมันจะแสดงชื่อจริงของ
 // WooCommerce attribute ที่ sync มาแทน (ดู WC_ATTRIBUTE_PREFIX)
 const FIELD_LABEL_KEYS: Record<Exclude<TargetField, '' | 'wc_attribute'>, string> = {
     description: 'description',
@@ -148,21 +148,31 @@ export function WooCommerceAttributeMappingPanel({ attributes, wooCommerceAttrib
             syncing={mapping.syncing}
             onSync={mapping.syncFromPlatform}
             renderMapToCell={(row) => (
-                <Select value={buildTargetValue(row)} onChange={(e) => applySelectValue(row, e.target.value)} size="small" fullWidth>
-                    <MenuItem value="">{t('notUsed')}</MenuItem>
-                    <ListSubheader>{t('contentFieldsGroup')}</ListSubheader>
-                    {CONTENT_FIELDS.map((field) => (
-                        <MenuItem key={field} value={field}>{t(FIELD_LABEL_KEYS[field as Exclude<TargetField, '' | 'wc_attribute'>])}</MenuItem>
-                    ))}
-                    <ListSubheader>{t('productFieldsGroup')}</ListSubheader>
-                    {STRUCTURED_FIELDS.map((field) => (
-                        <MenuItem key={field} value={field}>{t(FIELD_LABEL_KEYS[field as Exclude<TargetField, '' | 'wc_attribute'>])}</MenuItem>
-                    ))}
-                    <ListSubheader>{t('wcAttributesGroup')}</ListSubheader>
-                    {wooCommerceAttributes.map((wa) => (
-                        <MenuItem key={`wc_attribute:${wa.id}`} value={`${WC_ATTRIBUTE_PREFIX}${wa.id}`}>{wa.name}</MenuItem>
-                    ))}
-                </Select>
+                <MappingTargetSelect
+                    value={buildTargetValue(row)}
+                    onChange={(value) => applySelectValue(row, value)}
+                    emptyLabel={t('notUsed')}
+                    groups={[
+                        {
+                            header: t('contentFieldsGroup'),
+                            options: CONTENT_FIELDS.map((field) => ({
+                                value: field,
+                                label: t(FIELD_LABEL_KEYS[field as Exclude<TargetField, '' | 'wc_attribute'>]),
+                            })),
+                        },
+                        {
+                            header: t('productFieldsGroup'),
+                            options: STRUCTURED_FIELDS.map((field) => ({
+                                value: field,
+                                label: t(FIELD_LABEL_KEYS[field as Exclude<TargetField, '' | 'wc_attribute'>]),
+                            })),
+                        },
+                        {
+                            header: t('wcAttributesGroup'),
+                            options: wooCommerceAttributes.map((wa) => ({ value: `${WC_ATTRIBUTE_PREFIX}${wa.id}`, label: wa.name })),
+                        },
+                    ]}
+                />
             )}
         />
     );

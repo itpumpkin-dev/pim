@@ -1,29 +1,17 @@
-import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown';
-import DownloadIcon from '@mui/icons-material/Download';
-import SearchIcon from '@mui/icons-material/Search';
-import SyncIcon from '@mui/icons-material/Sync';
-import {
-    Box,
-    Button,
-    Chip,
-    CircularProgress,
-    InputAdornment,
-    Menu,
-    MenuItem,
-    Select,
-    Stack,
-    TextField,
-    Typography,
-} from '@mui/material';
-import { useState, type ReactNode } from 'react';
+import '@ui5/webcomponents-icons/dist/download.js';
+import '@ui5/webcomponents-icons/dist/slim-arrow-down.js';
+import { Button, Input, Menu, MenuItem, Option, Select, Tag, type ButtonDomRef } from '@ui5/webcomponents-react';
+import { useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
+
 import { CoverageStat, MappingCoverageSummary } from '@/components/catalog/mapping-coverage-summary';
+import { MappingSearchInput, MappingSyncButton, mappingStyles } from '@/components/catalog/marketplace-mapping-ui';
 import { FioriResponsiveColumn, FioriResponsiveTable } from '@/components/fiori-responsive-table';
-import { useLocale } from '@/hooks/use-locale';
 import { MappingAttributeRow } from '@/hooks/use-attribute-mapping';
-import { FIORI, fioriDefaultSx, fioriEmphasizedSx, fioriSearchFieldSx } from '@/lib/fiori-style';
+import { useLocale } from '@/hooks/use-locale';
 import { encodeQueryParams } from '@/lib/query-string';
-import { mappedChipSx, naChipSx, pendingRowSx } from '@/lib/ui-style';
+
+import styles from './attribute-mapping-table.module.css';
 
 export interface AttributeMappingTableProps {
     /** แท็บของตลาดไหนอยู่ — ใช้ระบุว่าจะ export ชุดข้อมูลไหนใน `MarketplaceAttributeMappingController::export()` */
@@ -86,7 +74,8 @@ export function AttributeMappingTable({
 }: AttributeMappingTableProps) {
     const { t } = useTranslation('catalog');
     const { locale } = useLocale();
-    const [exportAnchor, setExportAnchor] = useState<HTMLElement | null>(null);
+    const [exportOpen, setExportOpen] = useState(false);
+    const exportButtonRef = useRef<ButtonDomRef | null>(null);
 
     // ลำดับความสำคัญของคอลัมน์ตอนจอเล็ก (SAP Fiori responsive table): คอลัมน์
     // ที่ใช้ระบุตัวตน กับ select "Map to" — ฟิลด์ที่กำลังแก้ไขจริงๆ ตรงนี้ — จะ
@@ -99,12 +88,12 @@ export function AttributeMappingTable({
             priority: 'always',
             minWidth: 220,
             render: (row) => (
-                <>
-                    <Typography fontWeight={600}>{row.label}</Typography>
-                    <Typography variant="caption" color="text.secondary" sx={{ fontFamily: 'monospace' }}>
+                <div className={mappingStyles.stack}>
+                    <span className={mappingStyles.primary}>{row.label}</span>
+                    <span className={styles.code}>
                         {row.code} · {row.type}
-                    </Typography>
-                </>
+                    </span>
+                </div>
             ),
         },
         {
@@ -115,14 +104,12 @@ export function AttributeMappingTable({
                 const mapped = isMapped(row);
                 const caption = statusCaption(row);
                 return (
-                    <>
-                        <Chip label={mapped ? t('statusMapped') : t('statusUnmapped')} size="small" sx={mapped ? mappedChipSx : naChipSx} />
-                        {mapped && caption && (
-                            <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.5 }}>
-                                {caption}
-                            </Typography>
-                        )}
-                    </>
+                    <div className={mappingStyles.stack}>
+                        <Tag design={mapped ? 'Positive' : 'Neutral'} hideStateIcon>
+                            {mapped ? t('statusMapped') : t('statusUnmapped')}
+                        </Tag>
+                        {mapped && caption && <span className={mappingStyles.caption}>{caption}</span>}
+                    </div>
                 );
             },
         },
@@ -141,13 +128,12 @@ export function AttributeMappingTable({
             width: 110,
             render: (row) =>
                 isMapped(row) ? (
-                    <TextField
-                        type="number"
-                        size="small"
-                        value={sortOrderFor(row)}
-                        onChange={(e) => onSortOrderChange(row, Number(e.target.value) || 0)}
-                        sx={{ width: 90 }}
-                        slotProps={{ htmlInput: { min: 0 } }}
+                    <Input
+                        type="Number"
+                        style={{ width: 90 }}
+                        value={String(sortOrderFor(row))}
+                        accessibleName={t('sortOrder')}
+                        onInput={(e) => onSortOrderChange(row, Number(e.target.value) || 0)}
                     />
                 ) : null,
         },
@@ -160,95 +146,63 @@ export function AttributeMappingTable({
         // ดูคอมเมนต์ที่นั่น
         const params = encodeQueryParams({ platform, format, search, status, locale });
         window.location.href = `/catalog/marketplace/attribute-mapping/export?${params.join('&')}`;
-        setExportAnchor(null);
+        setExportOpen(false);
     };
 
     return (
-        <Box>
-            <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" alignItems={{ md: 'flex-start' }} spacing={2} sx={{ mb: 3 }}>
-                <Typography sx={{ color: FIORI.textSecondary, maxWidth: 840 }}>
-                    {t(helpTextKey)}
-                </Typography>
+        <div>
+            <div className={styles.header}>
+                <span className={styles.helpText}>{t(helpTextKey)}</span>
 
-                <Stack direction="row" spacing={1.5} sx={{ flexShrink: 0 }}>
-                    <Button
-                        variant="outlined"
-                        startIcon={<DownloadIcon />}
-                        endIcon={<ArrowDropDownIcon />}
-                        onClick={(e) => setExportAnchor(e.currentTarget)}
-                        sx={fioriDefaultSx}
-                    >
+                <div className={styles.headerActions}>
+                    <Button ref={exportButtonRef} icon="download" endIcon="slim-arrow-down" onClick={() => setExportOpen((open) => !open)}>
                         {t('quickExport')}
                     </Button>
-                    <Menu anchorEl={exportAnchor} open={Boolean(exportAnchor)} onClose={() => setExportAnchor(null)}>
-                        <MenuItem onClick={() => handleExport('csv')}>CSV</MenuItem>
-                        <MenuItem onClick={() => handleExport('xlsx')}>XLSX</MenuItem>
+                    <Menu
+                        open={exportOpen}
+                        opener={exportButtonRef.current ?? undefined}
+                        onClose={() => setExportOpen(false)}
+                        onItemClick={(e) => handleExport((e.detail.item as HTMLElement).dataset.format as 'csv' | 'xlsx')}
+                    >
+                        <MenuItem text="CSV" data-format="csv" />
+                        <MenuItem text="XLSX" data-format="xlsx" />
                     </Menu>
 
-                    <Button
-                        variant="outlined"
-                        disabled={syncing}
-                        onClick={onSync}
-                        startIcon={syncing ? <CircularProgress size={16} /> : <SyncIcon fontSize="small" />}
-                        sx={fioriDefaultSx}
-                    >
+                    <MappingSyncButton busy={syncing} onClick={onSync}>
                         {t(syncLabelKey)}
-                    </Button>
+                    </MappingSyncButton>
 
-                    <Button
-                        variant="contained"
-                        disabled={pendingCount === 0 || saving}
-                        onClick={onSave}
-                        startIcon={saving ? <CircularProgress size={16} color="inherit" /> : undefined}
-                        sx={fioriEmphasizedSx}
-                    >
-                        {t('saveChanges')}{pendingCount > 0 ? ` (${pendingCount})` : ''}
+                    <Button design="Emphasized" disabled={pendingCount === 0 || saving} loading={saving} loadingDelay={0} onClick={onSave}>
+                        {t('saveChanges')}
+                        {pendingCount > 0 ? ` (${pendingCount})` : ''}
                     </Button>
-                </Stack>
-            </Stack>
+                </div>
+            </div>
 
             <MappingCoverageSummary payloadFields={coverage.payloadFields} platformAttributes={coverage.platformAttributes} />
 
-            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} sx={{ mb: 2 }}>
-                <TextField
-                    value={search}
-                    onChange={(event) => onSearchChange(event.target.value)}
-                    placeholder={t('searchAttributes')}
-                    size="small"
-                    sx={{ ...fioriSearchFieldSx, minWidth: 320 }}
-                    InputProps={{
-                        startAdornment: (
-                            <InputAdornment position="start">
-                                <SearchIcon sx={{ color: FIORI.textSecondary, fontSize: 20 }} />
-                            </InputAdornment>
-                        ),
-                    }}
-                />
+            <div className={styles.filters}>
+                <MappingSearchInput value={search} onChange={onSearchChange} placeholder={t('searchAttributes')} />
 
                 <Select
+                    className={styles.statusSelect}
                     value={status}
-                    onChange={(e) => onStatusChange(e.target.value as 'all' | 'mapped' | 'unmapped')}
-                    size="small"
-                    sx={{
-                        minWidth: 160,
-                        bgcolor: FIORI.surface,
-                        borderRadius: '8px',
-                        '& .MuiOutlinedInput-notchedOutline': { borderColor: FIORI.border },
-                    }}
+                    accessibleName={t('status')}
+                    onChange={(e) => onStatusChange(e.detail.selectedOption.value as 'all' | 'mapped' | 'unmapped')}
                 >
-                    <MenuItem value="all">{t('statusAll')}</MenuItem>
-                    <MenuItem value="mapped">{t('statusMapped')}</MenuItem>
-                    <MenuItem value="unmapped">{t('statusUnmapped')}</MenuItem>
+                    <Option value="all">{t('statusAll')}</Option>
+                    <Option value="mapped">{t('statusMapped')}</Option>
+                    <Option value="unmapped">{t('statusUnmapped')}</Option>
                 </Select>
-            </Stack>
+            </div>
 
             <FioriResponsiveTable
                 columns={columns}
                 rows={filtered}
-                getRowKey={(row) => row.id}
-                rowSx={(row) => pendingRowSx(hasPendingChange(row))}
+                getRowKey={(row: MappingAttributeRow) => row.id}
+                rowClassName={(row: MappingAttributeRow) => (hasPendingChange(row) ? mappingStyles.pendingRow : undefined)}
                 emptyMessage={t('noAttributesFound')}
             />
-        </Box>
+        </div>
     );
 }

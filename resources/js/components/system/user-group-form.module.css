@@ -1,0 +1,58 @@
+.form {
+    display: flex;
+    flex-direction: column;
+    min-height: 100%;
+    background: var(--sapBackgroundColor);
+}
+
+.body {
+    flex: 1;
+    padding: 2rem;
+}
+
+/* Fiori footer action bar — sticky ล่างสุดของ scroll container ของหน้า */
+.footer {
+    position: sticky;
+    bottom: 0;
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.5rem;
+    padding: 1rem 2rem;
+    background: var(--sapGroup_ContentBackground);
+    border-top: 1px solid var(--sapGroup_ContentBorderColor);
+}
+
+.helper {
+    display: block;
+    margin-top: 0.25rem;
+    font-size: var(--sapFontSmallSize);
+    color: var(--sapContent_LabelColor);
+}
+
+.helperError {
+    color: var(--sapNegativeTextColor, var(--sapNegativeColor));
+}
+
+/* TODO(New Group): ใช้กับตาราง Users ที่ยังคอมเมนต์ไว้ */
+.divider {
+    border-top: 1px solid var(--sapGroup_ContentBorderColor);
+    margin-bottom: 1rem;
+}
+
+.verticalDivider {
+    display: none;
+    align-self: stretch;
+    border-left: 1px solid var(--sapGroup_ContentBorderColor);
+}
+
+@media (min-width: 900px) {
+    .verticalDivider {
+        display: block;
+    }
+}
+
+.selectedRow {
+    background: var(--sapList_SelectionBackgroundColor);
+}

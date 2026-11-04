@@ -1,13 +1,16 @@
-import AppLayout from '@/layouts/app-layout';
 import { useUnsavedChangesGuard } from '@/hooks/use-unsaved-changes-guard';
+import AppLayout from '@/layouts/app-layout';
 import SettingsLayout from '@/layouts/settings/layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, useForm } from '@inertiajs/react';
-import { Box, Button, CircularProgress, Fade, Stack, TextField, Typography } from '@mui/material';
-import { FormEventHandler, useRef } from 'react';
+import { Button, FlexBox, Label, Text } from '@ui5/webcomponents-react';
+import { FormEventHandler, useRef, type ReactNode } from 'react';
 
 import HeadingSmall from '@/components/heading-small';
-import { fioriEmphasizedSx } from '@/lib/fiori-style';
+import InputError from '@/components/input-error';
+import field from '@/pages/auth/credential-field.module.css';
+
+const cx = (...names: Array<string | false | undefined>) => names.filter(Boolean).join(' ');
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
@@ -15,6 +18,18 @@ const breadcrumbs: BreadcrumbItem[] = [
         href: '/settings/password',
     },
 ];
+
+function Field({ id, label, error, children }: { id: string; label: string; error?: string; children: ReactNode }) {
+    return (
+        <FlexBox direction="Column" style={{ gap: '0.25rem' }}>
+            <Label for={id} showColon={false}>
+                {label}
+            </Label>
+            {children}
+            <InputError message={error} />
+        </FlexBox>
+    );
+}
 
 export default function Password() {
     const passwordInput = useRef<HTMLInputElement>(null);
@@ -56,66 +71,73 @@ export default function Password() {
             <Head title="Profile settings" />
 
             <SettingsLayout>
-                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                <FlexBox direction="Column" style={{ gap: '1.5rem' }}>
                     <HeadingSmall title="Update password" description="Ensure your account is using a long, random password to stay secure" />
 
-                    <Box component="form" onSubmit={updatePassword}>
-                        <Stack spacing={3}>
-                            <TextField
-                                id="current_password"
-                                label="Current password"
-                                inputRef={currentPasswordInput}
-                                value={data.current_password}
-                                onChange={(e) => setData('current_password', e.target.value)}
-                                type="password"
-                                fullWidth
-                                autoComplete="current-password"
-                                placeholder="Current password"
-                                error={Boolean(errors.current_password)}
-                                helperText={errors.current_password}
-                            />
+                    <form onSubmit={updatePassword}>
+                        <FlexBox direction="Column" style={{ gap: '1.5rem' }}>
+                            <Field id="current_password" label="Current password" error={errors.current_password}>
+                                <input
+                                    id="current_password"
+                                    name="current_password"
+                                    autoComplete="current-password"
+                                    ref={currentPasswordInput}
+                                    value={data.current_password}
+                                    onChange={(e) => setData('current_password', e.target.value)}
+                                    type="password"
+                                    placeholder="Current password"
+                                    aria-invalid={Boolean(errors.current_password)}
+                                    className={cx(field.input, errors.current_password && field.invalid)}
+                                />
+                            </Field>
 
-                            <TextField
-                                id="password"
-                                label="New password"
-                                inputRef={passwordInput}
-                                value={data.password}
-                                onChange={(e) => setData('password', e.target.value)}
-                                type="password"
-                                fullWidth
-                                autoComplete="new-password"
-                                placeholder="New password"
-                                error={Boolean(errors.password)}
-                                helperText={errors.password}
-                            />
+                            <Field id="password" label="New password" error={errors.password}>
+                                <input
+                                    id="password"
+                                    name="password"
+                                    autoComplete="new-password"
+                                    ref={passwordInput}
+                                    value={data.password}
+                                    onChange={(e) => setData('password', e.target.value)}
+                                    type="password"
+                                    placeholder="New password"
+                                    aria-invalid={Boolean(errors.password)}
+                                    className={cx(field.input, errors.password && field.invalid)}
+                                />
+                            </Field>
 
-                            <TextField
-                                id="password_confirmation"
-                                label="Confirm password"
-                                value={data.password_confirmation}
-                                onChange={(e) => setData('password_confirmation', e.target.value)}
-                                type="password"
-                                fullWidth
-                                autoComplete="new-password"
-                                placeholder="Confirm password"
-                                error={Boolean(errors.password_confirmation)}
-                                helperText={errors.password_confirmation}
-                            />
+                            <Field id="password_confirmation" label="Confirm password" error={errors.password_confirmation}>
+                                <input
+                                    id="password_confirmation"
+                                    name="password_confirmation"
+                                    autoComplete="new-password"
+                                    value={data.password_confirmation}
+                                    onChange={(e) => setData('password_confirmation', e.target.value)}
+                                    type="password"
+                                    placeholder="Confirm password"
+                                    aria-invalid={Boolean(errors.password_confirmation)}
+                                    className={cx(field.input, errors.password_confirmation && field.invalid)}
+                                />
+                            </Field>
 
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                                <Button type="submit" variant="contained" disabled={processing} startIcon={processing ? <CircularProgress size={16} color="inherit" /> : undefined} sx={fioriEmphasizedSx}>
+                            <FlexBox alignItems="Center" style={{ gap: '1rem' }}>
+                                <Button type="Submit" design="Emphasized" disabled={processing} loading={processing} loadingDelay={0}>
                                     {processing ? 'Saving…' : 'Save password'}
                                 </Button>
 
-                                <Fade in={recentlySuccessful}>
-                                    <Typography variant="body2" color="text.secondary">
-                                        Saved
-                                    </Typography>
-                                </Fade>
-                            </Box>
-                        </Stack>
-                    </Box>
-                </Box>
+                                <Text
+                                    style={{
+                                        color: 'var(--sapContent_LabelColor)',
+                                        opacity: recentlySuccessful ? 1 : 0,
+                                        transition: 'opacity 225ms ease-in-out',
+                                    }}
+                                >
+                                    Saved
+                                </Text>
+                            </FlexBox>
+                        </FlexBox>
+                    </form>
+                </FlexBox>
             </SettingsLayout>
         </AppLayout>
     );

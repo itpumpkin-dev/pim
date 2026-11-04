@@ -1,66 +1,65 @@
 import { type BreadcrumbItem as BreadcrumbItemType } from '@/types';
-import { Link } from '@inertiajs/react';
-import { Breadcrumbs as MuiBreadcrumbs, Link as MuiLink, Typography } from '@mui/material';
+import { router } from '@inertiajs/react';
+import { BreadcrumbsItem, Breadcrumbs as Ui5Breadcrumbs, type BreadcrumbsPropTypes } from '@ui5/webcomponents-react';
+import { type CSSProperties } from 'react';
 
 interface BreadcrumbsProps {
     breadcrumbs: BreadcrumbItemType[];
-    /**
-     * Narrower layouts (the shell bar on mobile) collapse more aggressively —
-     * only the last 2 crumbs stay visible before the "…" expander, instead
-     * of the full trail. Default (false) is generous enough that this
-     * app's breadcrumbs (rarely more than 4-5 levels) essentially never
-     * collapse on desktop.
-     */
-    compact?: boolean;
+    style?: CSSProperties;
+    className?: string;
 }
 
 /**
- * SAP Fiori "Breadcrumb" — a trail down to the current page.
- * ref: sap.com/design-system/fiori-design-web → UI elements → Breadcrumb
+ * SAP Fiori "Breadcrumb" — a trail down to the current page, on the official
+ * UI5 `Breadcrumbs` control. ref: sap.com/design-system/fiori-design-web →
+ * UI elements → Breadcrumb
  *
- * Per the guideline: the current page is the trail's last item, shown as
- * plain text (never a link) and never truncated out of the trail — when
- * the full trail doesn't fit, the *leading* (origin-most) links collapse
- * behind an expandable "…" first, and the last item stays visible always.
- * MUI's built-in maxItems/itemsBeforeCollapse/itemsAfterCollapse drives
- * that: clicking "…" expands the hidden links in place rather than opening
- * the dropdown menu the guideline describes (sap.m.Select) — same practical
- * result (nothing's ever silently lost) without a bespoke popup component.
+ * The last item is the current page: UI5 renders it as plain (non-link) text
+ * and never moves it into the overflow. When the trail doesn't fit, the
+ * leading (origin-most) links collapse into UI5's own overflow dropdown —
+ * the guideline's sap.m.Select behaviour — so there's no `compact` mode any
+ * more; the control measures itself.
  *
- * Also treats an `href="#"` crumb as plain text, not a link — this app
- * uses "#" as a placeholder for a breadcrumb segment with nowhere to
- * navigate to yet (e.g. a parent section with no index page of its own),
- * and it's common (100+ call sites). Rendering it as a real MUI Link gave
- * it hover/underline affordances promising a click would do something,
- * when it silently wouldn't — not a real link, so it shouldn't look like one.
+ * Clicks are routed through Inertia (`router.visit`) so navigation stays
+ * client-side; ctrl/⌘/shift/alt-clicks fall through to the real `href` so
+ * "open in new tab" still works.
+ *
+ * `href="#"` is this app's placeholder for a segment with nowhere to go yet
+ * (100+ call sites). Those items get no `href` and their clicks are
+ * swallowed — UI5 has no "plain-text middle crumb" mode, so they still look
+ * like links, but clicking one does nothing (never a full page reload to #).
  */
-export function Breadcrumbs({ breadcrumbs, compact = false }: BreadcrumbsProps) {
+export function Breadcrumbs({ breadcrumbs, style, className }: BreadcrumbsProps) {
     if (breadcrumbs.length === 0) {
         return null;
     }
 
+    const onItemClick: BreadcrumbsPropTypes['onItemClick'] = (e) => {
+        const { item, altKey, ctrlKey, metaKey, shiftKey } = e.detail;
+        const href = item.getAttribute('href');
+
+        if (href && (altKey || ctrlKey || metaKey || shiftKey)) {
+            return;
+        }
+
+        e.preventDefault();
+        if (href) {
+            router.visit(href);
+        }
+    };
+
     return (
-        <MuiBreadcrumbs
-            aria-label="breadcrumb"
-            separator="/"
-            maxItems={compact ? 2 : 8}
-            itemsBeforeCollapse={0}
-            itemsAfterCollapse={compact ? 2 : 8}
-        >
+        <Ui5Breadcrumbs onItemClick={onItemClick} style={style} className={className}>
             {breadcrumbs.map((item, index) => {
                 const isCurrent = index === breadcrumbs.length - 1;
-                const isPlaceholder = item.href === '#';
+                const isPlaceholder = !item.href || item.href === '#';
 
-                return isCurrent || isPlaceholder ? (
-                    <Typography key={index} variant="body2" color={isCurrent ? 'text.primary' : 'text.secondary'} fontWeight={isCurrent ? 500 : 400}>
+                return (
+                    <BreadcrumbsItem key={index} href={isCurrent || isPlaceholder ? undefined : item.href}>
                         {item.title}
-                    </Typography>
-                ) : (
-                    <MuiLink key={index} component={Link} href={item.href} underline="hover" color="text.secondary" variant="body2">
-                        {item.title}
-                    </MuiLink>
+                    </BreadcrumbsItem>
                 );
             })}
-        </MuiBreadcrumbs>
+        </Ui5Breadcrumbs>
     );
 }

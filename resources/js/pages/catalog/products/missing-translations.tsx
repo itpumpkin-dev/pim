@@ -1,30 +1,18 @@
+import { FioriResponsiveColumn, FioriResponsiveTable } from '@/components/fiori-responsive-table';
 import AppLayout from '@/layouts/app-layout';
+import { percentToneFiori } from '@/lib/fiori-tokens';
 import { type BreadcrumbItem, type SharedData } from '@/types';
-import { Head, Link, router, usePage } from '@inertiajs/react';
-import SearchIcon from '@mui/icons-material/Search';
-import EditIcon from '@mui/icons-material/Edit';
-import TranslateIcon from '@mui/icons-material/Translate';
-import {
-    Box,
-    Button,
-    Checkbox,
-    Chip,
-    CircularProgress,
-    IconButton,
-    InputAdornment,
-    LinearProgress,
-    Paper,
-    Stack,
-    TablePagination,
-    TextField,
-    Tooltip,
-    Typography,
-} from '@mui/material';
+import { Head, router, usePage } from '@inertiajs/react';
+import '@ui5/webcomponents-icons/dist/edit.js';
+import '@ui5/webcomponents-icons/dist/search.js';
+import '@ui5/webcomponents-icons/dist/slim-arrow-left.js';
+import '@ui5/webcomponents-icons/dist/slim-arrow-right.js';
+import '@ui5/webcomponents-icons/dist/translate.js';
+import { Button, CheckBox, Icon, Input, Option, ProgressIndicator, Select, Tag, Title } from '@ui5/webcomponents-react';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FioriResponsiveColumn, FioriResponsiveTable } from '@/components/fiori-responsive-table';
-import { mappedChipSx, naChipSx, percentTone, solidActionSx, UI_BORDER } from '@/lib/ui-style';
-import { FIORI } from '@/lib/fiori-style';
+
+import styles from './missing-translations.module.css';
 
 interface LocaleOption {
     id: number;
@@ -58,6 +46,11 @@ interface Props {
     attributes: MissingAttribute[];
 }
 
+const ROWS_PER_PAGE_OPTIONS = [25, 50, 100, 250];
+
+/** percentToneFiori → UI5 value state (Tag design / ProgressIndicator valueState). */
+const TONE_STATE = { success: 'Positive', warning: 'Critical', error: 'Negative' } as const;
+
 export default function MissingTranslations({ rows, totalProducts, locales, attributes }: Props) {
     const { t } = useTranslation('catalog');
     const { t: tNav } = useTranslation('nav');
@@ -85,16 +78,17 @@ export default function MissingTranslations({ rows, totalProducts, locales, attr
         const needle = search.trim().toLowerCase();
         if (!needle) return rows;
 
-        return rows.filter(
-            (row) => row.sku.toLowerCase().includes(needle) || (row.family ?? '').toLowerCase().includes(needle),
-        );
+        return rows.filter((row) => row.sku.toLowerCase().includes(needle) || (row.family ?? '').toLowerCase().includes(needle));
     }, [rows, search]);
 
     const pagedRows = filteredRows.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
+    const pageFrom = filteredRows.length === 0 ? 0 : page * rowsPerPage + 1;
+    const pageTo = Math.min(filteredRows.length, (page + 1) * rowsPerPage);
+    const lastPage = Math.max(0, Math.ceil(filteredRows.length / rowsPerPage) - 1);
 
     const translatedCount = totalProducts - rows.length;
     const percent = totalProducts > 0 ? Math.round((translatedCount / totalProducts) * 100) : 100;
-    const progressTone = percentTone(percent, { high: 100, mid: 50 });
+    const progressState = TONE_STATE[percentToneFiori(percent, { high: 100, mid: 50 })];
 
     const allFilteredSelected = filteredRows.length > 0 && filteredRows.every((row) => selectedIds.has(row.id));
     const someFilteredSelected = filteredRows.some((row) => selectedIds.has(row.id));
@@ -125,11 +119,7 @@ export default function MissingTranslations({ rows, totalProducts, locales, attr
 
     const translateOne = (id: number) => {
         setTranslatingId(id);
-        router.post(
-            `/catalog/products/${id}/queue-missing-translations`,
-            {},
-            { preserveScroll: true, onFinish: () => setTranslatingId(null) },
-        );
+        router.post(`/catalog/products/${id}/queue-missing-translations`, {}, { preserveScroll: true, onFinish: () => setTranslatingId(null) });
     };
 
     const translateSelected = () => {
@@ -155,18 +145,17 @@ export default function MissingTranslations({ rows, totalProducts, locales, attr
                   {
                       key: 'select',
                       header: (
-                          <Checkbox
-                              size="small"
-                              checked={allFilteredSelected}
+                          <CheckBox
+                              // UI5 shows the partial state only while `checked` is also true
+                              checked={someFilteredSelected}
                               indeterminate={someFilteredSelected && !allFilteredSelected}
                               onChange={toggleSelectAll}
                           />
                       ),
+                      popinText: '',
                       priority: 'always' as const,
                       width: 48,
-                      render: (row: MissingRow) => (
-                          <Checkbox size="small" checked={selectedIds.has(row.id)} onChange={() => toggleRow(row.id)} />
-                      ),
+                      render: (row: MissingRow) => <CheckBox checked={selectedIds.has(row.id)} onChange={() => toggleRow(row.id)} />,
                   },
               ]
             : []),
@@ -174,7 +163,7 @@ export default function MissingTranslations({ rows, totalProducts, locales, attr
             key: 'sku',
             header: t('missingTranslationsColSku'),
             priority: 'always',
-            render: (row) => <Typography sx={{ fontFamily: 'monospace', fontSize: '0.8rem' }}>{row.sku}</Typography>,
+            render: (row) => <span className={styles.sku}>{row.sku}</span>,
         },
         {
             key: 'family',
@@ -187,12 +176,9 @@ export default function MissingTranslations({ rows, totalProducts, locales, attr
             header: t('publishing'),
             priority: 'medium',
             render: (row) => (
-                <Chip
-                    label={row.enabled ? t('published') : t('unpublished')}
-                    size="small"
-                    variant={row.enabled ? 'filled' : 'outlined'}
-                    sx={row.enabled ? { ...mappedChipSx, height: 20, fontSize: '0.7rem' } : { ...naChipSx, height: 20, fontSize: '0.7rem' }}
-                />
+                <Tag design={row.enabled ? 'Positive' : 'Neutral'} hideStateIcon>
+                    {row.enabled ? t('published') : t('unpublished')}
+                </Tag>
             ),
         },
         {
@@ -200,7 +186,7 @@ export default function MissingTranslations({ rows, totalProducts, locales, attr
             header: t('missingTranslationsColMissingLocales'),
             priority: 'high',
             render: (row) => (
-                <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.25rem' }}>
                     {row.missing_locales.map(({ locale_id, attribute_ids }) => {
                         const locale = localesById.get(locale_id);
                         const attributeLabels = attribute_ids.map((id) => {
@@ -209,17 +195,14 @@ export default function MissingTranslations({ rows, totalProducts, locales, attr
                         });
 
                         return (
-                            <Tooltip key={locale_id} title={attributeLabels.join(', ')}>
-                                <Chip
-                                    label={`${locale ? locale.display_name || locale.code : locale_id} (${attribute_ids.length})`}
-                                    size="small"
-                                    variant="outlined"
-                                    sx={{ height: 20, fontSize: '0.7rem' }}
-                                />
-                            </Tooltip>
+                            <span key={locale_id} title={attributeLabels.join(', ')}>
+                                <Tag design="Neutral" hideStateIcon>
+                                    {`${locale ? locale.display_name || locale.code : locale_id} (${attribute_ids.length})`}
+                                </Tag>
+                            </span>
                         );
                     })}
-                </Stack>
+                </div>
             ),
         },
         {
@@ -228,22 +211,26 @@ export default function MissingTranslations({ rows, totalProducts, locales, attr
             priority: 'always',
             align: 'right',
             render: (row) => (
-                <Stack direction="row" spacing={0.5} justifyContent="flex-end">
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.25rem' }}>
                     {canEdit && (
-                        <Tooltip title={t('missingTranslationsTranslateAction')}>
-                            <span>
-                                <IconButton size="small" disabled={translatingId === row.id} onClick={() => translateOne(row.id)}>
-                                    {translatingId === row.id ? <CircularProgress size={16} /> : <TranslateIcon fontSize="small" />}
-                                </IconButton>
-                            </span>
-                        </Tooltip>
+                        <Button
+                            design="Transparent"
+                            icon="translate"
+                            tooltip={t('missingTranslationsTranslateAction')}
+                            accessibleName={t('missingTranslationsTranslateAction')}
+                            loading={translatingId === row.id}
+                            disabled={translatingId === row.id}
+                            onClick={() => translateOne(row.id)}
+                        />
                     )}
-                    <Tooltip title={t('missingTranslationsEditAction')}>
-                        <IconButton size="small" component={Link} href={`/catalog/products/${row.id}/edit`}>
-                            <EditIcon fontSize="small" />
-                        </IconButton>
-                    </Tooltip>
-                </Stack>
+                    <Button
+                        design="Transparent"
+                        icon="edit"
+                        tooltip={t('missingTranslationsEditAction')}
+                        accessibleName={t('missingTranslationsEditAction')}
+                        onClick={() => router.visit(`/catalog/products/${row.id}/edit`)}
+                    />
+                </div>
             ),
         },
     ];
@@ -251,107 +238,108 @@ export default function MissingTranslations({ rows, totalProducts, locales, attr
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={t('missingTranslationsTitle')} />
-            <Box sx={{ p: { xs: 2, md: 4 }, bgcolor: 'background.default', minHeight: '100%' }}>
-                <Stack direction="row" justifyContent="space-between" alignItems="flex-start" sx={{ mb: 3 }} flexWrap="wrap" gap={2}>
-                    <Box>
-                        <Typography variant="h5" fontWeight={700} color="text.primary">
+            <div className={styles.page}>
+                <div className={styles.header}>
+                    <div>
+                        <Title level="H3" wrappingType="Normal">
                             {t('missingTranslationsTitle')}
-                        </Typography>
-                        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-                            {t('missingTranslationsSubtitle')}
-                        </Typography>
-                    </Box>
+                        </Title>
+                        <span className={styles.subtitle}>{t('missingTranslationsSubtitle')}</span>
+                    </div>
                     {canEdit && (
                         <Button
-                            variant="contained"
-                            startIcon={bulkTranslating ? <CircularProgress size={16} color="inherit" /> : <TranslateIcon fontSize="small" />}
+                            design="Emphasized"
+                            icon="translate"
+                            loading={bulkTranslating}
                             disabled={selectedIds.size === 0 || bulkTranslating}
                             onClick={translateSelected}
-                            sx={{ ...solidActionSx, textTransform: 'none', fontWeight: 700 }}
                         >
                             {bulkTranslating
                                 ? t('missingTranslationsTranslating')
                                 : t('missingTranslationsTranslateSelected', { count: selectedIds.size })}
                         </Button>
                     )}
-                </Stack>
+                </div>
 
-                <Paper variant="outlined" sx={{ borderRadius: 2, p: 2.5, mb: 2, borderColor: UI_BORDER }}>
-                    <Stack direction="row" alignItems="center" spacing={1.5}>
-                        <Typography variant="subtitle1" fontWeight={700}>
+                <div className={`${styles.card} ${styles.summary}`}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+                        <Title level="H5" wrappingType="Normal">
                             {t('missingTranslationsSummary', { missing: rows.length, total: totalProducts })}
-                        </Typography>
-                        <Chip
-                            label={`${translatedCount} / ${totalProducts} · ${percent}%`}
-                            size="small"
-                            sx={{ bgcolor: progressTone.bg, color: progressTone.fg, fontWeight: 600, height: 22, fontSize: '0.7rem' }}
-                        />
-                    </Stack>
-                    <LinearProgress
-                        variant="determinate"
+                        </Title>
+                        <Tag design={progressState} hideStateIcon>
+                            {`${translatedCount} / ${totalProducts} · ${percent}%`}
+                        </Tag>
+                    </div>
+                    <ProgressIndicator
                         value={percent}
-                        sx={{
-                            mt: 1.5,
-                            height: 6,
-                            borderRadius: 3,
-                            bgcolor: 'grey.200',
-                            maxWidth: 320,
-                            '& .MuiLinearProgress-bar': { bgcolor: progressTone.bg },
-                        }}
+                        valueState={progressState}
+                        hideValue
+                        style={{ marginTop: '0.75rem', maxWidth: 320, height: 6 }}
                     />
-                </Paper>
+                </div>
 
                 {rows.length === 0 ? (
-                    <Paper variant="outlined" sx={{ borderRadius: 2, p: 4, textAlign: 'center' }}>
-                        <Typography color="text.secondary">{t('missingTranslationsAllTranslated')}</Typography>
-                    </Paper>
+                    <div className={`${styles.card} ${styles.allTranslated}`}>{t('missingTranslationsAllTranslated')}</div>
                 ) : (
                     <>
-                        <TextField
+                        <Input
+                            className={styles.search}
                             value={search}
-                            onChange={(e) => {
+                            onInput={(e) => {
                                 setSearch(e.target.value);
                                 setPage(0);
                             }}
                             placeholder={t('missingTranslationsSearch')}
-                            size="small"
-                            sx={{ mb: 2, minWidth: 320, bgcolor: FIORI.surface }}
-                            InputProps={{
-                                endAdornment: (
-                                    <InputAdornment position="end">
-                                        <SearchIcon sx={{ color: 'text.secondary' }} />
-                                    </InputAdornment>
-                                ),
-                            }}
+                            icon={<Icon name="search" />}
                         />
 
-                        <Paper variant="outlined" sx={{ borderRadius: 2 }}>
+                        <div className={`${styles.card} ${styles.tableCard}`}>
                             <FioriResponsiveTable
                                 variant="plain"
                                 size="small"
                                 columns={columns}
                                 rows={pagedRows}
                                 getRowKey={(row) => row.id}
-                                rowSx={(row) => (selectedIds.has(row.id) ? { bgcolor: 'action.selected' } : {})}
+                                rowClassName={(row: MissingRow) => (selectedIds.has(row.id) ? styles.selectedRow : undefined)}
                                 emptyMessage={t('missingTranslationsNoMatches')}
                             />
-                            <TablePagination
-                                component="div"
-                                count={filteredRows.length}
-                                page={page}
-                                onPageChange={(_, newPage) => setPage(newPage)}
-                                rowsPerPage={rowsPerPage}
-                                onRowsPerPageChange={(e) => {
-                                    setRowsPerPage(parseInt(e.target.value, 10));
-                                    setPage(0);
-                                }}
-                                rowsPerPageOptions={[25, 50, 100, 250]}
-                                labelRowsPerPage={t('missingTranslationsRowsPerPage')}
-                            />
-                        </Paper>
+                            <div className={styles.pager}>
+                                <span>{t('missingTranslationsRowsPerPage')}</span>
+                                <Select
+                                    style={{ width: '6rem' }}
+                                    value={String(rowsPerPage)}
+                                    accessibleName={t('missingTranslationsRowsPerPage')}
+                                    onChange={(e) => {
+                                        setRowsPerPage(parseInt(e.detail.selectedOption.value ?? '50', 10));
+                                        setPage(0);
+                                    }}
+                                >
+                                    {ROWS_PER_PAGE_OPTIONS.map((size) => (
+                                        <Option key={size} value={String(size)}>
+                                            {size}
+                                        </Option>
+                                    ))}
+                                </Select>
+                                <span>{`${pageFrom}–${pageTo} / ${filteredRows.length}`}</span>
+                                <Button
+                                    design="Transparent"
+                                    icon="slim-arrow-left"
+                                    accessibleName="‹"
+                                    disabled={page <= 0}
+                                    onClick={() => setPage(page - 1)}
+                                />
+                                <Button
+                                    design="Transparent"
+                                    icon="slim-arrow-right"
+                                    accessibleName="›"
+                                    disabled={page >= lastPage}
+                                    onClick={() => setPage(page + 1)}
+                                />
+                            </div>
+                        </div>
                     </>
                 )}
-            </Box>
+            </div>
         </AppLayout>
     );
 }

@@ -1,32 +1,15 @@
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem, type SharedData } from '@/types';
 import { Head, router, usePage } from '@inertiajs/react';
-import AddIcon from '@mui/icons-material/Add';
-import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
-import ChevronRightIcon from '@mui/icons-material/ChevronRight';
-import DeleteIcon from '@mui/icons-material/Delete';
-import EditIcon from '@mui/icons-material/Edit';
-import FirstPageIcon from '@mui/icons-material/FirstPage';
-import LastPageIcon from '@mui/icons-material/LastPage';
-import SearchIcon from '@mui/icons-material/Search';
-import {
-    Box,
-    Button,
-    IconButton,
-    InputAdornment,
-    Paper,
-    Stack,
-    TableSortLabel,
-    TextField,
-    Typography,
-} from '@mui/material';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { FioriMessageBox } from '@/components/fiori-message-box';
-import { FioriResponsiveColumn, FioriResponsiveTable } from '@/components/fiori-responsive-table';
-import { FIORI, FioriStatus, fioriEmphasizedSx, fioriIconButtonSx, fioriSearchFieldSx } from '@/lib/fiori-style';
+import { FioriResponsiveTable, type FioriResponsiveColumn } from '@/components/fiori-responsive-table';
+import { FioriStatus } from '@/lib/fiori-style';
 import { formatDateRange } from '@/lib/format';
+
+import { MasterListPage, MasterListToolbar, MasterPagination, RowActions, SecondaryText, SortableHeader, StrongText } from '../master-crud';
 
 interface CommissionGroupItem {
     id: number;
@@ -90,7 +73,8 @@ export default function CommissionGroupIndex({ commissionGroups, filters }: Prop
 
     const currentPage = commissionGroups.current_page ?? 1;
     const lastPage = commissionGroups.last_page ?? 1;
-    const goToPage = (page: number) => router.get('/catalog/commission-groups', { search, page, sort: sortField, dir: sortDir }, { preserveState: true });
+    const goToPage = (page: number) =>
+        router.get('/catalog/commission-groups', { search, page, sort: sortField, dir: sortDir }, { preserveState: true });
 
     const handleSort = (field: string) => {
         const nextDir: 'asc' | 'desc' = sortField === field && sortDir === 'asc' ? 'desc' : 'asc';
@@ -100,41 +84,39 @@ export default function CommissionGroupIndex({ commissionGroups, filters }: Prop
     };
 
     const sortHeader = (field: string, label: string) => (
-        <TableSortLabel active={sortField === field} direction={sortField === field ? sortDir : 'asc'} onClick={() => handleSort(field)}>
-            {label}
-        </TableSortLabel>
+        <SortableHeader label={label} active={sortField === field} direction={sortDir} onSort={() => handleSort(field)} />
     );
 
     const columns: FioriResponsiveColumn<CommissionGroupItem>[] = [
         {
             key: 'code',
             header: sortHeader('code', t('commissionGroupCode')),
+            popinText: t('commissionGroupCode'),
             priority: 'always',
-            render: (row) => <Typography sx={{ fontWeight: 600 }}>{row.code}</Typography>,
+            render: (row) => <StrongText>{row.code}</StrongText>,
         },
         {
             key: 'p_group_name',
             header: sortHeader('p_group_name', t('commissionGroupName')),
+            popinText: t('commissionGroupName'),
             priority: 'high',
-            render: (row) => (
-                <Typography sx={{ color: FIORI.textSecondary }}>
-                    {row.p_group_name || <Typography component="span" color="text.disabled">—</Typography>}
-                </Typography>
-            ),
+            render: (row) => <SecondaryText value={row.p_group_name} />,
         },
         {
             key: 'divisor_start',
             header: sortHeader('divisor_start', t('divisorStart')),
+            popinText: t('divisorStart'),
             priority: 'high',
             align: 'right',
-            render: (row) => <Typography sx={{ fontVariantNumeric: 'tabular-nums' }}>{fmt(row.divisor_start)}</Typography>,
+            render: (row) => <span style={{ fontVariantNumeric: 'tabular-nums' }}>{fmt(row.divisor_start)}</span>,
         },
         {
             key: 'divisor_secondary',
             header: sortHeader('divisor_secondary', t('divisorSecondary')),
+            popinText: t('divisorSecondary'),
             priority: 'high',
             align: 'right',
-            render: (row) => <Typography sx={{ fontVariantNumeric: 'tabular-nums' }}>{fmt(row.divisor_secondary)}</Typography>,
+            render: (row) => <span style={{ fontVariantNumeric: 'tabular-nums' }}>{fmt(row.divisor_secondary)}</span>,
         },
         {
             key: 'period',
@@ -142,11 +124,7 @@ export default function CommissionGroupIndex({ commissionGroups, filters }: Prop
             priority: 'medium',
             render: (row) => {
                 const period = formatDateRange(row.start_date, row.end_date);
-                return period ? (
-                    <Typography variant="body2">{period}</Typography>
-                ) : (
-                    <Typography component="span" color="text.disabled">—</Typography>
-                );
+                return period ? <span>{period}</span> : <SecondaryText value={null} />;
             },
         },
         {
@@ -159,11 +137,7 @@ export default function CommissionGroupIndex({ commissionGroups, filters }: Prop
             key: 'remark',
             header: t('remark'),
             priority: 'medium',
-            render: (row) => (
-                <Typography sx={{ color: FIORI.textSecondary, maxWidth: 320, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {row.remark || <Typography component="span" color="text.disabled">—</Typography>}
-                </Typography>
-            ),
+            render: (row) => <SecondaryText value={row.remark} maxWidth={320} />,
         },
         ...(canEdit
             ? [
@@ -173,14 +147,7 @@ export default function CommissionGroupIndex({ commissionGroups, filters }: Prop
                       priority: 'always' as const,
                       align: 'right' as const,
                       render: (row: CommissionGroupItem) => (
-                          <Stack direction="row" spacing={0.5} justifyContent="flex-end">
-                              <IconButton size="small" sx={fioriIconButtonSx} onClick={() => router.visit(`/catalog/commission-groups/${row.id}/edit`)}>
-                                  <EditIcon fontSize="small" />
-                              </IconButton>
-                              <IconButton size="small" sx={fioriIconButtonSx} onClick={() => setDeleteId(row.id)}>
-                                  <DeleteIcon fontSize="small" />
-                              </IconButton>
-                          </Stack>
+                          <RowActions onEdit={() => router.visit(`/catalog/commission-groups/${row.id}/edit`)} onDelete={() => setDeleteId(row.id)} />
                       ),
                   },
               ]
@@ -190,73 +157,27 @@ export default function CommissionGroupIndex({ commissionGroups, filters }: Prop
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={tNav('commissionGroups')} />
-            <Box sx={{ p: { xs: 2, md: 4 }, bgcolor: FIORI.pageBg, minHeight: '100%' }}>
-                <Box
-                    sx={{
-                        display: 'flex',
-                        flexDirection: { xs: 'column', sm: 'row' },
-                        justifyContent: 'space-between',
-                        alignItems: { xs: 'stretch', sm: 'flex-start' },
-                        gap: 2,
-                        mb: 3,
-                    }}
-                >
-                    <Box>
-                        <Typography variant="h5" fontWeight={600} sx={{ color: FIORI.textPrimary }}>{tNav('commissionGroups')}</Typography>
-                        <Typography variant="body2" sx={{ color: FIORI.textSecondary, mt: 0.25 }}>{tGrid('results', { count: commissionGroups.total })}</Typography>
-                    </Box>
-                    {canEdit && (
-                        <Button
-                            variant="contained"
-                            startIcon={<AddIcon />}
-                            onClick={() => router.visit('/catalog/commission-groups/create')}
-                            sx={fioriEmphasizedSx}
-                        >
-                            {t('createCommissionGroup')}
-                        </Button>
-                    )}
-                </Box>
+            <MasterListPage
+                title={tNav('commissionGroups')}
+                addLabel={t('createCommissionGroup')}
+                onAdd={canEdit ? () => router.visit('/catalog/commission-groups/create') : undefined}
+            >
+                <MasterListToolbar
+                    resultsLabel={tGrid('results', { count: commissionGroups.total })}
+                    search={search}
+                    onSearchChange={setSearch}
+                    searchPlaceholder={t('searchCommissionGroups')}
+                />
 
-                <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="flex-end" sx={{ mb: 2 }}>
-                    <TextField
-                        value={search}
-                        onChange={(e) => setSearch(e.target.value)}
-                        placeholder={t('searchCommissionGroups')}
-                        size="small"
-                        sx={{ ...fioriSearchFieldSx, width: { xs: '100%', md: 'auto' }, minWidth: { xs: 0, md: 260 } }}
-                        InputProps={{
-                            startAdornment: (
-                                <InputAdornment position="start">
-                                    <SearchIcon fontSize="small" sx={{ color: FIORI.textSecondary }} />
-                                </InputAdornment>
-                            ),
-                        }}
-                    />
-                </Stack>
+                <FioriResponsiveTable
+                    columns={columns}
+                    rows={commissionGroups.data}
+                    getRowKey={(row) => row.id}
+                    emptyMessage={t('noCommissionGroupsFound')}
+                />
 
-                <FioriResponsiveTable columns={columns} rows={commissionGroups.data} getRowKey={(row) => row.id} emptyMessage={t('noCommissionGroupsFound')} />
-
-                <Stack direction="row" justifyContent="flex-end" alignItems="center" spacing={1.5} sx={{ mt: 2 }}>
-                    <Typography variant="body2" sx={{ color: FIORI.textSecondary }}>{tGrid('pageOf', { lastPage })}</Typography>
-                    <Stack direction="row" spacing={0.2}>
-                        <IconButton size="small" sx={fioriIconButtonSx} disabled={currentPage <= 1} onClick={() => goToPage(1)}>
-                            <FirstPageIcon fontSize="small" />
-                        </IconButton>
-                        <IconButton size="small" sx={fioriIconButtonSx} disabled={currentPage <= 1} onClick={() => goToPage(currentPage - 1)}>
-                            <ChevronLeftIcon fontSize="small" />
-                        </IconButton>
-                        <Paper variant="outlined" sx={{ px: 1.5, py: 0.5, bgcolor: FIORI.surface, borderRadius: '8px', borderColor: FIORI.border, display: 'flex', alignItems: 'center' }}>
-                            <Typography variant="body2" sx={{ color: FIORI.textPrimary }}>{currentPage}</Typography>
-                        </Paper>
-                        <IconButton size="small" sx={fioriIconButtonSx} disabled={currentPage >= lastPage} onClick={() => goToPage(currentPage + 1)}>
-                            <ChevronRightIcon fontSize="small" />
-                        </IconButton>
-                        <IconButton size="small" sx={fioriIconButtonSx} disabled={currentPage >= lastPage} onClick={() => goToPage(lastPage)}>
-                            <LastPageIcon fontSize="small" />
-                        </IconButton>
-                    </Stack>
-                </Stack>
-            </Box>
+                <MasterPagination currentPage={currentPage} lastPage={lastPage} label={tGrid('pageOf', { lastPage })} onPageChange={goToPage} />
+            </MasterListPage>
 
             <FioriMessageBox
                 open={deleteId !== null}

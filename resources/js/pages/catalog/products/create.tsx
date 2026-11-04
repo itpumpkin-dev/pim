@@ -1,47 +1,31 @@
+import { FioriField, FioriFormErrorSummary, FioriFormGroup, FioriMessageStrip, ui5ValueState, valueStateOf } from '@/components/fiori-form';
 import { FioriResponsiveColumn, FioriResponsiveTable } from '@/components/fiori-responsive-table';
-import {
-    FioriField,
-    FioriFormErrorSummary,
-    FioriFormGroup,
-    FioriMessageStrip,
-    fioriFieldStateSx,
-    fioriMultiInputSx,
-    valueStateOf,
-} from '@/components/fiori-form';
-import { FIORI, fioriDefaultSx, fioriEmphasizedSx } from '@/lib/fiori-style';
 import { useDraftAutosave } from '@/hooks/use-draft-autosave';
 import { useUnsavedChangesGuard } from '@/hooks/use-unsaved-changes-guard';
 import AppLayout from '@/layouts/app-layout';
-import { mappedChipSx, solidActionSx, UI_BORDER, UI_BORDER_STRONG } from '@/lib/ui-style';
 import { type BreadcrumbItem, type SharedData } from '@/types';
 import { type FormDataConvertible } from '@inertiajs/core';
-import { Head, Link, useForm, usePage } from '@inertiajs/react';
-import ArrowBackIcon from '@mui/icons-material/ArrowBack';
-import CloseIcon from '@mui/icons-material/Close';
-import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
-import SaveIcon from '@mui/icons-material/Save';
+import { Head, router, useForm, usePage } from '@inertiajs/react';
+import '@ui5/webcomponents-icons/dist/nav-back.js';
+import '@ui5/webcomponents-icons/dist/save.js';
 import {
-    Alert,
-    Autocomplete,
-    Box,
+    Bar,
     Button,
-    Chip,
-    CircularProgress,
     Dialog,
-    DialogActions,
-    DialogContent,
-    DialogTitle,
-    FormControl,
-    IconButton,
-    MenuItem,
-    Paper,
+    FlexBox,
+    Input,
+    MessageStrip,
+    MultiComboBox,
+    MultiComboBoxItem,
+    Option,
     Select,
-    Stack,
-    TextField,
-    Typography,
-} from '@mui/material';
+    Text,
+    Title,
+} from '@ui5/webcomponents-react';
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+
+import styles from './create.module.css';
 
 interface AttributeOption {
     id: number;
@@ -92,8 +76,8 @@ interface ProductForm {
     }[];
 }
 
-function cartesian(sets: any[][]): any[][] {
-    return sets.reduce((acc, set) => acc.flatMap((x) => set.map((y) => [...x, y])), [[]]);
+function cartesian<T>(sets: T[][]): T[][] {
+    return sets.reduce((acc, set) => acc.flatMap((x) => set.map((y) => [...x, y])), [[]] as T[][]);
 }
 
 // Every combination becomes a table row with three MUI text fields. A few of
@@ -231,34 +215,36 @@ export default function ProductCreate({ attributes, productTypeAttribute }: Prop
             key: 'label',
             header: 'ตัวเลือกย่อย',
             priority: 'always',
-            render: (row) => <Typography sx={{ fontWeight: 600 }}>{row.label}</Typography>,
+            render: (row) => <Text style={{ fontWeight: 600 }}>{row.label}</Text>,
         },
         {
             key: 'sku',
             header: 'SKU ย่อย *',
             priority: 'high',
-            render: (row) => (
-                <TextField
-                    size="small"
-                    required
-                    value={row.sku}
-                    onChange={(e) => handleVariantFieldChange(row.__index, 'sku', e.target.value)}
-                    onBlur={(e) => handleVariantFieldChange(row.__index, 'sku', e.target.value.trim())}
-                    error={Boolean(errors[`variants.${row.__index}.sku` as keyof typeof errors])}
-                    helperText={errors[`variants.${row.__index}.sku` as keyof typeof errors]}
-                />
-            ),
+            render: (row) => {
+                const skuError = errors[`variants.${row.__index}.sku` as keyof typeof errors];
+                return (
+                    <Input
+                        required
+                        value={row.sku}
+                        onInput={(e) => handleVariantFieldChange(row.__index, 'sku', e.target.value)}
+                        // UI5 change = blur/Enter (เหมือน onBlur เดิม) → ตัดช่องว่างหัวท้าย
+                        onChange={(e) => handleVariantFieldChange(row.__index, 'sku', e.target.value.trim())}
+                        valueState={ui5ValueState(valueStateOf(skuError))}
+                        valueStateMessage={skuError ? <div>{skuError}</div> : undefined}
+                    />
+                );
+            },
         },
         {
             key: 'price',
             header: 'ราคา',
             priority: 'medium',
             render: (row) => (
-                <TextField
-                    size="small"
-                    type="number"
+                <Input
+                    type="Number"
                     value={row.price}
-                    onChange={(e) => handleVariantFieldChange(row.__index, 'price', e.target.value)}
+                    onInput={(e) => handleVariantFieldChange(row.__index, 'price', e.target.value)}
                     placeholder="ราคา"
                 />
             ),
@@ -268,11 +254,10 @@ export default function ProductCreate({ attributes, productTypeAttribute }: Prop
             header: 'จำนวนสต๊อก (Qty)',
             priority: 'medium',
             render: (row) => (
-                <TextField
-                    size="small"
-                    type="number"
+                <Input
+                    type="Number"
                     value={row.qty}
-                    onChange={(e) => handleVariantFieldChange(row.__index, 'qty', e.target.value)}
+                    onInput={(e) => handleVariantFieldChange(row.__index, 'qty', e.target.value)}
                     placeholder="สต๊อก"
                 />
             ),
@@ -324,58 +309,44 @@ export default function ProductCreate({ attributes, productTypeAttribute }: Prop
         });
     };
 
+    const closeConfigModal = () => setConfigModalOpen(false);
+
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={t('createProductTitle')} />
-            {/* <Box component="form" onSubmit={handleFormSubmit} sx={{ p: { xs: 2, md: 4 }, width: '100%', maxWidth: 1000, mx: 'auto' }}> */}
-            <Box component="form" onSubmit={handleFormSubmit} sx={{ p: { xs: 2, md: 4 }, bgcolor: FIORI.pageBg, minHeight: '100%', width: '100%', maxWidth: 760 }}>
+            <form onSubmit={handleFormSubmit} className={styles.page}>
                 {/* พบร่างที่ useDraftAutosave เก็บไว้ใน localStorage จากรอบก่อน (เช่น
                     โดน logout กะทันหันตอนสิทธิ์เปลี่ยนกลางคัน ก่อนเคย save สินค้านี้แม้แต่
                     ครั้งเดียว) — ถามก่อนเสมอ ไม่กู้คืนให้อัตโนมัติ */}
                 {draftPrompt && (
-                    <Box sx={{ mb: 3 }}>
-                        <FioriMessageStrip severity="warning">
-                            <Typography variant="body2" fontWeight={700} sx={{ mb: 0.5 }}>
-                                {t('autosaveDraftFoundTitle')}
-                            </Typography>
-                            <Typography variant="body2" sx={{ mb: 1 }}>
-                                {t('autosaveDraftFoundMessage', { time: new Date(draftPrompt.savedAt).toLocaleString() })}
-                            </Typography>
-                            <Stack direction="row" spacing={1}>
-                                <Button size="small" variant="contained" color="inherit" onClick={restoreDraft}>
-                                    {t('restoreDraft')}
-                                </Button>
-                                <Button size="small" variant="outlined" color="inherit" onClick={discardDraft}>
-                                    {t('discardDraft')}
-                                </Button>
-                            </Stack>
-                        </FioriMessageStrip>
-                    </Box>
+                    <FioriMessageStrip severity="warning" style={{ marginBottom: '1.5rem' }}>
+                        <div style={{ fontWeight: 700, marginBottom: '0.25rem' }}>{t('autosaveDraftFoundTitle')}</div>
+                        <div style={{ marginBottom: '0.5rem' }}>
+                            {t('autosaveDraftFoundMessage', { time: new Date(draftPrompt.savedAt).toLocaleString() })}
+                        </div>
+                        <FlexBox style={{ gap: '0.5rem' }}>
+                            <Button design="Emphasized" onClick={restoreDraft}>
+                                {t('restoreDraft')}
+                            </Button>
+                            <Button onClick={discardDraft}>{t('discardDraft')}</Button>
+                        </FlexBox>
+                    </FioriMessageStrip>
                 )}
 
-                <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 3 }}>
-                    <Typography variant="h5" fontWeight={700}>
-                        {t('createProductTitle')}
-                    </Typography>
-                    <Stack direction="row" spacing={1}>
-                        <Button component={Link} href="/catalog/products" variant="outlined" color="inherit" startIcon={<ArrowBackIcon />}>
+                <FlexBox justifyContent="SpaceBetween" alignItems="Center" wrap="Wrap" style={{ gap: '1rem', marginBottom: '1.5rem' }}>
+                    <Title level="H3">{t('createProductTitle')}</Title>
+                    <FlexBox style={{ gap: '0.5rem' }}>
+                        <Button icon="nav-back" onClick={() => router.visit('/catalog/products')}>
                             {t('back')}
                         </Button>
-                        <Button
-                            sx={solidActionSx}
-                            type="submit"
-                            variant="contained"
-                            disabled={processing}
-                            startIcon={processing ? <CircularProgress size={16} color="inherit" /> : <SaveIcon />}
-                        >
+                        <Button design="Emphasized" icon="save" disabled={processing} loading={processing} onClick={() => handleFormSubmit()}>
                             {processing ? t('saving') : t('save')}
                         </Button>
-                    </Stack>
-                </Stack>
+                    </FlexBox>
+                </FlexBox>
 
-                <Stack spacing={3}>
-                    <FioriFormGroup title={t('productInfo')} sx={{ maxWidth: 760 }}>
-
+                <FlexBox direction="Column" style={{ gap: '1.5rem' }}>
+                    <FioriFormGroup title={t('productInfo')} style={{ maxWidth: 760 }}>
                         {/* เดิมมีช่อง "ประเภทสินค้า" (Simple/Configurable) อยู่ตรงนี้ — เอาออก
                             ตามที่ user ขอ เพราะชนชื่อกับฟิลด์ "ประเภทสินค้า" (แอตทริบิวต์
                             producttype) ด้านล่าง ทั้งที่เป็นคนละเรื่องกันในระบบ: ตัวนี้กำหนดว่ามี
@@ -385,22 +356,16 @@ export default function ProductCreate({ attributes, productTypeAttribute }: Prop
                             สินค้าที่สร้างใหม่ทุกตัว — ไม่ต้องมี field ให้ผู้ใช้เลือกอีกต่อไป */}
 
                         {/* SKU หลัก */}
-                        <FioriField
-                            label={t('sku')}
-                            htmlFor="product-sku"
-                            required
-                            valueState={valueStateOf(errors.sku)}
-                            message={errors.sku}
-                        >
-                            <TextField
+                        <FioriField label={t('sku')} htmlFor="product-sku" required valueState={valueStateOf(errors.sku)} message={errors.sku}>
+                            <Input
                                 id="product-sku"
-                                fullWidth
-                                size="small"
+                                style={{ width: '100%' }}
                                 value={data.sku}
-                                onChange={(e) => setData('sku', e.target.value)}
-                                onBlur={(e) => setData('sku', e.target.value.trim())}
+                                onInput={(e) => setData('sku', e.target.value)}
+                                // UI5 change = blur/Enter (เหมือน onBlur เดิม) → ตัดช่องว่างหัวท้าย
+                                onChange={(e) => setData('sku', e.target.value.trim())}
                                 placeholder={t('skuPlaceholder')}
-                                sx={fioriFieldStateSx(valueStateOf(errors.sku))}
+                                valueState={ui5ValueState(valueStateOf(errors.sku))}
                             />
                         </FioriField>
 
@@ -415,101 +380,89 @@ export default function ProductCreate({ attributes, productTypeAttribute }: Prop
                                 valueState={valueStateOf(errors.product_type_code)}
                                 message={errors.product_type_code}
                             >
-                                <FormControl fullWidth size="small" sx={fioriFieldStateSx(valueStateOf(errors.product_type_code))}>
-                                    <Select
-                                        id="product-type-master"
-                                        IconComponent={KeyboardArrowDownIcon}
-                                        displayEmpty
-                                        value={data.product_type_code}
-                                        onChange={(e) => setData('product_type_code', e.target.value)}
-                                    >
-                                        <MenuItem value="">{t('masterProductTypeNone')}</MenuItem>
-                                        {(productTypeAttribute.options || [])
-                                            .filter((opt) => opt.is_active !== false)
-                                            .map((opt) => (
-                                                <MenuItem key={opt.id} value={opt.code || ''}>
-                                                    {opt.admin_label || opt.code}
-                                                </MenuItem>
-                                            ))}
-                                    </Select>
-                                </FormControl>
+                                <Select
+                                    id="product-type-master"
+                                    style={{ width: '100%' }}
+                                    value={data.product_type_code}
+                                    valueState={ui5ValueState(valueStateOf(errors.product_type_code))}
+                                    onChange={(e) => setData('product_type_code', e.detail.selectedOption?.value ?? '')}
+                                >
+                                    <Option value="">{t('masterProductTypeNone')}</Option>
+                                    {(productTypeAttribute.options || [])
+                                        .filter((opt) => opt.is_active !== false)
+                                        .map((opt) => (
+                                            <Option key={opt.id} value={opt.code || ''}>
+                                                {opt.admin_label || opt.code}
+                                            </Option>
+                                        ))}
+                                </Select>
                             </FioriField>
                         )}
                     </FioriFormGroup>
 
                     {/* ตาราง Variants ที่ generate แบบ cartesian */}
                     {data.type === 'configurable' && data.variants.length > 0 && (
-                        <Paper variant="outlined" sx={{ p: 3, borderRadius: 1.5, borderColor: UI_BORDER }}>
-                            <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
-                                <Typography variant="h6" fontWeight={700}>
+                        <section className={styles.variantsCard}>
+                            <FlexBox justifyContent="SpaceBetween" alignItems="Center" wrap="Wrap" style={{ gap: '0.5rem', marginBottom: '1rem' }}>
+                                <Title level="H5" wrappingType="Normal">
                                     สร้างตัวเลือกสินค้าย่อย (Variants Cartesian List)
-                                </Typography>
-                                <Button variant="outlined" size="small" onClick={() => setConfigModalOpen(true)}>
-                                    เลือกคุณสมบัติย่อยเพิ่ม ({selectedAttributeObjects.length})
-                                </Button>
-                            </Stack>
+                                </Title>
+                                <Button onClick={() => setConfigModalOpen(true)}>เลือกคุณสมบัติย่อยเพิ่ม ({selectedAttributeObjects.length})</Button>
+                            </FlexBox>
 
-                            <FioriResponsiveTable variant="plain" columns={variantColumns} rows={variantRows} getRowKey={(row) => row.__index} />
-                        </Paper>
+                            <FioriResponsiveTable
+                                variant="plain"
+                                columns={variantColumns}
+                                rows={variantRows}
+                                getRowKey={(row: VariantRow) => row.__index}
+                            />
+                        </section>
                     )}
-                </Stack>
+                </FlexBox>
 
-                <FioriFormErrorSummary errors={errors} message={t('correctHighlightedFields')} sx={{ mt: 2, maxWidth: 760 }} />
-            </Box>
+                <FioriFormErrorSummary errors={errors} message={t('correctHighlightedFields')} style={{ marginTop: '1rem', maxWidth: 760 }} />
+            </form>
 
             {/* Dialog เลือก Attribute สำหรับ Configurable */}
             <Dialog
                 open={configModalOpen}
-                onClose={() => setConfigModalOpen(false)}
-                fullWidth
-                maxWidth="sm"
-                PaperProps={{ sx: { borderRadius: 2, border: `1px solid ${UI_BORDER_STRONG}` } }}
-            >
-                <DialogTitle sx={{ m: 0, p: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <Typography variant="h6" fontWeight={700}>
-                        {t('configurableAttributesTitle')}
-                    </Typography>
-                    <IconButton onClick={() => setConfigModalOpen(false)} size="small">
-                        <CloseIcon />
-                    </IconButton>
-                </DialogTitle>
-                <DialogContent dividers sx={{ p: 3 }}>
-                    {variantOverflow !== null && (
-                        <Alert severity="warning" sx={{ mb: 2 }}>
-                            {t('tooManyVariantCombinations', { count: variantOverflow, max: MAX_VARIANT_COMBINATIONS })}
-                        </Alert>
-                    )}
-                    <Autocomplete
-                        multiple
-                        size="small"
-                        options={familyScopedAttributeOptions}
-                        getOptionLabel={(option) => option.name || option.code}
-                        value={selectedAttributeObjects}
-                        onChange={(_, newValue) => {
-                            const newIds = newValue.map((item) => item.id);
-                            handleGenerateVariants(newIds);
-                        }}
-                        sx={fioriMultiInputSx('none')}
-                        renderTags={(value, getTagProps) =>
-                            value.map((option, index) => (
-                                <Chip label={option.name || option.code} size="small" {...getTagProps({ index })} key={option.id} sx={mappedChipSx} />
-                            ))
+                onClose={closeConfigModal}
+                headerText={t('configurableAttributesTitle')}
+                style={{ width: 'min(600px, 95vw)' }}
+                footer={
+                    <Bar
+                        design="Footer"
+                        endContent={
+                            <>
+                                <Button design="Transparent" onClick={closeConfigModal}>
+                                    {t('back')}
+                                </Button>
+                                <Button design="Emphasized" onClick={closeConfigModal}>
+                                    Save Configurations
+                                </Button>
+                            </>
                         }
-                        renderInput={(params) => <TextField {...params} placeholder={t('selectAttributesPlaceholder')} variant="outlined" />}
                     />
-                </DialogContent>
-                <DialogActions sx={{ px: 3, py: 2, justifyContent: 'flex-end', gap: 1 }}>
-                    <Button onClick={() => setConfigModalOpen(false)} sx={{ color: 'text.secondary', fontWeight: 700, textTransform: 'none' }}>
-                        {t('back')}
-                    </Button>
-                    <Button
-                        variant="contained"
-                        onClick={() => setConfigModalOpen(false)}
-                        sx={{ ...solidActionSx, fontWeight: 700, borderRadius: 1.5, px: 2.5, textTransform: 'none' }}
-                    >
-                        Save Configurations
-                    </Button>
-                </DialogActions>
+                }
+            >
+                {variantOverflow !== null && (
+                    <MessageStrip design="Critical" hideCloseButton style={{ marginBottom: '1rem' }}>
+                        {t('tooManyVariantCombinations', { count: variantOverflow, max: MAX_VARIANT_COMBINATIONS })}
+                    </MessageStrip>
+                )}
+                <MultiComboBox
+                    style={{ width: '100%' }}
+                    placeholder={t('selectAttributesPlaceholder')}
+                    selectedValues={selectedAttributeObjects.map((attr) => String(attr.id))}
+                    onSelectionChange={(e) => {
+                        const newIds = e.detail.items.map((item) => Number(item.value)).filter((id) => !Number.isNaN(id));
+                        handleGenerateVariants(newIds);
+                    }}
+                >
+                    {familyScopedAttributeOptions.map((option) => (
+                        <MultiComboBoxItem key={option.id} value={String(option.id)} text={option.name || option.code} />
+                    ))}
+                </MultiComboBox>
             </Dialog>
         </AppLayout>
     );

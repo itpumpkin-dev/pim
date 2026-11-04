@@ -1,32 +1,16 @@
+import { FioriMessageBox } from '@/components/fiori-message-box';
+import { FioriResponsiveColumn, FioriResponsiveTable } from '@/components/fiori-responsive-table';
 import AppLayout from '@/layouts/app-layout';
+import { FioriStatus } from '@/lib/fiori-style';
 import { type BreadcrumbItem, type SharedData } from '@/types';
 import { Head, router, usePage } from '@inertiajs/react';
-import {
-    Box,
-    Button,
-    Divider,
-    InputAdornment,
-    Paper,
-    TextField,
-    Typography,
-    IconButton,
-} from '@mui/material';
-import SearchIcon from '@mui/icons-material/Search';
-import EditIcon from '@mui/icons-material/Edit';
-import ContentCopyIcon from '@mui/icons-material/ContentCopy';
-import DeleteIcon from '@mui/icons-material/Delete';
-import { useState, useEffect, useRef } from 'react';
+import '@ui5/webcomponents-icons/dist/copy.js';
+import '@ui5/webcomponents-icons/dist/delete.js';
+import '@ui5/webcomponents-icons/dist/edit.js';
+import '@ui5/webcomponents-icons/dist/search.js';
+import { Button, FlexBox, Icon, Input, Text, Title } from '@ui5/webcomponents-react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FioriResponsiveColumn, FioriResponsiveTable } from '@/components/fiori-responsive-table';
-import { FioriMessageBox } from '@/components/fiori-message-box';
-import {
-    FIORI,
-    FioriStatus,
-    fioriCardSx,
-    fioriEmphasizedSx,
-    fioriIconButtonSx,
-    fioriSearchFieldSx,
-} from '@/lib/fiori-style';
 
 interface PaginationData<T> {
     data: T[];
@@ -37,26 +21,36 @@ interface PaginationData<T> {
 }
 
 interface GridConfig {
-    columns: Record<string, {
-        label: string;
-        type: string;
-        sortable?: boolean;
-    }>;
-    actions?: Record<string, {
-        icon: string;
-        label: string;
-    }>;
+    columns: Record<
+        string,
+        {
+            label: string;
+            type: string;
+            sortable?: boolean;
+        }
+    >;
+    actions?: Record<
+        string,
+        {
+            icon: string;
+            label: string;
+        }
+    >;
 }
 
 interface JobPositionIndexProps {
     gridConfig: GridConfig;
-    gridData: PaginationData<any>;
+    gridData: PaginationData<GridRow>;
     filters: {
         search?: string;
         sort?: string;
         dir?: string;
     };
 }
+
+type GridRow = { id: number; name: string; [key: string]: unknown };
+
+const actionIcon = (icon: string) => (icon === 'copy' ? 'copy' : icon === 'delete' ? 'delete' : 'edit');
 
 export default function JobPositionIndex({ gridConfig, gridData, filters }: JobPositionIndexProps) {
     const { t } = useTranslation('grid');
@@ -91,18 +85,16 @@ export default function JobPositionIndex({ gridConfig, gridData, filters }: JobP
     // allows, and the rest reflow into the pop-in area first. Row actions
     // stay pinned like the identifying column since they're always reachable
     // in Fiori's pattern too.
-    type JobPositionRow = PaginationData<any>['data'][number];
+    type JobPositionRow = GridRow;
     const columns: FioriResponsiveColumn<JobPositionRow>[] = Object.entries(gridConfig.columns).map(([key, column], index) => ({
         key,
         header: t(column.label),
         priority: index === 0 ? 'always' : index === 1 ? 'high' : index === 2 ? 'medium' : 'low',
-        render: (row) =>
+        render: (row: JobPositionRow) =>
             column.type === 'boolean' ? (
                 <FioriStatus label={row[key] ? t('active') : t('inactive')} tone={row[key] ? 'success' : 'neutral'} />
             ) : (
-                <Typography variant="body2" sx={{ fontWeight: key === 'name' ? 600 : 400 }}>
-                    {row[key] || '-'}
-                </Typography>
+                <Text style={{ fontWeight: key === 'name' ? 600 : 400 }}>{(row[key] as ReactNode) || '-'}</Text>
             ),
     }));
 
@@ -112,13 +104,9 @@ export default function JobPositionIndex({ gridConfig, gridData, filters }: JobP
             header: t('actionsHeader'),
             priority: 'always',
             align: 'right',
-            render: (row) => (
-                <Box sx={{ display: 'flex', gap: 0.5, justifyContent: 'flex-end' }}>
+            render: (row: JobPositionRow) => (
+                <FlexBox justifyContent="End" style={{ gap: '0.25rem' }}>
                     {visibleActions.map(([actionKey, action]) => {
-                        let Icon = EditIcon;
-                        if (action.icon === 'copy') Icon = ContentCopyIcon;
-                        if (action.icon === 'delete') Icon = DeleteIcon;
-
                         const handleClick = () => {
                             if (actionKey === 'update') {
                                 router.visit(`/system/jobPosition/${row.id}/edit`);
@@ -129,13 +117,17 @@ export default function JobPositionIndex({ gridConfig, gridData, filters }: JobP
                         };
 
                         return (
-                            <IconButton key={actionKey} size="small" sx={{ ...fioriIconButtonSx, display: 'flex', flexDirection: 'column' }} onClick={handleClick}>
-                                <Icon fontSize="small" />
-                                <Typography variant="caption" sx={{ fontSize: '0.6rem' }}>{t(action.label)}</Typography>
-                            </IconButton>
+                            <Button
+                                key={actionKey}
+                                design="Transparent"
+                                icon={actionIcon(action.icon)}
+                                tooltip={t(action.label)}
+                                accessibleName={t(action.label)}
+                                onClick={handleClick}
+                            />
                         );
                     })}
-                </Box>
+                </FlexBox>
             ),
         });
     }
@@ -169,41 +161,37 @@ export default function JobPositionIndex({ gridConfig, gridData, filters }: JobP
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={tSystem('jobPositionsCount', { count: gridData.total })} />
-            <Box sx={{ p: 4, bgcolor: FIORI.pageBg, minHeight: '100%' }}>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 2, mb: 3 }}>
-                    <Typography variant="h5" sx={{ fontWeight: 600, color: FIORI.textPrimary }}>
+            <div style={{ padding: '2rem', background: 'var(--sapBackgroundColor)', minHeight: '100%', boxSizing: 'border-box' }}>
+                <FlexBox justifyContent="SpaceBetween" alignItems="Start" style={{ gap: '1rem', marginBottom: '1.5rem' }}>
+                    <Title level="H3" wrappingType="Normal">
                         {tSystem('jobPositionsCount', { count: gridData.total })}
-                    </Typography>
+                    </Title>
                     {canCreate && (
-                        <Button
-                            variant="contained"
-                            onClick={() => router.visit('/system/jobPosition/create')}
-                            sx={fioriEmphasizedSx}
-                        >
+                        <Button design="Emphasized" onClick={() => router.visit('/system/jobPosition/create')}>
                             {tSystem('createJobPosition')}
                         </Button>
                     )}
-                </Box>
+                </FlexBox>
 
-                <Paper elevation={0} sx={fioriCardSx}>
-                    <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center', p: 2 }}>
-                        <TextField
+                <div
+                    style={{
+                        background: 'var(--sapGroup_ContentBackground)',
+                        border: '1px solid var(--sapGroup_ContentBorderColor)',
+                        borderRadius: 'var(--sapElement_BorderCornerRadius)',
+                        overflow: 'hidden',
+                    }}
+                >
+                    <FlexBox alignItems="Center" style={{ gap: '0.75rem', padding: '1rem' }}>
+                        <Input
                             placeholder={tSystem('searchByName')}
                             value={search}
-                            onChange={(e) => setSearch(e.target.value)}
-                            size="small"
-                            sx={{ ...fioriSearchFieldSx, minWidth: 300 }}
-                            InputProps={{
-                                startAdornment: (
-                                    <InputAdornment position="start">
-                                        <SearchIcon sx={{ color: FIORI.textSecondary, fontSize: 20 }} />
-                                    </InputAdornment>
-                                ),
-                            }}
+                            onInput={(e) => setSearch(e.target.value)}
+                            icon={<Icon name="search" />}
+                            style={{ minWidth: 300, maxWidth: '100%' }}
                         />
-                    </Box>
+                    </FlexBox>
 
-                    <Divider sx={{ borderColor: FIORI.border }} />
+                    <div style={{ borderTop: '1px solid var(--sapGroup_ContentBorderColor)' }} />
 
                     <FioriResponsiveTable
                         variant="plain"
@@ -212,8 +200,8 @@ export default function JobPositionIndex({ gridConfig, gridData, filters }: JobP
                         getRowKey={(row) => row.id}
                         emptyMessage={t('noDataFound')}
                     />
-                </Paper>
-            </Box>
+                </div>
+            </div>
 
             <FioriMessageBox
                 open={Boolean(deleteTarget)}

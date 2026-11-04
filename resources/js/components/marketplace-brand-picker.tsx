@@ -1,5 +1,5 @@
-import { FIORI, fioriSearchFieldSx } from '@/lib/fiori-style';
-import { Autocomplete, Stack, TextField, Typography } from '@mui/material';
+import '@ui5/webcomponents-icons/dist/search.js';
+import { ComboBox, ComboBoxItem, Icon, Label } from '@ui5/webcomponents-react';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { MarketplacePlatform } from './marketplace-category-picker';
@@ -56,12 +56,16 @@ export function MarketplaceBrandPicker({
     useEffect(() => {
         if (!value) {
             setSelected(null);
+            setQuery('');
             return;
         }
         setLoadingCurrent(true);
         fetch(`/catalog/marketplace-brands/${platform}/lookup?id=${value}`, { headers: { Accept: 'application/json' } })
             .then((res) => (res.ok ? res.json() : null))
-            .then(setSelected)
+            .then((opt: BrandOption | null) => {
+                setSelected(opt);
+                if (opt) setQuery(opt.name);
+            })
             .finally(() => setLoadingCurrent(false));
     }, [platform, value]);
 
@@ -85,39 +89,60 @@ export function MarketplaceBrandPicker({
         return () => clearTimeout(timer);
     }, [platform, query, shopeeCategoryId]);
 
+    // รายการที่ให้ ComboBox แสดง — ต้องมีตัวที่เลือกไว้อยู่ด้วยเสมอ (แม้จะไม่อยู่ในผลค้นหา
+    // ล่าสุด) ไม่งั้น UI5 จะหา item ที่ตรงกับ selectedValue ไม่เจอ
+    const options = selected && !results.some((r) => r.id === selected.id) ? [selected, ...results] : results;
+    const trimmed = query.trim();
+    const showNoMatch = trimmed !== '' && !searching && results.length === 0 && trimmed !== selected?.name;
+
     return (
-        <Stack spacing={0.5}>
-            <Typography variant="caption" fontWeight={600} color="#334155">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+            <Label showColon={false} style={{ fontWeight: 600 }}>
                 {label}
-            </Typography>
-            <Autocomplete
-                size="small"
+            </Label>
+            <ComboBox
+                style={{ width: '100%' }}
                 disabled={disabled}
-                options={results}
+                // ค้นหาฝั่ง server แล้ว (debounce 300ms ด้านบน) — ไม่ต้องให้ UI5 กรองซ้ำ
+                filter="None"
+                noTypeahead
+                showClearIcon
                 loading={searching || loadingCurrent}
-                filterOptions={(options) => options}
-                getOptionLabel={(opt) => opt.name}
-                isOptionEqualToValue={(opt, val) => opt.id === val.id}
-                value={selected}
-                onChange={(_, val) => {
-                    setSelected(val);
-                    onChange(val ? val.id : null);
+                icon={<Icon name="search" />}
+                placeholder={t('searchPlatformBrandPlaceholder', { platform: label })}
+                value={query}
+                selectedValue={selected ? String(selected.id) : undefined}
+                onInput={(e) => {
+                    const next = e.target.value ?? '';
+                    setQuery(next);
+                    // ช่องถูกล้าง (ปุ่ม clear หรือลบจนว่าง) = ล้าง override แบบเดียวกับปุ่ม × ของ MUI Autocomplete เดิม
+                    if (next === '' && selected) {
+                        setSelected(null);
+                        onChange(null);
+                    }
                 }}
-                inputValue={query}
-                onInputChange={(_, val) => setQuery(val)}
-                // MUI เปิด dropdown ทันทีที่ช่อง focus (ก่อนพิมพ์อะไรเลยด้วยซ้ำ) —
-                // ไม่ได้แปลว่า request พังหรือหาไม่เจอ แค่ยังไม่เริ่มค้นหาเพราะ
-                // ยังไม่มีตัวอักษรให้ค้น (ดู useEffect ด้านบน: query ว่าง = ไม่ยิง
-                // request เลย เหตุผลเดียวกับที่ categorySearchPlaceholder ใช้ —
-                // ชุดข้อมูลนี้ใหญ่เกินจะโหลดมาแสดงทั้งหมดไว้ก่อน) ข้อความ default
-                // ของ MUI ตรงนี้คือ "No options" เฉยๆ ซึ่งดูเหมือนพังไปเลย เลย
-                // ต้องแยกข้อความสองแบบนี้ออกจากกันชัดเจน
-                noOptionsText={query.trim() === '' ? t('categorySearchPlaceholder') : t('noBrandMatching', { query })}
-                renderInput={(params) => (
-                    <TextField {...params} placeholder={t('searchPlatformBrandPlaceholder', { platform: label })} sx={fioriSearchFieldSx} />
-                )}
-                sx={{ '& .MuiOutlinedInput-root': { borderColor: FIORI.border } }}
-            />
-        </Stack>
+                onSelectionChange={(e) => {
+                    const id = e.detail.item?.value;
+                    if (!id) return;
+                    const val = options.find((opt) => String(opt.id) === id) ?? null;
+                    if (!val) return;
+                    setSelected(val);
+                    setQuery(val.name);
+                    onChange(val.id);
+                }}
+                onChange={() => {
+                    // blur/Enter โดยไม่ได้เลือก item — คืนข้อความในช่องเป็นชื่อของตัวที่เลือกไว้ (เหมือน MUI)
+                    if (selected && query !== selected.name) setQuery(selected.name);
+                }}
+            >
+                {options.map((opt) => (
+                    <ComboBoxItem key={opt.id} text={opt.name} value={String(opt.id)} />
+                ))}
+            </ComboBox>
+            {/* UI5 ComboBox ไม่มีข้อความ "no options" — แยกข้อความ "ยังไม่ได้พิมพ์" (placeholder) กับ "ค้นไม่เจอ" ให้ชัดเหมือนเดิม */}
+            {showNoMatch && (
+                <span style={{ fontSize: 'var(--sapFontSmallSize)', color: 'var(--sapContent_LabelColor)' }}>{t('noBrandMatching', { query })}</span>
+            )}
+        </div>
     );
 }

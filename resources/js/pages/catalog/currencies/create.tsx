@@ -1,16 +1,15 @@
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
-import { Head, Link, router, useForm } from '@inertiajs/react';
-import ArrowBackIcon from '@mui/icons-material/ArrowBack';
-import SaveIcon from '@mui/icons-material/Save';
-import { Box, Button, CircularProgress, Stack, TextField, Typography } from '@mui/material';
+import { Head, router, useForm } from '@inertiajs/react';
+import { Input } from '@ui5/webcomponents-react';
 import { FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { useUnsavedChangesGuard } from '@/hooks/use-unsaved-changes-guard';
 import LocaleLabelFields from '@/components/catalog/locale-label-fields';
-import { FioriField, FioriFormErrorSummary, FioriFormGroup, fioriFieldStateSx, valueStateOf } from '@/components/fiori-form';
-import { FIORI, fioriDefaultSx, fioriEmphasizedSx } from '@/lib/fiori-style';
+import { FioriField, FioriFormGroup, ui5ValueState, valueStateOf } from '@/components/fiori-form';
+import { useUnsavedChangesGuard } from '@/hooks/use-unsaved-changes-guard';
+
+import { MasterFormPage } from '../master-crud';
 
 export default function CurrencyCreate() {
     const { t } = useTranslation('catalog');
@@ -43,28 +42,27 @@ export default function CurrencyCreate() {
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={t('createCurrency')} />
-            <Box component="form" onSubmit={submit} sx={{ p: { xs: 2, md: 4 }, width: '100%', maxWidth: 560, bgcolor: FIORI.pageBg }}>
-                <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ sm: 'center' }} spacing={2} sx={{ mb: 3 }}>
-                    <Typography variant="h5" fontWeight={600} sx={{ color: FIORI.textPrimary }}>{t('createCurrency')}</Typography>
-                    <Stack direction="row" spacing={1}>
-                        <Button component={Link} href="/catalog/currencies" variant="outlined" startIcon={<ArrowBackIcon />} sx={fioriDefaultSx}>
-                            {t('back')}
-                        </Button>
-                        <Button type="submit" variant="contained" disabled={processing} startIcon={processing ? <CircularProgress size={16} color="inherit" /> : <SaveIcon />} sx={fioriEmphasizedSx}>
-                            {processing ? t('saving') : t('save')}
-                        </Button>
-                    </Stack>
-                </Stack>
-
+            <MasterFormPage
+                title={t('createCurrency')}
+                backHref="/catalog/currencies"
+                processing={processing}
+                onSubmit={submit}
+                errors={errors}
+                maxWidth={560}
+            >
                 <FioriFormGroup title={t('generalTitle')}>
-                    <FioriField label={t('currencyCode')} htmlFor="cur-code" valueState={valueStateOf(errors.code)} message={errors.code} hint={t('currencyCodeHelperText')}>
-                        <TextField
+                    <FioriField
+                        label={t('currencyCode')}
+                        htmlFor="cur-code"
+                        valueState={valueStateOf(errors.code)}
+                        message={errors.code}
+                        hint={t('currencyCodeHelperText')}
+                    >
+                        <Input
                             id="cur-code"
-                            fullWidth
-                            size="small"
                             value={data.code}
-                            onChange={(e) => setData('code', e.target.value.toUpperCase())}
-                            sx={fioriFieldStateSx(valueStateOf(errors.code))}
+                            valueState={ui5ValueState(valueStateOf(errors.code))}
+                            onInput={(e) => setData('code', e.target.value.toUpperCase())}
                         />
                     </FioriField>
 
@@ -75,30 +73,23 @@ export default function CurrencyCreate() {
                         message={errors.exchange_rate}
                         hint={t('currencyExchangeRateHelperText')}
                     >
-                        <TextField
+                        <Input
                             id="cur-exchange-rate"
-                            fullWidth
-                            size="small"
-                            type="number"
-                            inputProps={{ step: '0.0001', min: 0 }}
+                            type="Number"
                             value={data.exchange_rate}
-                            onChange={(e) => setData('exchange_rate', e.target.value)}
-                            sx={fioriFieldStateSx(valueStateOf(errors.exchange_rate))}
+                            valueState={ui5ValueState(valueStateOf(errors.exchange_rate))}
+                            onInput={(e) => setData('exchange_rate', e.target.value)}
                         />
                     </FioriField>
                 </FioriFormGroup>
 
-                <Stack sx={{ mt: 2 }}>
-                    <LocaleLabelFields
-                        title={t('currencyName')}
-                        description={t('nameHelperText')}
-                        values={data.translations}
-                        onChange={(localeId, value) => setData('translations', { ...data.translations, [localeId]: value })}
-                    />
-                </Stack>
-
-                <FioriFormErrorSummary errors={errors} message={t('correctHighlightedFields')} sx={{ mt: 2, maxWidth: 560 }} />
-            </Box>
+                <LocaleLabelFields
+                    title={t('currencyName')}
+                    description={t('nameHelperText')}
+                    values={data.translations}
+                    onChange={(localeId, value) => setData('translations', { ...data.translations, [localeId]: value })}
+                />
+            </MasterFormPage>
         </AppLayout>
     );
 }

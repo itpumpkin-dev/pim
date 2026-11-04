@@ -1,0 +1,414 @@
+/* Shared page layout for the Import / Export module (exports, imports, jobs, woo-convert). */
+
+.page {
+    box-sizing: border-box;
+    width: 100%;
+    min-height: 100%;
+    padding: 1rem;
+    background: var(--sapBackgroundColor);
+}
+
+@media (min-width: 900px) {
+    .page {
+        padding: 2rem;
+    }
+}
+
+/* Title + action buttons: stacked on phones, one row from 600px. */
+.header {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+@media (min-width: 600px) {
+    .header {
+        flex-direction: row;
+        align-items: center;
+        justify-content: space-between;
+    }
+}
+
+.actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+/* Card surface (replaces the old MUI Paper card). */
+.card {
+    box-sizing: border-box;
+    background: var(--sapGroup_ContentBackground);
+    border: 1px solid var(--sapGroup_ContentBorderColor);
+    border-radius: var(--sapElement_BorderCornerRadius, 0.5rem);
+}
+
+.cardPadded {
+    composes: card;
+    padding: 1.5rem;
+}
+
+.toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 1rem;
+    border-bottom: 1px solid var(--sapGroup_ContentBorderColor);
+}
+
+.secondaryText {
+    color: var(--sapContent_LabelColor);
+    font-size: var(--sapFontSize);
+}
+
+.smallText {
+    color: var(--sapContent_LabelColor);
+    font-size: var(--sapFontSmallSize);
+}
+
+.mono {
+    font-family: var(--sapFontFamily);
+    font-weight: 600;
+}
+
+.fullWidth {
+    width: 100%;
+}
+
+/* Selectable radio "card" (wizard choices). */
+.choiceCard {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.25rem;
+    box-sizing: border-box;
+    padding: 0.5rem 0.75rem 0.5rem 0.25rem;
+    border: 1px solid var(--sapGroup_ContentBorderColor);
+    border-radius: var(--sapElement_BorderCornerRadius, 0.5rem);
+    background: var(--sapGroup_ContentBackground);
+    cursor: pointer;
+}
+
+.choiceCard:hover {
+    background: var(--sapList_Hover_Background);
+}
+
+.choiceCardSelected {
+    border-color: var(--sapBrandColor);
+    background: var(--sapList_SelectionBackgroundColor);
+}
+
+.choiceTitle {
+    display: block;
+    padding-top: 0.625rem;
+    font-weight: 600;
+    color: var(--sapTextColor);
+    font-size: var(--sapFontSize);
+}
+
+.choiceDescription {
+    display: block;
+    color: var(--sapContent_LabelColor);
+    font-size: var(--sapFontSize);
+}
+
+.stack {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.375rem;
+}
+
+/* column on phones, row from 600px (category cascade) / 900px (scope cards) */
+.responsiveRow {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.responsiveRow > * {
+    flex: 1;
+    min-width: 0;
+}
+
+@media (min-width: 600px) {
+    .responsiveRowSm {
+        flex-direction: row;
+    }
+}
+
+@media (min-width: 900px) {
+    .responsiveRowMd {
+        flex-direction: row;
+    }
+}
+
+.sectionHeading {
+    margin-bottom: 0.125rem;
+}
+
+.subHeading {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 600;
+    color: var(--sapTextColor);
+    font-size: var(--sapFontSize);
+}
+
+.hint {
+    display: block;
+    margin-top: 0.25rem;
+    color: var(--sapContent_LabelColor);
+    font-size: var(--sapFontSmallSize);
+}
+
+.warningText {
+    font-style: italic;
+    color: var(--sapCriticalTextColor, var(--sapCriticalColor));
+    font-size: var(--sapFontSize);
+}
+
+.mutedItalic {
+    font-style: italic;
+    color: var(--sapContent_DisabledTextColor, var(--sapContent_LabelColor));
+    font-size: var(--sapFontSize);
+}
+
+.footerNav {
+    display: flex;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-top: 1.5rem;
+}
+
+.sampleTableWrap {
+    overflow-x: auto;
+    border: 1px solid var(--sapList_BorderColor);
+    border-radius: var(--sapElement_BorderCornerRadius, 0.5rem);
+}
+
+.sampleTable {
+    border-collapse: collapse;
+    width: 100%;
+    font-size: 0.8125rem;
+    font-family: var(--sapFontFamily);
+    color: var(--sapTextColor);
+}
+
+.sampleTable th {
+    text-align: left;
+    white-space: nowrap;
+    padding: 0.5rem;
+    font-weight: 600;
+    background: var(--sapList_HeaderBackground);
+    border-bottom: 1px solid var(--sapList_BorderColor);
+}
+
+.sampleTable td {
+    white-space: nowrap;
+    padding: 0.5rem;
+    background: var(--sapList_Background);
+}
+
+/* KPI tiles (1 col on phones, 3 from 600px). */
+.statGrid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+@media (min-width: 600px) {
+    .statGrid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+}
+
+.statValue {
+    display: block;
+    font-size: var(--sapFontHeader2Size, 2rem);
+    font-weight: 700;
+    color: var(--sapTextColor);
+    font-family: var(--sapFontFamily);
+}
+
+/* Label / value pairs (1 col on phones, 2 from 600px). */
+.summaryGrid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1rem;
+}
+
+@media (min-width: 600px) {
+    .summaryGrid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+.summaryValue {
+    display: block;
+    color: var(--sapTextColor);
+    font-size: var(--sapFontSize);
+    font-family: var(--sapFontFamily);
+}
+
+/* Indeterminate progress stripe along the bottom edge of a card (UI5 has no indeterminate ProgressIndicator). */
+.indeterminateTrack {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 3px;
+    overflow: hidden;
+    background: var(--sapList_Hover_Background);
+}
+
+.indeterminateTrack::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: -40%;
+    width: 40%;
+    background: var(--sapBrandColor);
+    animation: indeterminateSlide 1.4s ease-in-out infinite;
+}
+
+@keyframes indeterminateSlide {
+    0% {
+        left: -40%;
+    }
+    100% {
+        left: 100%;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .indeterminateTrack::after {
+        animation: none;
+        left: 0;
+        width: 100%;
+        opacity: 0.5;
+    }
+}
+
+/* WooCommerce hub direction cards: stacked on phones, side by side from 600px. */
+.directionRow {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    margin-bottom: 2rem;
+}
+
+@media (min-width: 600px) {
+    .directionRow {
+        flex-direction: row;
+    }
+}
+
+.directionCard {
+    composes: cardPadded;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    cursor: pointer;
+    transition: border-color 0.15s;
+}
+
+.directionCard:hover {
+    border-color: var(--sapBrandColor);
+}
+
+.iconCircle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    background: var(--sapList_SelectionBackgroundColor);
+    color: var(--sapBrandColor);
+}
+
+.emptyState {
+    composes: cardPadded;
+    padding: 3rem;
+    text-align: center;
+}
+
+/* WooCommerce convert drop target (label wrapping a hidden file input). */
+.dropzone {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.25rem;
+    padding: 1.5rem;
+    border: 2px dashed var(--sapGroup_ContentBorderColor);
+    border-radius: var(--sapElement_BorderCornerRadius, 0.5rem);
+    background: transparent;
+    cursor: pointer;
+    text-align: center;
+    transition:
+        border-color 0.15s,
+        background-color 0.15s;
+}
+
+.dropzone:hover {
+    border-color: var(--sapBrandColor);
+}
+
+.dropzoneActive {
+    border-color: var(--sapBrandColor);
+    background: var(--sapList_SelectionBackgroundColor);
+}
+
+.selectedFile {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem;
+    border: 1px solid var(--sapPositiveColor);
+    border-radius: var(--sapElement_BorderCornerRadius, 0.5rem);
+    background: var(--sapList_Hover_Background);
+}
+
+.ellipsis {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Conversion result tiles: 2 per row on phones, 4 from 600px. */
+.statGrid4 {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+@media (min-width: 600px) {
+    .statGrid4 {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+}
+
+.chip {
+    padding: 0.25rem 0.5rem;
+    border-radius: 6px;
+    background: var(--sapList_Hover_Background);
+    color: var(--sapTextColor);
+    font-size: var(--sapFontSize);
+    font-family: var(--sapFontFamily);
+}

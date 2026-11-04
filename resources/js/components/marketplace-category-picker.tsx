@@ -1,25 +1,11 @@
-import { FIORI, FIORI_RAW, fioriDefaultSx, fioriEmphasizedSx, fioriSearchFieldSx } from '@/lib/fiori-style';
-import { UI_BORDER, UI_BORDER_STRONG } from '@/lib/ui-style';
-import ChevronRightIcon from '@mui/icons-material/ChevronRight';
-import ClearIcon from '@mui/icons-material/Clear';
-import CloseIcon from '@mui/icons-material/Close';
-import SearchIcon from '@mui/icons-material/Search';
-import {
-    Box,
-    Button,
-    CircularProgress,
-    Dialog,
-    DialogActions,
-    DialogContent,
-    DialogTitle,
-    IconButton,
-    InputAdornment,
-    Stack,
-    TextField,
-    Typography,
-} from '@mui/material';
+import '@ui5/webcomponents-icons/dist/decline.js';
+import '@ui5/webcomponents-icons/dist/search.js';
+import '@ui5/webcomponents-icons/dist/slim-arrow-right.js';
+import { Bar, BusyIndicator, Button, Dialog, Icon, Input, Label, Text, Title } from '@ui5/webcomponents-react';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+
+import styles from './marketplace-category-picker.module.css';
 
 export type MarketplacePlatform = 'shopee' | 'lazada' | 'tiktok' | 'woocommerce';
 
@@ -189,165 +175,180 @@ export function MarketplaceCategoryPicker({
         setOpen(false);
     };
 
-    const clearValue = (e: React.MouseEvent) => {
+    const clearValue = (e: { stopPropagation: () => void }) => {
         e.stopPropagation();
         onChange(null);
     };
 
+    const spinner = (size: 'S' | 'M') => <BusyIndicator active delay={0} size={size} />;
+
     return (
-        <Stack spacing={0.5}>
-            <Typography variant="caption" fontWeight={600} color="#334155">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+            <Label showColon={false} style={{ fontWeight: 600 }}>
                 {label}
-            </Typography>
-            <Box
+            </Label>
+            <div
+                role="button"
+                tabIndex={disabled ? -1 : 0}
+                aria-disabled={disabled || undefined}
                 onClick={disabled ? undefined : openPicker}
-                sx={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    gap: 1,
-                    px: 1.5,
-                    py: 1,
-                    border: `1px solid ${UI_BORDER_STRONG}`,
-                    borderRadius: 1,
-                    cursor: disabled ? 'not-allowed' : 'pointer',
-                    opacity: disabled ? 0.5 : 1,
-                    bgcolor: disabled ? 'action.disabledBackground' : 'transparent',
-                    '&:hover': disabled ? undefined : { borderColor: FIORI.brand },
-                }}
+                onKeyDown={
+                    disabled
+                        ? undefined
+                        : (e) => {
+                              if (e.target !== e.currentTarget) return;
+                              if (e.key === 'Enter' || e.key === ' ') {
+                                  e.preventDefault();
+                                  void openPicker();
+                              }
+                          }
+                }
+                className={[styles.trigger, disabled ? styles.triggerDisabled : ''].filter(Boolean).join(' ')}
             >
-                <Typography
-                    variant="body2"
-                    color={loadingCurrent || currentPath.length === 0 ? 'text.disabled' : 'text.primary'}
-                    sx={{ fontStyle: !loadingCurrent && currentPath.length === 0 ? 'italic' : 'normal' }}
+                <span
+                    style={{
+                        fontSize: 'var(--sapFontSize)',
+                        color:
+                            loadingCurrent || currentPath.length === 0
+                                ? 'var(--sapContent_DisabledTextColor, var(--sapContent_LabelColor))'
+                                : 'var(--sapTextColor)',
+                        fontStyle: !loadingCurrent && currentPath.length === 0 ? 'italic' : 'normal',
+                    }}
                 >
                     {loadingCurrent
                         ? t('loadingEllipsis')
                         : currentPath.length > 0
                           ? currentPath.map((n) => n.name).join(' > ')
                           : t('notSetClickToSelectPlatformCategory', { platform: label })}
-                </Typography>
-                <Stack direction="row" spacing={0.5} alignItems="center">
+                </span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
                     {!disabled && currentPath.length > 0 && (
-                        <IconButton size="small" onClick={clearValue} title={t('clearValue')}>
-                            <ClearIcon fontSize="small" />
-                        </IconButton>
+                        <Button design="Transparent" icon="decline" tooltip={t('clearValue')} accessibleName={t('clearValue')} onClick={clearValue} />
                     )}
-                    <ChevronRightIcon fontSize="small" sx={{ color: 'text.disabled' }} />
-                </Stack>
-            </Box>
+                    <Icon name="slim-arrow-right" style={{ color: 'var(--sapContent_IconColor)', width: '1rem', height: '1rem' }} />
+                </div>
+            </div>
 
-            <Dialog open={open} onClose={() => setOpen(false)} maxWidth="md" fullWidth>
-                <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    {t('selectPlatformCategoryDialogTitle', { platform: label })}
-                    <IconButton size="small" onClick={() => setOpen(false)}>
-                        <CloseIcon fontSize="small" />
-                    </IconButton>
-                </DialogTitle>
-                <DialogContent dividers sx={{ p: 0 }}>
-                    <Box sx={{ p: 2, borderBottom: `1px solid ${UI_BORDER}` }}>
-                        <TextField
-                            size="small"
-                            fullWidth
+            <Dialog
+                open={open}
+                onClose={() => setOpen(false)}
+                className={styles.dialog}
+                style={{ width: 'min(900px, calc(100vw - 2rem))' }}
+                header={
+                    <div
+                        style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            width: '100%',
+                            gap: '0.5rem',
+                            padding: '0.25rem 0',
+                        }}
+                    >
+                        <Title level="H5" size="H5" wrappingType="Normal">
+                            {t('selectPlatformCategoryDialogTitle', { platform: label })}
+                        </Title>
+                        <Button design="Transparent" icon="decline" accessibleName={t('cancel')} onClick={() => setOpen(false)} />
+                    </div>
+                }
+                footer={
+                    <Bar
+                        design="Footer"
+                        startContent={
+                            <Text
+                                style={{
+                                    fontSize: 'var(--sapFontSmallSize)',
+                                    color: canConfirm ? 'var(--sapContent_LabelColor)' : 'var(--sapNegativeTextColor, var(--sapNegativeColor))',
+                                }}
+                            >
+                                {selectedPath.length > 0
+                                    ? selectedPath.map((n) => n.name).join(' > ') + (canConfirm ? '' : ` — ${t('selectDownToMostSpecificCategory')}`)
+                                    : '—'}
+                            </Text>
+                        }
+                        endContent={
+                            <>
+                                <Button onClick={() => setOpen(false)}>{t('cancel')}</Button>
+                                <Button design="Emphasized" onClick={handleConfirm} disabled={!canConfirm}>
+                                    {t('confirm')}
+                                </Button>
+                            </>
+                        }
+                    />
+                }
+            >
+                <div>
+                    <div style={{ padding: '1rem', borderBottom: '1px solid var(--sapGroup_ContentBorderColor)' }}>
+                        <Input
+                            style={{ width: '100%' }}
                             placeholder={t('categorySearchPlaceholder')}
                             value={search}
-                            onChange={(e) => setSearch(e.target.value)}
-                            InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" /></InputAdornment> }}
-                            sx={fioriSearchFieldSx}
+                            onInput={(e) => setSearch(e.target.value ?? '')}
+                            icon={<Icon name="search" />}
                         />
-                    </Box>
+                    </div>
 
                     {search.trim() !== '' ? (
-                        <Box sx={{ maxHeight: 360, overflowY: 'auto' }}>
+                        <div style={{ maxHeight: 360, overflowY: 'auto' }}>
                             {searching ? (
-                                <Stack alignItems="center" sx={{ p: 3 }}>
-                                    <CircularProgress size={24} />
-                                </Stack>
+                                <div style={{ display: 'flex', justifyContent: 'center', padding: '1.5rem' }}>{spinner('M')}</div>
                             ) : searchResults.length === 0 ? (
-                                <Typography variant="body2" color="text.secondary" sx={{ p: 2 }}>
+                                <Text style={{ display: 'block', padding: '1rem', color: 'var(--sapContent_LabelColor)' }}>
                                     {t('noCategoryMatching', { query: search })}
-                                </Typography>
+                                </Text>
                             ) : (
                                 searchResults.map((result) => (
-                                    <Box
-                                        key={result.id}
-                                        onClick={() => selectFromSearch(result)}
-                                        sx={{ px: 2, py: 1, cursor: 'pointer', '&:hover': { bgcolor: 'action.hover' } }}
-                                    >
-                                        <Typography variant="body2">{result.name}</Typography>
+                                    <div key={result.id} className={styles.searchResult} onClick={() => selectFromSearch(result)}>
+                                        <div style={{ fontSize: 'var(--sapFontSize)', color: 'var(--sapTextColor)' }}>{result.name}</div>
                                         {result.parent_name && (
-                                            <Typography variant="caption" color="text.secondary">
+                                            <div style={{ fontSize: 'var(--sapFontSmallSize)', color: 'var(--sapContent_LabelColor)' }}>
                                                 {result.parent_name}
-                                            </Typography>
+                                            </div>
                                         )}
-                                    </Box>
+                                    </div>
                                 ))
                             )}
-                        </Box>
+                        </div>
                     ) : loadingLevel === 0 && columns.length === 0 ? (
-                        <Stack alignItems="center" justifyContent="center" sx={{ height: 360 }}>
-                            <CircularProgress size={24} />
-                        </Stack>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 360 }}>{spinner('M')}</div>
                     ) : (
-                        <Stack direction="row" sx={{ height: 360 }}>
+                        <div style={{ display: 'flex', height: 360, overflowX: 'auto' }}>
                             {columns.map((nodes, level) => (
-                                <Box
-                                    key={level}
-                                    sx={{ width: 220, flexShrink: 0, overflowY: 'auto', borderRight: `1px solid ${UI_BORDER}`, '&:last-child': { borderRight: 'none' } }}
-                                >
+                                <div key={level} className={styles.column}>
                                     {nodes.map((node) => {
                                         const isSelected = node.id === selectedPath[level]?.id;
                                         return (
-                                            <Box
+                                            <div
                                                 key={node.id}
                                                 onClick={() => selectAt(level, node)}
-                                                sx={{
-                                                    display: 'flex',
-                                                    alignItems: 'center',
-                                                    justifyContent: 'space-between',
-                                                    gap: 1,
-                                                    px: 2,
-                                                    py: 1,
-                                                    cursor: 'pointer',
-                                                    bgcolor: isSelected ? FIORI_RAW.brand + '1a' : 'transparent',
-                                                    color: isSelected ? FIORI.brand : 'text.primary',
-                                                    fontWeight: isSelected ? 700 : 400,
-                                                    '&:hover': { bgcolor: isSelected ? FIORI_RAW.brand + '1a' : 'action.hover' },
-                                                }}
+                                                className={[styles.node, isSelected ? styles.nodeSelected : ''].filter(Boolean).join(' ')}
                                             >
-                                                <Typography variant="body2" sx={{ fontWeight: 'inherit', color: 'inherit' }}>
-                                                    {node.name}
-                                                </Typography>
-                                                {!node.is_leaf && <ChevronRightIcon fontSize="small" sx={{ color: isSelected ? FIORI.brand : 'text.disabled' }} />}
-                                            </Box>
+                                                <span>{node.name}</span>
+                                                {!node.is_leaf && (
+                                                    <Icon
+                                                        name="slim-arrow-right"
+                                                        style={{
+                                                            width: '1rem',
+                                                            height: '1rem',
+                                                            flexShrink: 0,
+                                                            color: isSelected ? 'var(--sapBrandColor)' : 'var(--sapContent_IconColor)',
+                                                        }}
+                                                    />
+                                                )}
+                                            </div>
                                         );
                                     })}
-                                </Box>
+                                </div>
                             ))}
                             {loadingLevel !== null && loadingLevel > 0 && (
-                                <Stack alignItems="center" justifyContent="center" sx={{ width: 220, flexShrink: 0 }}>
-                                    <CircularProgress size={20} />
-                                </Stack>
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 220, flexShrink: 0 }}>
+                                    {spinner('S')}
+                                </div>
                             )}
-                        </Stack>
+                        </div>
                     )}
-                </DialogContent>
-                <DialogActions sx={{ justifyContent: 'space-between', px: 2, py: 1.5 }}>
-                    <Typography variant="caption" color={canConfirm ? 'text.secondary' : 'error'}>
-                        {selectedPath.length > 0
-                            ? selectedPath.map((n) => n.name).join(' > ') + (canConfirm ? '' : ` — ${t('selectDownToMostSpecificCategory')}`)
-                            : '—'}
-                    </Typography>
-                    <Stack direction="row" spacing={1}>
-                        <Button onClick={() => setOpen(false)} sx={fioriDefaultSx}>
-                            {t('cancel')}
-                        </Button>
-                        <Button variant="contained" onClick={handleConfirm} disabled={!canConfirm} sx={fioriEmphasizedSx}>
-                            {t('confirm')}
-                        </Button>
-                    </Stack>
-                </DialogActions>
+                </div>
             </Dialog>
-        </Stack>
+        </div>
     );
 }

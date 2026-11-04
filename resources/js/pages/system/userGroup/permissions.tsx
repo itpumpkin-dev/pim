@@ -1,14 +1,14 @@
-import AppLayout from '@/layouts/app-layout';
-import { type BreadcrumbItem } from '@/types';
-import { Head, router } from '@inertiajs/react';
-import { Box, Button, InputAdornment, TextField, Typography } from '@mui/material';
-import ArrowBackIcon from '@mui/icons-material/ArrowBack';
-import SearchIcon from '@mui/icons-material/Search';
-import { useMemo, useState } from 'react';
-import { useTranslation } from 'react-i18next';
 import { FioriResponsiveColumn, FioriResponsiveTable } from '@/components/fiori-responsive-table';
 import { ScrollTopButton } from '@/components/scroll-top-button';
-import { FIORI, FioriStatus, fioriDefaultSx, fioriSearchFieldSx } from '@/lib/fiori-style';
+import AppLayout from '@/layouts/app-layout';
+import { FioriStatus } from '@/lib/fiori-style';
+import { type BreadcrumbItem } from '@/types';
+import { Head, router } from '@inertiajs/react';
+import '@ui5/webcomponents-icons/dist/nav-back.js';
+import '@ui5/webcomponents-icons/dist/search.js';
+import { Button, FlexBox, Icon, Input, Text, Title } from '@ui5/webcomponents-react';
+import { useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 interface GroupPermissionRow {
     id: number;
@@ -61,33 +61,25 @@ export default function UserGroupPermissions({ group, permissions }: UserGroupPe
             key: 'permissionId',
             header: tSystem('groupPermissionsPermissionId'),
             priority: 'medium',
-            render: (row) => (
-                <Typography component="span" sx={{ fontFamily: 'monospace', fontSize: '0.8125rem' }}>
-                    {row.permission_id}
-                </Typography>
-            ),
+            render: (row) => <span style={{ fontFamily: 'var(--sapFontFamilyMono, monospace)', fontSize: '0.8125rem' }}>{row.permission_id}</span>,
         },
         {
             key: 'permissionName',
             header: tSystem('groupPermissionsPermissionName'),
             priority: 'always',
-            render: (row) => (
-                <Typography component="span" fontWeight={600}>
-                    {row.permission_name}
-                </Typography>
-            ),
+            render: (row) => <span style={{ fontWeight: 600 }}>{row.permission_name}</span>,
         },
         {
             key: 'description',
             header: tSystem('groupPermissionsDescription'),
             priority: 'low',
             render: (row) => (
-                <Box>
-                    {row.module && <Typography variant="body2">{row.module}</Typography>}
-                    <Typography variant="caption" sx={{ color: FIORI.textSecondary }}>
+                <div>
+                    {row.module && <div style={{ fontSize: 'var(--sapFontSize)', color: 'var(--sapTextColor)' }}>{row.module}</div>}
+                    <span style={{ fontSize: 'var(--sapFontSmallSize)', color: 'var(--sapContent_LabelColor)' }}>
                         {tSystem('groupPermissionsViaRoles', { roles: row.roles })}
-                    </Typography>
-                </Box>
+                    </span>
+                </div>
             ),
         },
     ];
@@ -95,57 +87,38 @@ export default function UserGroupPermissions({ group, permissions }: UserGroupPe
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={tSystem('groupPermissionsGroupLabel', { name: group.name })} />
-            <Box sx={{ p: 4, bgcolor: FIORI.pageBg, minHeight: '100%' }}>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 2, mb: 3, flexWrap: 'wrap' }}>
-                    <Box>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
-                            <Typography variant="h5" fontWeight={600} sx={{ color: FIORI.textPrimary }}>
-                                {tSystem('groupPermissionsGroupLabel', { name: group.name })}
-                            </Typography>
-                            <Typography component="span" sx={{ color: FIORI.textSecondary }}>
-                                ({group.code})
-                            </Typography>
+            <div style={{ padding: '2rem', background: 'var(--sapBackgroundColor)', minHeight: '100%', boxSizing: 'border-box' }}>
+                <FlexBox justifyContent="SpaceBetween" alignItems="Start" wrap="Wrap" style={{ gap: '1rem', marginBottom: '1.5rem' }}>
+                    <div>
+                        <FlexBox alignItems="Center" wrap="Wrap" style={{ gap: '0.75rem' }}>
+                            <Title level="H3">{tSystem('groupPermissionsGroupLabel', { name: group.name })}</Title>
+                            <span style={{ color: 'var(--sapContent_LabelColor)' }}>({group.code})</span>
                             <FioriStatus label={group.is_active ? t('active') : t('inactive')} tone={group.is_active ? 'success' : 'neutral'} />
-                        </Box>
-                        <Typography variant="body2" sx={{ color: FIORI.textSecondary, mt: 1 }}>
+                        </FlexBox>
+                        <Text style={{ display: 'block', color: 'var(--sapContent_LabelColor)', marginTop: '0.5rem' }}>
                             *{tSystem('groupPermissionsSubtitle')}
-                        </Typography>
+                        </Text>
                         {!group.is_active && (
-                            <Typography variant="body2" sx={{ color: FIORI.warning, mt: 0.5 }}>
+                            <Text style={{ display: 'block', color: 'var(--sapCriticalTextColor, var(--sapCriticalColor))', marginTop: '0.25rem' }}>
                                 {tSystem('groupPermissionsInactiveNote')}
-                            </Typography>
+                            </Text>
                         )}
-                    </Box>
-                    <Button
-                        variant="contained"
-                        color="inherit"
-                        startIcon={<ArrowBackIcon />}
-                        sx={{ ...fioriDefaultSx, px: 2.5, py: 1 }}
-                        onClick={() => router.visit('/system/userGroup')}
-                    >
+                    </div>
+                    <Button icon="nav-back" onClick={() => router.visit('/system/userGroup')}>
                         {tSystem('groupPermissionsBack')}
                     </Button>
-                </Box>
+                </FlexBox>
 
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
-                    <TextField
+                <FlexBox alignItems="Center" wrap="Wrap" style={{ gap: '1rem', marginBottom: '1rem' }}>
+                    <Input
                         placeholder={tSystem('searchByName')}
-                        size="small"
                         value={search}
-                        onChange={(e) => setSearch(e.target.value)}
-                        sx={{ ...fioriSearchFieldSx, minWidth: 280 }}
-                        InputProps={{
-                            startAdornment: (
-                                <InputAdornment position="start">
-                                    <SearchIcon sx={{ color: FIORI.textSecondary, fontSize: 20 }} />
-                                </InputAdornment>
-                            ),
-                        }}
+                        onInput={(e) => setSearch(e.target.value)}
+                        icon={<Icon name="search" />}
+                        style={{ minWidth: 280 }}
                     />
-                    <Typography variant="body2" sx={{ color: FIORI.textSecondary }}>
-                        {t('results', { count: filtered.length })}
-                    </Typography>
-                </Box>
+                    <Text style={{ color: 'var(--sapContent_LabelColor)' }}>{t('results', { count: filtered.length })}</Text>
+                </FlexBox>
 
                 <FioriResponsiveTable
                     columns={columns}
@@ -153,7 +126,7 @@ export default function UserGroupPermissions({ group, permissions }: UserGroupPe
                     getRowKey={(row) => row.permission_id}
                     emptyMessage={search ? t('noDataFound') : tSystem('groupPermissionsEmpty')}
                 />
-            </Box>
+            </div>
             <ScrollTopButton />
         </AppLayout>
     );

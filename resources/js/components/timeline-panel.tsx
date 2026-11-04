@@ -1,22 +1,25 @@
+import '@ui5/webcomponents-icons/dist/add-employee.js';
+import '@ui5/webcomponents-icons/dist/chain-link.js';
+import '@ui5/webcomponents-icons/dist/delete.js';
+import '@ui5/webcomponents-icons/dist/edit.js';
+import '@ui5/webcomponents-icons/dist/error.js';
+import '@ui5/webcomponents-icons/dist/group.js';
+import '@ui5/webcomponents-icons/dist/history.js';
+import '@ui5/webcomponents-icons/dist/key.js';
+import '@ui5/webcomponents-icons/dist/log.js';
+import '@ui5/webcomponents-icons/dist/product.js';
+import '@ui5/webcomponents-icons/dist/role.js';
+import '@ui5/webcomponents-icons/dist/slim-arrow-down.js';
+import '@ui5/webcomponents-icons/dist/slim-arrow-up.js';
+import '@ui5/webcomponents-icons/dist/synchronize.js';
+import '@ui5/webcomponents-icons/dist/translate.js';
+import '@ui5/webcomponents-icons/dist/tree.js';
+import '@ui5/webcomponents-icons/dist/visits.js';
+import { Button, SegmentedButton, SegmentedButtonItem, Text, Timeline, TimelineItem } from '@ui5/webcomponents-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import AdminPanelSettingsOutlinedIcon from '@mui/icons-material/AdminPanelSettingsOutlined';
-import CategoryOutlinedIcon from '@mui/icons-material/CategoryOutlined';
-import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
-import EditNoteOutlinedIcon from '@mui/icons-material/EditNoteOutlined';
-import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
-import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
-import GroupOutlinedIcon from '@mui/icons-material/GroupOutlined';
-import HistoryOutlinedIcon from '@mui/icons-material/HistoryOutlined';
-import Inventory2OutlinedIcon from '@mui/icons-material/Inventory2Outlined';
-import LinkOutlinedIcon from '@mui/icons-material/LinkOutlined';
-import LockResetIcon from '@mui/icons-material/LockReset';
-import LoginIcon from '@mui/icons-material/Login';
-import LogoutIcon from '@mui/icons-material/Logout';
-import PersonAddAlt1OutlinedIcon from '@mui/icons-material/PersonAddAlt1Outlined';
-import SyncOutlinedIcon from '@mui/icons-material/SyncOutlined';
-import TranslateOutlinedIcon from '@mui/icons-material/TranslateOutlined';
-import { Box, Chip, Collapse, IconButton, Paper, Stack, Table, TableBody, TableCell, TableHead, TableRow, Typography } from '@mui/material';
+
+import { FioriResponsiveTable, type FioriResponsiveColumn } from '@/components/fiori-responsive-table';
 
 interface TimelineDiffRow {
     key: string;
@@ -44,52 +47,55 @@ const CATEGORY_FILTERS: Array<{ key: 'all' | TimelineCategory; labelKey: string 
     { key: 'account', labelKey: 'timelineFilterAccount' },
 ];
 
-const EVENT_META: Record<string, { label: string; icon: typeof HistoryOutlinedIcon; color: string }> = {
+type EventState = 'None' | 'Positive' | 'Negative' | 'Critical' | 'Information';
+
+// icon = SAP-icons name (side-effect imported above); state = UI5 value state that tints the timeline icon
+const EVENT_META: Record<string, { label: string; icon: string; state: EventState }> = {
     // "created"/"updated"/"deleted" are the generic events the Auditable
     // trait fires automatically for ANY model (see app/Models/Concerns/
     // Auditable.php) — kept entity-agnostic ("Record ...") since this panel
     // is shared across users, products, and anything else Auditable.
-    created: { label: 'Record created', icon: PersonAddAlt1OutlinedIcon, color: '#16a34a' },
-    updated: { label: 'Record updated', icon: EditNoteOutlinedIcon, color: '#2563eb' },
-    deleted: { label: 'Record deleted', icon: DeleteOutlineIcon, color: '#dc2626' },
-    login: { label: 'Logged in', icon: LoginIcon, color: '#16a34a' },
-    logout: { label: 'Logged out', icon: LogoutIcon, color: '#64748b' },
-    login_failed: { label: 'Failed login attempt', icon: ErrorOutlineIcon, color: '#dc2626' },
-    password_reset: { label: 'Password changed', icon: LockResetIcon, color: '#d97706' },
-    groups_updated: { label: 'Groups updated', icon: GroupOutlinedIcon, color: '#7c3aed' },
-    roles_updated: { label: 'Roles updated', icon: AdminPanelSettingsOutlinedIcon, color: '#7c3aed' },
-    duplicated: { label: 'Duplicated', icon: Inventory2OutlinedIcon, color: '#2563eb' },
-    labels_set: { label: 'Labels set', icon: EditNoteOutlinedIcon, color: '#2563eb' },
-    labels_updated: { label: 'Labels updated', icon: EditNoteOutlinedIcon, color: '#2563eb' },
-    published_shops_updated: { label: 'Sales channels updated', icon: EditNoteOutlinedIcon, color: '#2563eb' },
-    import_run: { label: 'Import run', icon: HistoryOutlinedIcon, color: '#0891b2' },
+    created: { label: 'Record created', icon: 'add-employee', state: 'Positive' },
+    updated: { label: 'Record updated', icon: 'edit', state: 'Information' },
+    deleted: { label: 'Record deleted', icon: 'delete', state: 'Negative' },
+    login: { label: 'Logged in', icon: 'visits', state: 'Positive' },
+    logout: { label: 'Logged out', icon: 'log', state: 'None' },
+    login_failed: { label: 'Failed login attempt', icon: 'error', state: 'Negative' },
+    password_reset: { label: 'Password changed', icon: 'key', state: 'Critical' },
+    groups_updated: { label: 'Groups updated', icon: 'group', state: 'Information' },
+    roles_updated: { label: 'Roles updated', icon: 'role', state: 'Information' },
+    duplicated: { label: 'Duplicated', icon: 'product', state: 'Information' },
+    labels_set: { label: 'Labels set', icon: 'edit', state: 'Information' },
+    labels_updated: { label: 'Labels updated', icon: 'edit', state: 'Information' },
+    published_shops_updated: { label: 'Sales channels updated', icon: 'edit', state: 'Information' },
+    import_run: { label: 'Import run', icon: 'history', state: 'Information' },
     // ProductController::recordProductValueChanges() — the two events that
     // cover almost every real product edit (plain product-row column
     // changes already fall under "updated" above via the Auditable trait).
-    attribute_values_updated: { label: 'Product details updated', icon: EditNoteOutlinedIcon, color: '#2563eb' },
-    variant_values_updated: { label: 'Variant details updated', icon: EditNoteOutlinedIcon, color: '#2563eb' },
+    attribute_values_updated: { label: 'Product details updated', icon: 'edit', state: 'Information' },
+    variant_values_updated: { label: 'Variant details updated', icon: 'edit', state: 'Information' },
     // AutoTranslateProductValueJob → AttributeAutoTranslator::fillMissingProductValue()
-    attribute_values_auto_translated: { label: 'AI translated', icon: TranslateOutlinedIcon, color: '#7c3aed' },
+    attribute_values_auto_translated: { label: 'AI translated', icon: 'translate', state: 'Information' },
     // Lazada category/attribute mapping journey — see
     // LazadaMappingTimelineBuilder and the AuditLog::record() call sites it
     // pulls from (CategoryController::bulkMapMarketplaceCategory(),
     // LazadaAttributeFamilyGenerator, LazadaMappedAttributeCreator).
-    lazada_category_mapped: { label: 'Lazada category mapped', icon: CategoryOutlinedIcon, color: '#ea580c' },
-    lazada_synced: { label: 'Attribute family re-synced', icon: SyncOutlinedIcon, color: '#0891b2' },
-    lazada_family_attributes_synced: { label: 'Attribute family fields updated', icon: EditNoteOutlinedIcon, color: '#0891b2' },
-    lazada_family_attached_to_category: { label: 'Attribute family attached to category', icon: LinkOutlinedIcon, color: '#0891b2' },
+    lazada_category_mapped: { label: 'Lazada category mapped', icon: 'tree', state: 'Critical' },
+    lazada_synced: { label: 'Attribute family re-synced', icon: 'synchronize', state: 'Information' },
+    lazada_family_attributes_synced: { label: 'Attribute family fields updated', icon: 'edit', state: 'Information' },
+    lazada_family_attached_to_category: { label: 'Attribute family attached to category', icon: 'chain-link', state: 'Information' },
     // Shopee mirror ของ 4 event ข้างบน — ดู ShopeeAttributeFamilyGenerator /
     // CategoryController::bulkMapShopee()
-    shopee_category_mapped: { label: 'Shopee category mapped', icon: CategoryOutlinedIcon, color: '#ea580c' },
-    shopee_synced: { label: 'Attribute family re-synced', icon: SyncOutlinedIcon, color: '#0891b2' },
-    shopee_family_attributes_synced: { label: 'Attribute family fields updated', icon: EditNoteOutlinedIcon, color: '#0891b2' },
-    shopee_family_attached_to_category: { label: 'Attribute family attached to category', icon: LinkOutlinedIcon, color: '#0891b2' },
-    option_created: { label: 'Option created', icon: PersonAddAlt1OutlinedIcon, color: '#16a34a' },
+    shopee_category_mapped: { label: 'Shopee category mapped', icon: 'tree', state: 'Critical' },
+    shopee_synced: { label: 'Attribute family re-synced', icon: 'synchronize', state: 'Information' },
+    shopee_family_attributes_synced: { label: 'Attribute family fields updated', icon: 'edit', state: 'Information' },
+    shopee_family_attached_to_category: { label: 'Attribute family attached to category', icon: 'chain-link', state: 'Information' },
+    option_created: { label: 'Option created', icon: 'add-employee', state: 'Positive' },
 };
 
 // 'work' entries land on humanize() for their label; keep a distinct icon/tint
 // so they read differently from account/sign-in rows at a glance.
-const WORK_FALLBACK = { icon: Inventory2OutlinedIcon, color: '#2563eb' };
+const WORK_FALLBACK: { icon: string; state: EventState } = { icon: 'product', state: 'Information' };
 
 function humanize(value: unknown): string {
     return String(value)
@@ -100,7 +106,7 @@ function humanize(value: unknown): string {
 
 function eventMeta(event: string, category?: TimelineCategory) {
     if (EVENT_META[event]) return EVENT_META[event];
-    const fallback = category === 'work' ? WORK_FALLBACK : { icon: HistoryOutlinedIcon, color: '#64748b' };
+    const fallback: { icon: string; state: EventState } = category === 'work' ? WORK_FALLBACK : { icon: 'history', state: 'None' };
     return { label: humanize(event), ...fallback };
 }
 
@@ -110,9 +116,7 @@ function formatValue(value: unknown): string {
     if (Array.isArray(value)) {
         if (value.length === 0) return '—';
         // list payloads can hold objects (e.g. permissions: {resource, action})
-        return value
-            .map((item) => (item !== null && typeof item === 'object' ? Object.values(item).join('.') : String(item)))
-            .join(', ');
+        return value.map((item) => (item !== null && typeof item === 'object' ? Object.values(item).join('.') : String(item))).join(', ');
     }
     if (typeof value === 'object') return JSON.stringify(value);
     return String(value);
@@ -139,6 +143,24 @@ function formatDateTime(value: string | null): { display: string; relative: stri
 
     return { display, relative };
 }
+
+const DIFF_COLUMNS: FioriResponsiveColumn<TimelineDiffRow>[] = [
+    { key: 'field', header: 'Field', priority: 'always', render: (row) => humanize(row.key) },
+    {
+        key: 'old',
+        header: <span style={{ fontWeight: 700, color: 'var(--sapNegativeTextColor)' }}>Before</span>,
+        popinText: 'Before',
+        priority: 'high',
+        render: (row) => <span style={{ color: 'var(--sapNegativeTextColor)' }}>{formatValue(row.old)}</span>,
+    },
+    {
+        key: 'new',
+        header: <span style={{ fontWeight: 700, color: 'var(--sapLinkColor)' }}>After</span>,
+        popinText: 'After',
+        priority: 'high',
+        render: (row) => <span style={{ color: 'var(--sapLinkColor)', fontWeight: 600 }}>{formatValue(row.new)}</span>,
+    },
+];
 
 /**
  * Vertical activity timeline fed by any backend endpoint that returns
@@ -177,128 +199,78 @@ export function TimelinePanel({ timelineUrl }: { timelineUrl: string }) {
         return base;
     }, [entries]);
 
-    const visible = useMemo(
-        () => (filter === 'all' ? entries : entries.filter((entry) => entry.category === filter)),
-        [entries, filter],
-    );
+    const visible = useMemo(() => (filter === 'all' ? entries : entries.filter((entry) => entry.category === filter)), [entries, filter]);
 
     // Some categories may not exist for a given user (e.g. a user who has
     // never performed a 'work' action) — hide those filter chips entirely.
     const availableFilters = CATEGORY_FILTERS.filter((option) => option.key === 'all' || counts[option.key] > 0);
 
     if (!loading && entries.length === 0) {
-        return (
-            <Typography variant="body2" color="text.secondary">
-                {t('timelineEmpty')}
-            </Typography>
-        );
+        return <Text style={{ color: 'var(--sapContent_LabelColor)' }}>{t('timelineEmpty')}</Text>;
     }
 
     return (
-        <Stack spacing={2}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
             {availableFilters.length > 2 && (
-                <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+                <SegmentedButton accessibleName={t('timelineFilterAll')} style={{ alignSelf: 'flex-start', maxWidth: '100%' }}>
                     {availableFilters.map((option) => (
-                        <Chip
+                        <SegmentedButtonItem
                             key={option.key}
-                            label={`${t(option.labelKey)} (${counts[option.key]})`}
-                            size="small"
-                            color={filter === option.key ? 'primary' : 'default'}
-                            variant={filter === option.key ? 'filled' : 'outlined'}
+                            selected={filter === option.key}
                             onClick={() => {
                                 setFilter(option.key);
                                 setExpanded(null);
                             }}
-                        />
+                        >
+                            {`${t(option.labelKey)} (${counts[option.key]})`}
+                        </SegmentedButtonItem>
                     ))}
-                </Stack>
+                </SegmentedButton>
             )}
 
             {visible.length === 0 ? (
-                <Typography variant="body2" color="text.secondary">
-                    {t('timelineEmptyFiltered')}
-                </Typography>
+                <Text style={{ color: 'var(--sapContent_LabelColor)' }}>{t('timelineEmptyFiltered')}</Text>
             ) : (
-            <Stack spacing={0}>
-            {visible.map((entry, index) => {
-                const { label, icon: Icon, color } = eventMeta(entry.event, entry.category);
-                const { display, relative } = formatDateTime(entry.created_at);
-                const isLast = index === visible.length - 1;
-                const subject = entry.subject_type
-                    ? `${entry.subject_type}${entry.subject_id != null ? ` #${entry.subject_id}` : ''}`
-                    : null;
-                const hasDiff = entry.diff.length > 0;
-                const isOpen = expanded === index;
+                <Timeline loading={loading} accessibleName={t('timelineFilterAll')}>
+                    {visible.map((entry, index) => {
+                        const { label, icon, state } = eventMeta(entry.event, entry.category);
+                        const { display, relative } = formatDateTime(entry.created_at);
+                        const subject = entry.subject_type ? `${entry.subject_type}${entry.subject_id != null ? ` #${entry.subject_id}` : ''}` : null;
+                        const hasDiff = entry.diff.length > 0;
+                        const isOpen = expanded === index;
 
-                return (
-                    <Box key={index} sx={{ display: 'flex', gap: 2 }}>
-                        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                            <Box
-                                sx={{
-                                    width: 36,
-                                    height: 36,
-                                    borderRadius: '50%',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    bgcolor: `${color}1a`,
-                                    color,
-                                    flexShrink: 0,
-                                }}
+                        return (
+                            <TimelineItem
+                                key={index}
+                                icon={icon}
+                                state={state}
+                                titleText={label}
+                                subtitleText={`${entry.actor} · ${subject ? `${subject} · ` : ''}${display}${relative ? ` (${relative})` : ''}`}
                             >
-                                <Icon fontSize="small" />
-                            </Box>
-                            {!isLast && <Box sx={{ flex: 1, width: '2px', bgcolor: 'divider', my: 0.5 }} />}
-                        </Box>
-
-                        <Box sx={{ pb: 3, flex: 1, minWidth: 0 }}>
-                            <Stack direction="row" alignItems="center" spacing={1} sx={{ pt: 0.5 }}>
-                                <Typography variant="body2" sx={{ fontWeight: 700 }}>
-                                    {label}
-                                </Typography>
                                 {hasDiff && (
-                                    <IconButton size="small" onClick={() => setExpanded(isOpen ? null : index)}>
-                                        <ExpandMoreIcon
-                                            fontSize="small"
-                                            sx={{ transform: isOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }}
+                                    <div>
+                                        <Button
+                                            design="Transparent"
+                                            icon={isOpen ? 'slim-arrow-up' : 'slim-arrow-down'}
+                                            accessibleName={label}
+                                            onClick={() => setExpanded(isOpen ? null : index)}
                                         />
-                                    </IconButton>
+                                        {isOpen && (
+                                            <FioriResponsiveTable
+                                                size="small"
+                                                columns={DIFF_COLUMNS}
+                                                rows={entry.diff}
+                                                getRowKey={(row) => row.key}
+                                                style={{ marginTop: '0.5rem' }}
+                                            />
+                                        )}
+                                    </div>
                                 )}
-                            </Stack>
-                            <Typography variant="caption" color="text.secondary">
-                                {entry.actor} &middot; {subject ? `${subject} · ` : ''}{display} {relative && `(${relative})`}
-                            </Typography>
-
-                            {hasDiff && (
-                                <Collapse in={isOpen}>
-                                    <Paper variant="outlined" sx={{ mt: 1, borderRadius: 1.5, overflow: 'hidden' }}>
-                                        <Table size="small">
-                                            <TableHead sx={{ bgcolor: '#f8fafc' }}>
-                                                <TableRow>
-                                                    <TableCell sx={{ fontWeight: 700 }}>Field</TableCell>
-                                                    <TableCell sx={{ fontWeight: 700, color: '#dc2626' }}>Before</TableCell>
-                                                    <TableCell sx={{ fontWeight: 700, color: 'primary.main' }}>After</TableCell>
-                                                </TableRow>
-                                            </TableHead>
-                                            <TableBody>
-                                                {entry.diff.map((row) => (
-                                                    <TableRow key={row.key}>
-                                                        <TableCell sx={{ color: '#334155' }}>{humanize(row.key)}</TableCell>
-                                                        <TableCell sx={{ color: '#dc2626' }}>{formatValue(row.old)}</TableCell>
-                                                        <TableCell sx={{ color: 'primary.main', fontWeight: 600 }}>{formatValue(row.new)}</TableCell>
-                                                    </TableRow>
-                                                ))}
-                                            </TableBody>
-                                        </Table>
-                                    </Paper>
-                                </Collapse>
-                            )}
-                        </Box>
-                    </Box>
-                );
-            })}
-            </Stack>
+                            </TimelineItem>
+                        );
+                    })}
+                </Timeline>
             )}
-        </Stack>
+        </div>
     );
 }

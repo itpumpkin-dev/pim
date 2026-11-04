@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { FIORI, FIORI_RAW, percentToneFiori } from './fiori-style';
+import { FIORI, FIORI_RAW, percentToneFiori } from './fiori-tokens';
 
 describe('FIORI tokens', () => {
     it('every token is a CSS custom-property reference, not a literal color', () => {

@@ -1,40 +1,21 @@
-import AppLayout from '@/layouts/app-layout';
-import { type BreadcrumbItem, type SharedData } from '@/types';
-import { Head, router, usePage } from '@inertiajs/react';
-import SearchIcon from '@mui/icons-material/Search';
-import EditIcon from '@mui/icons-material/Edit';
-import DeleteIcon from '@mui/icons-material/Delete';
-import FilterListIcon from '@mui/icons-material/FilterList';
-import FirstPageIcon from '@mui/icons-material/FirstPage';
-import LastPageIcon from '@mui/icons-material/LastPage';
-import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
-import ChevronRightIcon from '@mui/icons-material/ChevronRight';
-import {
-    Box,
-    Button,
-    Divider,
-    IconButton,
-    InputAdornment,
-    MenuItem,
-    Paper,
-    Select,
-    Stack,
-    TextField,
-    Typography,
-} from '@mui/material';
-import { useEffect, useRef, useState } from 'react';
-import { useTranslation } from 'react-i18next';
 import { FioriMessageBox } from '@/components/fiori-message-box';
 import { FioriResponsiveColumn, FioriResponsiveTable } from '@/components/fiori-responsive-table';
 import { GridFilterDrawer, type FilterValue } from '@/components/grid-filter-drawer';
-import {
-    FIORI,
-    fioriCardSx,
-    fioriDefaultSx,
-    fioriEmphasizedSx,
-    fioriIconButtonSx,
-    fioriSearchFieldSx,
-} from '@/lib/fiori-style';
+import AppLayout from '@/layouts/app-layout';
+import { type BreadcrumbItem, type SharedData } from '@/types';
+import { Head, router, usePage } from '@inertiajs/react';
+import '@ui5/webcomponents-icons/dist/add.js';
+import '@ui5/webcomponents-icons/dist/delete.js';
+import '@ui5/webcomponents-icons/dist/edit.js';
+import '@ui5/webcomponents-icons/dist/filter.js';
+import '@ui5/webcomponents-icons/dist/search.js';
+import '@ui5/webcomponents-icons/dist/slim-arrow-left.js';
+import '@ui5/webcomponents-icons/dist/slim-arrow-right.js';
+import '@ui5/webcomponents-icons/dist/sys-first-page.js';
+import '@ui5/webcomponents-icons/dist/sys-last-page.js';
+import { Button, FlexBox, Icon, Input, Option, Select, Text, Title } from '@ui5/webcomponents-react';
+import { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 interface GridColumn {
     label: string;
@@ -157,7 +138,7 @@ export default function AttributeGroupIndex({ gridConfig, gridData, filters }: P
     // คอลัมน์ actions ก็ตรึงไว้เหมือนคอลัมน์ที่ใช้ระบุแถวเช่นกัน
     const columns: FioriResponsiveColumn<AttributeGroupRow>[] = [
         { key: 'id', header: t('fields.id'), priority: 'low', render: (row) => row.id },
-        { key: 'code', header: t('fields.code'), priority: 'always', render: (row) => <Typography sx={{ fontWeight: 500 }}>{row.code}</Typography> },
+        { key: 'code', header: t('fields.code'), priority: 'always', render: (row) => <Text style={{ fontWeight: 500 }}>{row.code}</Text> },
         { key: 'name', header: t('fields.name'), priority: 'high', render: (row) => row.name || ucfirst(row.code) },
         {
             key: 'actions',
@@ -165,18 +146,26 @@ export default function AttributeGroupIndex({ gridConfig, gridData, filters }: P
             priority: 'always',
             align: 'right',
             render: (row) => (
-                <Stack direction="row" spacing={0.5} justifyContent="flex-end">
+                <FlexBox justifyContent="End" style={{ gap: '0.25rem' }}>
                     {canEdit && (
-                        <IconButton size="small" sx={fioriIconButtonSx} onClick={() => router.visit(`/catalog/attributeGroups/${row.id}/edit`)}>
-                            <EditIcon fontSize="small" />
-                        </IconButton>
+                        <Button
+                            design="Transparent"
+                            icon="edit"
+                            tooltip={t('edit')}
+                            accessibleName={t('edit')}
+                            onClick={() => router.visit(`/catalog/attributeGroups/${row.id}/edit`)}
+                        />
                     )}
                     {canDelete && (
-                        <IconButton size="small" sx={fioriIconButtonSx} onClick={() => setDeleteGroupId(row.id)}>
-                            <DeleteIcon fontSize="small" />
-                        </IconButton>
+                        <Button
+                            design="Transparent"
+                            icon="delete"
+                            tooltip={t('delete')}
+                            accessibleName={t('delete')}
+                            onClick={() => setDeleteGroupId(row.id)}
+                        />
                     )}
-                </Stack>
+                </FlexBox>
             ),
         },
     ];
@@ -184,108 +173,86 @@ export default function AttributeGroupIndex({ gridConfig, gridData, filters }: P
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={tCatalog('attributeGroupsTitle')} />
-            <Box sx={{ p: { xs: 2, md: 4 }, bgcolor: FIORI.pageBg, minHeight: '100%' }}>
+            <div style={{ padding: 'clamp(1rem, 3vw, 2rem)', background: 'var(--sapBackgroundColor)', minHeight: '100%', boxSizing: 'border-box' }}>
                 {/* หัวข้อและปุ่มสร้างใหม่ */}
-                <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 3 }}>
-                    <Box>
-                        <Typography variant="h5" fontWeight={600} sx={{ color: FIORI.textPrimary }}>
-                            {tCatalog('attributeGroupsTitle')}
-                        </Typography>
-                        <Typography variant="body2" sx={{ color: FIORI.textSecondary, mt: 0.25 }}>
+                <FlexBox justifyContent="SpaceBetween" alignItems="Center" wrap="Wrap" style={{ gap: '0.75rem', marginBottom: '1.5rem' }}>
+                    <div>
+                        <Title level="H3">{tCatalog('attributeGroupsTitle')}</Title>
+                        <Text style={{ color: 'var(--sapContent_LabelColor)', marginTop: '0.125rem', display: 'block' }}>
                             {t('results', { count: gridData.total })}
-                        </Typography>
-                    </Box>
+                        </Text>
+                    </div>
                     {canCreate && (
-                        <Button
-                            variant="contained"
-                            onClick={() => router.visit('/catalog/attributeGroups/create')}
-                            sx={{ ...fioriEmphasizedSx, px: 2.5, py: 1 }}
-                        >
+                        <Button design="Emphasized" icon="add" onClick={() => router.visit('/catalog/attributeGroups/create')}>
                             {tCatalog('createAttributeGroup')}
                         </Button>
                     )}
-                </Stack>
+                </FlexBox>
 
                 {/* การ์ดตาราง: รวม toolbar + หัวตาราง + แถวข้อมูล ไว้บนพื้นผิว "Table" แบบ Fiori เดียวกัน */}
-                <Paper elevation={0} sx={fioriCardSx}>
+                <div
+                    style={{
+                        background: 'var(--sapGroup_ContentBackground)',
+                        border: '1px solid var(--sapGroup_ContentBorderColor)',
+                        borderRadius: 'var(--sapElement_BorderCornerRadius)',
+                        overflow: 'hidden',
+                    }}
+                >
                     {/* แถบเครื่องมือ */}
-                    <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" alignItems="center" spacing={2} sx={{ p: 2 }}>
-                        <TextField
+                    <FlexBox justifyContent="SpaceBetween" alignItems="Center" wrap="Wrap" style={{ gap: '1rem', padding: '1rem' }}>
+                        <Input
                             value={search}
-                            onChange={(e) => setSearch(e.target.value)}
+                            onInput={(e) => setSearch(e.target.value)}
                             placeholder={tCatalog('search')}
-                            size="small"
-                            sx={{ ...fioriSearchFieldSx, minWidth: 240 }}
-                            InputProps={{
-                                endAdornment: (
-                                    <InputAdornment position="end">
-                                        <SearchIcon sx={{ color: FIORI.textSecondary, fontSize: 20 }} />
-                                    </InputAdornment>
-                                ),
-                            }}
+                            icon={<Icon name="search" />}
+                            style={{ minWidth: 240 }}
                         />
 
-                        <Stack direction="row" alignItems="center" spacing={1.5} useFlexGap flexWrap="wrap" sx={{ width: { xs: '100%', md: 'auto' }, rowGap: 1, justifyContent: { xs: 'space-between', md: 'flex-end' } }}>
-                            <Button
-                                variant="outlined"
-                                startIcon={<FilterListIcon />}
-                                onClick={() => setFilterDrawerOpen(true)}
-                                sx={fioriDefaultSx}
-                            >
+                        <FlexBox alignItems="Center" wrap="Wrap" style={{ gap: '0.75rem', rowGap: '0.5rem' }}>
+                            <Button icon="filter" onClick={() => setFilterDrawerOpen(true)}>
                                 {t('filter')}
                                 {Object.keys(activeFilters).length > 0 && ` (${Object.keys(activeFilters).length})`}
                             </Button>
 
                             <Select
-                                value={perPage}
-                                onChange={(e) => handlePerPageChange(Number(e.target.value))}
-                                size="small"
-                                sx={{
-                                    bgcolor: FIORI.surface,
-                                    borderRadius: '8px',
-                                    minWidth: 60,
-                                    height: 34,
-                                    '& .MuiOutlinedInput-notchedOutline': { borderColor: FIORI.border },
-                                }}
+                                value={String(perPage)}
+                                onChange={(e) => handlePerPageChange(Number(e.detail.selectedOption.value))}
+                                style={{ width: '5rem' }}
                             >
-                                <MenuItem value={10}>10</MenuItem>
-                                <MenuItem value={25}>25</MenuItem>
-                                <MenuItem value={50}>50</MenuItem>
+                                <Option value="10">10</Option>
+                                <Option value="25">25</Option>
+                                <Option value="50">50</Option>
                             </Select>
 
-                            <Typography variant="body2" sx={{ color: FIORI.textSecondary }}>
-                                {t('perPage')}
-                            </Typography>
+                            <Text style={{ color: 'var(--sapContent_LabelColor)' }}>{t('perPage')}</Text>
+                            <Text>{currentPage}</Text>
+                            <Text style={{ color: 'var(--sapContent_LabelColor)' }}>{t('pageOf', { lastPage })}</Text>
 
-                            <Paper
-                                variant="outlined"
-                                sx={{ px: 1.5, py: 0.5, bgcolor: FIORI.surface, borderRadius: '8px', borderColor: FIORI.border, display: 'flex', alignItems: 'center' }}
-                            >
-                                <Typography variant="body2" sx={{ color: FIORI.textPrimary }}>{currentPage}</Typography>
-                            </Paper>
+                            <FlexBox style={{ gap: '0.125rem' }}>
+                                <Button design="Transparent" icon="sys-first-page" disabled={currentPage <= 1} onClick={() => goToPage(1)} />
+                                <Button
+                                    design="Transparent"
+                                    icon="slim-arrow-left"
+                                    disabled={currentPage <= 1}
+                                    onClick={() => goToPage(currentPage - 1)}
+                                />
+                                <Button
+                                    design="Transparent"
+                                    icon="slim-arrow-right"
+                                    disabled={currentPage >= lastPage}
+                                    onClick={() => goToPage(currentPage + 1)}
+                                />
+                                <Button
+                                    design="Transparent"
+                                    icon="sys-last-page"
+                                    disabled={currentPage >= lastPage}
+                                    onClick={() => goToPage(lastPage)}
+                                />
+                            </FlexBox>
+                        </FlexBox>
+                    </FlexBox>
 
-                            <Typography variant="body2" sx={{ color: FIORI.textSecondary }}>
-                                {t('pageOf', { lastPage })}
-                            </Typography>
-
-                            <Stack direction="row" spacing={0.2}>
-                                <IconButton size="small" sx={fioriIconButtonSx} disabled={currentPage <= 1} onClick={() => goToPage(1)}>
-                                    <FirstPageIcon fontSize="small" />
-                                </IconButton>
-                                <IconButton size="small" sx={fioriIconButtonSx} disabled={currentPage <= 1} onClick={() => goToPage(currentPage - 1)}>
-                                    <ChevronLeftIcon fontSize="small" />
-                                </IconButton>
-                                <IconButton size="small" sx={fioriIconButtonSx} disabled={currentPage >= lastPage} onClick={() => goToPage(currentPage + 1)}>
-                                    <ChevronRightIcon fontSize="small" />
-                                </IconButton>
-                                <IconButton size="small" sx={fioriIconButtonSx} disabled={currentPage >= lastPage} onClick={() => goToPage(lastPage)}>
-                                    <LastPageIcon fontSize="small" />
-                                </IconButton>
-                            </Stack>
-                        </Stack>
-                    </Stack>
-
-                    <Divider sx={{ borderColor: FIORI.border }} />
+                    <div style={{ borderTop: '1px solid var(--sapGroup_ContentBorderColor)' }} />
 
                     {/* ตาราง */}
                     <FioriResponsiveTable
@@ -295,8 +262,8 @@ export default function AttributeGroupIndex({ gridConfig, gridData, filters }: P
                         getRowKey={(row) => row.id}
                         emptyMessage={tCatalog('noAttributeGroupsFound')}
                     />
-                </Paper>
-            </Box>
+                </div>
+            </div>
 
             {/* ไดอะล็อกยืนยันการลบ */}
             <FioriMessageBox
@@ -319,28 +286,22 @@ export default function AttributeGroupIndex({ gridConfig, gridData, filters }: P
                 confirmLoading={deleting}
                 confirmDisabled={deleteUsageLoading}
             >
-                <Stack spacing={1}>
-                    <Typography variant="body2">{tCatalog('confirmDeleteAttributeGroupMessage')}</Typography>
-                    {deleteUsageLoading && (
-                        <Typography variant="body2" color="text.secondary">
-                            {tCatalog('checkingAttributeGroupUsage')}
-                        </Typography>
-                    )}
+                <FlexBox direction="Column" style={{ gap: '0.5rem' }}>
+                    <span>{tCatalog('confirmDeleteAttributeGroupMessage')}</span>
+                    {deleteUsageLoading && <span style={{ color: 'var(--sapContent_LabelColor)' }}>{tCatalog('checkingAttributeGroupUsage')}</span>}
                     {!deleteUsageLoading && deleteUsage && (deleteUsage.family_count > 0 || deleteUsage.product_value_count > 0) && (
-                        <Typography variant="body2" color="error.main" fontWeight={600}>
+                        <span style={{ color: 'var(--sapNegativeColor)', fontWeight: 600 }}>
                             {tCatalog('attributeGroupInUseWarning', {
                                 families: deleteUsage.family_count,
                                 attributes: deleteUsage.attribute_count,
                                 products: deleteUsage.product_value_count,
                             })}
-                        </Typography>
+                        </span>
                     )}
                     {!deleteUsageLoading && deleteUsage && deleteUsage.family_count === 0 && deleteUsage.product_value_count === 0 && (
-                        <Typography variant="body2" color="text.secondary">
-                            {tCatalog('attributeGroupNotInUse')}
-                        </Typography>
+                        <span style={{ color: 'var(--sapContent_LabelColor)' }}>{tCatalog('attributeGroupNotInUse')}</span>
                     )}
-                </Stack>
+                </FlexBox>
             </FioriMessageBox>
             <GridFilterDrawer
                 open={filterDrawerOpen}

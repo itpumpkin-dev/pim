@@ -1,296 +1,286 @@
-import { NavPrimary } from '@/components/nav-primary';
-import { NavSecondary } from '@/components/nav-secondary';
-import { useResolvedAppearance } from '@/hooks/use-appearance';
 import { filterNavItemsByPermission, useMainNavItems } from '@/hooks/use-nav-items';
-import { SIDEBAR_WIDTH, SIDEBAR_WIDTH_ICON, useSidebar } from '@/hooks/use-sidebar';
-import { FIORI } from '@/lib/fiori-style';
-import { getTheme } from '@/theme';
+import { useSidebar } from '@/hooks/use-sidebar';
 import { type NavItem, type SharedData } from '@/types';
-import { Link, usePage } from '@inertiajs/react';
-import { Box, Divider, Drawer, ThemeProvider, Toolbar, Typography } from '@mui/material';
-import { useEffect, useMemo, useRef, useState } from 'react';
-import AppLogo from './app-logo';
+import { router, usePage } from '@inertiajs/react';
+// Every glyph named by NavItem.icon in hooks/use-nav-items.ts must be
+// registered once — UI5 renders nothing for an icon whose module was never
+// imported. Keep this list in sync with that file.
+import '@ui5/webcomponents-icons/dist/action-settings.js';
+import '@ui5/webcomponents-icons/dist/badge.js';
+import '@ui5/webcomponents-icons/dist/building.js';
+import '@ui5/webcomponents-icons/dist/cart.js';
+import '@ui5/webcomponents-icons/dist/chain-link.js';
+import '@ui5/webcomponents-icons/dist/course-book.js';
+import '@ui5/webcomponents-icons/dist/database.js';
+import '@ui5/webcomponents-icons/dist/direction-arrows.js';
+import '@ui5/webcomponents-icons/dist/download-from-cloud.js';
+import '@ui5/webcomponents-icons/dist/employee.js';
+import '@ui5/webcomponents-icons/dist/globe.js';
+import '@ui5/webcomponents-icons/dist/group.js';
+import '@ui5/webcomponents-icons/dist/history.js';
+import '@ui5/webcomponents-icons/dist/home.js';
+import '@ui5/webcomponents-icons/dist/product.js';
+import '@ui5/webcomponents-icons/dist/role.js';
+import '@ui5/webcomponents-icons/dist/settings.js';
+import '@ui5/webcomponents-icons/dist/switch-classes.js';
+import '@ui5/webcomponents-icons/dist/tag.js';
+import '@ui5/webcomponents-icons/dist/task.js';
+import '@ui5/webcomponents-icons/dist/translate.js';
+import '@ui5/webcomponents-icons/dist/upload-to-cloud.js';
+import {
+    SideNavigation,
+    SideNavigationGroup,
+    SideNavigationItem,
+    SideNavigationSubItem,
+    type SideNavigationPropTypes,
+} from '@ui5/webcomponents-react';
+import { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
-// Nav items only list each section's top-level URL (e.g. /catalog/products)
-// — an exact-equality match against the page URL would never match a nested
-// detail page (/catalog/products/33/edit, /catalog/products/create, ?query
-// strings, ...). Match by path prefix instead (with a '/' boundary so
-// /catalog/products doesn't also match an unrelated /catalog/productsX).
-function findActiveGroup(items: NavItem[], pageUrl: string): NavItem | null {
-    const currentPath = pageUrl.split('?')[0];
-    const matchesCurrentPath = (url?: string) => !!url && (currentPath === url || currentPath.startsWith(url.endsWith('/') ? url : url + '/'));
-
-    // Recurses through any depth of nesting (e.g. Catalog > "หมวดหมู่" group >
-    // its leaf links) rather than checking just one level down — the
-    // Catalog section's items are themselves label-only groups with no url
-    // of their own since the sidebar restructure, so a one-level check here
-    // would never find a match and Catalog would stop highlighting as the
-    // active primary-nav section.
-    const matchesItem = (item: NavItem): boolean =>
-        matchesCurrentPath(item.url) || (item.matchUrls ?? []).some(matchesCurrentPath) || (item.items ?? []).some(matchesItem);
-
-    return items.find(matchesItem) || items[0] || null;
+/**
+ * The nav tree as UI5's SideNavigation can render it. SideNavigation has a
+ * fixed shape — optional SideNavigationGroup (a titled section) >
+ * SideNavigationItem (icon + text) > SideNavigationSubItem (text only) — so
+ * the free-form NavItem tree from use-nav-items.ts is mapped onto it here:
+ *
+ *  - a top-level leaf (Dashboard) → a plain item;
+ *  - a top-level node with children (Catalog, Import/Export, System) → a group;
+ *  - inside a group, each child → an item, its leaf children → sub-items;
+ *  - anything nested deeper than that (Catalog > Master > Marketplace >
+ *    {platform}) can't be a sub-sub-item, so that branch is lifted to its
+ *    own item right after its parent (Master, then Marketplace).
+ */
+interface SideNode {
+    key: string;
+    kind: 'group' | 'item' | 'sub';
+    title: string;
+    icon?: string;
+    url?: string;
+    source: NavItem;
+    children: SideNode[];
 }
 
-export function AppSidebar() {
-    const { isMobile, openMobile, setOpenMobile, state } = useSidebar();
-    const page = usePage();
-    const { auth } = usePage<SharedData>().props;
-    const { resolved } = useResolvedAppearance();
-    // SAP Fiori's SideNavigation follows the app's light/dark appearance
-    // toggle like the rest of the Fiori-themed UI — FIORI.surface below is a
-    // CSS-var token that already resolves to the right shade for `resolved`.
-    const sidebarTheme = useMemo(() => getTheme(resolved), [resolved]);
-    const collapsed = state === 'collapsed';
-    const mainNavItems = useMainNavItems();
+// A group whose only child repeats its own title (e.g. "Products" > "Products")
+// is really just that one leaf — every Catalog entity is wrapped in a group
+// for a uniform data shape, but a header restating the single link below it is
+// noise. Unwrap it so it renders as a plain link.
+function unwrap(item: NavItem): NavItem {
+    let node = item;
+    while (node.items && node.items.length === 1 && node.items[0].title === node.title) {
+        node = node.items[0];
+    }
+    return node;
+}
 
-    // Memoize filtered items to avoid unnecessary recalculations and keep stable references
-    const filteredMainNavItems = useMemo(
-        () => filterNavItemsByPermission(mainNavItems, auth.permissions),
-        [mainNavItems, auth.permissions],
-    );
+// Stable key for a node — its path down the (original) tree. `title` alone
+// isn't unique across the whole tree, and a group node has no `url`.
+const keyOf = (parentKey: string, item: NavItem) => `${parentKey}/${item.title}`;
 
-    // Lazy-initialized (not useState(null) + an effect) so the very first
-    // paint after AppSidebar mounts — which is every navigation, since each
-    // page wraps itself in <AppLayout> rather than Inertia persisting a
-    // shared layout instance — already has the right group selected. With
-    // useState(null), that first paint always rendered with hasSubmenus
-    // false (secondary sidebar collapsed to width 0/opacity 0), then the
-    // post-mount effect set the real group and the secondary sidebar
-    // animated open — a visible flash on every page load.
-    const [selectedGroup, setSelectedGroup] = useState<NavItem | null>(() => findActiveGroup(filteredMainNavItems, page.url));
+function toItems(list: NavItem[], parentKey: string): SideNode[] {
+    const result: SideNode[] = [];
+    for (const raw of list) {
+        const item = unwrap(raw);
+        const key = keyOf(parentKey, item);
+        const children = item.items ?? [];
 
-    // Still needed for a page.url change without a remount (e.g. if a future
-    // refactor moves to Inertia's persistent-layout pattern) — harmless
-    // no-op re-render on first mount since it recomputes the same group the
-    // lazy initializer above already set.
-    useEffect(() => {
-        const activeGroup = findActiveGroup(filteredMainNavItems, page.url);
-        if (activeGroup) {
-            setSelectedGroup(activeGroup);
+        if (children.length === 0) {
+            result.push({ key, kind: 'item', title: item.title, icon: item.icon ?? undefined, url: item.url, source: item, children: [] });
+            continue;
         }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [page.url]);
 
-    // Keep selectedGroup in sync with new translated items when language changes
-    useEffect(() => {
-        if (selectedGroup) {
-            const updatedGroup = filteredMainNavItems.find((item) => item.icon === selectedGroup.icon);
-            if (updatedGroup) {
-                setSelectedGroup(updatedGroup);
+        const subs: SideNode[] = [];
+        const lifted: SideNode[] = [];
+        for (const rawChild of children) {
+            const child = unwrap(rawChild);
+            if (child.items && child.items.length > 0) {
+                lifted.push(...toItems([child], key));
+            } else {
+                subs.push({ key: keyOf(key, child), kind: 'sub', title: child.title, url: child.url, source: child, children: [] });
             }
         }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [filteredMainNavItems]);
 
-    const hasSubmenus = selectedGroup && selectedGroup.items && selectedGroup.items.length > 0;
-    const width = collapsed ? SIDEBAR_WIDTH_ICON : hasSubmenus ? SIDEBAR_WIDTH : SIDEBAR_WIDTH_ICON;
+        if (subs.length > 0 || item.url) {
+            result.push({ key, kind: 'item', title: item.title, icon: item.icon ?? undefined, url: item.url, source: item, children: subs });
+        }
+        result.push(...lifted);
+    }
+    return result;
+}
 
-    // Fiori Side Navigation's real "collapsed" behaviour: an icon-only rail
-    // that reveals a floating flyout of the hovered group's items *without*
-    // pushing the rail itself back open — this used to instead call
-    // setOpen(true) on click, permanently re-expanding the whole sidebar,
-    // which isn't how Fiori's collapsed rail behaves at all. flyoutGroup is
-    // only ever meaningful while collapsed (see the render guards below) —
-    // no need to reset it on expand/collapse toggles since AppSidebar fully
-    // remounts every navigation anyway (see the lazy-init comment above).
-    const [flyoutGroup, setFlyoutGroup] = useState<NavItem | null>(null);
-    const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+function toSideNavTree(items: NavItem[]): SideNode[] {
+    return items.map((raw) => {
+        const item = unwrap(raw);
+        const key = keyOf('', item);
+        const children = item.items ?? [];
+        if (children.length === 0) {
+            return { key, kind: 'item', title: item.title, icon: item.icon ?? undefined, url: item.url, source: item, children: [] };
+        }
+        return { key, kind: 'group', title: item.title, source: item, children: toItems(children, key) };
+    });
+}
 
-    const clearFlyoutCloseTimer = () => {
-        if (closeTimerRef.current) {
-            clearTimeout(closeTimerRef.current);
-            closeTimerRef.current = null;
+/**
+ * How strongly `item` claims the current path — the length of the longest
+ * matching URL prefix (0 = no match). Nav items only list each section's
+ * top-level URL (e.g. /catalog/products), so match by path prefix with a '/'
+ * boundary (nested detail pages, ?query strings), honouring
+ * matchUrls/excludeUrls. The longest match wins so overlapping prefixes
+ * (/catalog/attributes vs /catalog/attributes/api-sources) pick the right one.
+ */
+function matchScore(item: NavItem, currentPath: string): number {
+    const matches = (url?: string) => !!url && (currentPath === url || currentPath.startsWith(url.endsWith('/') ? url : url + '/'));
+    let score = 0;
+    if (matches(item.url) && !(item.excludeUrls ?? []).some(matches)) score = item.url!.length;
+    for (const url of item.matchUrls ?? []) {
+        if (matches(url)) score = Math.max(score, url.length);
+    }
+    return score;
+}
+
+function findSelected(tree: SideNode[], currentPath: string): { key: string | null; branch: string[] } {
+    let best: { key: string; branch: string[]; score: number } | null = null;
+    const walk = (nodes: SideNode[], ancestors: string[]) => {
+        for (const node of nodes) {
+            if (node.children.length > 0) {
+                walk(node.children, [...ancestors, node.key]);
+            }
+            if (node.kind !== 'group' && node.url) {
+                const score = matchScore(node.source, currentPath);
+                if (score > 0 && (!best || score > best.score)) best = { key: node.key, branch: ancestors, score };
+            }
         }
     };
-    // Small grace delay (not an immediate close) so moving the mouse
-    // diagonally from a rail icon toward the flyout panel itself doesn't
-    // slam it shut mid-transit — standard flyout-menu hover-intent pattern.
-    const scheduleFlyoutClose = () => {
-        clearFlyoutCloseTimer();
-        closeTimerRef.current = setTimeout(() => setFlyoutGroup(null), 150);
-    };
-    const openFlyout = (item: NavItem) => {
-        clearFlyoutCloseTimer();
-        setFlyoutGroup(item.items && item.items.length > 0 ? item : null);
-    };
+    walk(tree, []);
+    const found = best as { key: string; branch: string[] } | null;
+    return { key: found?.key ?? null, branch: found?.branch ?? [] };
+}
 
-    useEffect(() => clearFlyoutCloseTimer, []);
+// Expanded/collapsed state of every group and parent item, remembered across
+// navigations and reloads (the whole shell remounts on each Inertia visit).
+const STORAGE_KEY = 'pim.sidenav.expanded';
 
-    // Shared by the docked secondary panel (expanded state) and the
-    // collapsed-state flyout overlay below — same title/list, just a
-    // different container around it.
-    const renderSecondaryPanelContent = (group: NavItem | null) => (
-        <>
-            <Toolbar
-                sx={{
-                    px: 3,
-                    minHeight: '57px !important',
-                    justifyContent: 'flex-start',
-                }}
-            >
-                <Typography
-                    variant="h6"
-                    noWrap
-                    sx={{
-                        fontWeight: 600,
-                        fontSize: '1.05rem',
-                        color: FIORI.textPrimary,
-                    }}
-                >
-                    PIM PK
-                </Typography>
-            </Toolbar>
-            <Divider sx={{ borderColor: FIORI.border }} />
-            <Box sx={{ flex: 1, overflowY: 'auto', overflowX: 'hidden' }}>
-                {group && <NavSecondary title={group.title} items={group.items ?? []} />}
-            </Box>
-        </>
-    );
-
-    const content = (
-        <Box sx={{ display: 'flex', height: '100%', overflow: 'hidden' }}>
-            {/* Primary Sidebar (Narrow Left Column) */}
-            <Box
-                onMouseLeave={collapsed ? scheduleFlyoutClose : undefined}
-                sx={{
-                    width: SIDEBAR_WIDTH_ICON,
-                    height: '100%',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    borderRight: '1px solid',
-                    borderColor: FIORI.border,
-                }}
-            >
-                <Toolbar
-                    sx={{
-                        px: 1,
-                        minHeight: '57px !important',
-                        justifyContent: 'center',
-                    }}
-                >
-                    <Box
-                        component={Link}
-                        href="/dashboard"
-                        prefetch
-                        sx={{ display: 'flex', alignItems: 'center', textDecoration: 'none', color: 'inherit' }}
-                    >
-                        <AppLogo collapsed={true} />
-                    </Box>
-                </Toolbar>
-                <Divider sx={{ alignSelf: 'stretch', borderColor: FIORI.border }} />
-                <Box sx={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', alignSelf: 'stretch' }}>
-                    <NavPrimary
-                        items={filteredMainNavItems}
-                        // "Active" หมายถึง section ที่กำลังอยู่จริง (ตาม URL ปัจจุบัน) — คงที่
-                        // เสมอ ไม่ผูกกับ flyoutGroup (สถานะแค่ตอน hover/focus ชั่วคราว)
-                        // ไม่งั้นแค่ hover ไอคอนอื่นเฉยๆ ระหว่าง collapsed จะไปแย่ง highlight
-                        // จาก section ที่ผู้ใช้อยู่จริง แล้วพอเลิก hover ก็จะไม่มีอะไร active
-                        // เลยสักตัว — hover ของแต่ละไอคอนมี :hover state ของตัวเองอยู่แล้วพอ
-                        activeTitle={selectedGroup?.title ?? null}
-                        onSelect={(item) => {
-                            setSelectedGroup(item);
-                            // ปุ่ม/แตะ (ไม่ใช่แค่ hover) ก็เปิด flyout ได้เหมือนกัน — สำคัญ
-                            // สำหรับ touch/keyboard ที่ไม่มี hover ให้ใช้ ไม่ re-expand
-                            // sidebar ทั้งแถบแบบเดิมอีกต่อไป (ไม่ใช่พฤติกรรมของ Fiori
-                            // collapsed rail จริงๆ — ดูคอมเมนต์ flyoutGroup ด้านบน)
-                            if (collapsed) {
-                                openFlyout(item);
-                            }
-                        }}
-                        onHoverItem={collapsed ? openFlyout : undefined}
-                    />
-                </Box>
-            </Box>
-
-            {/* Secondary Sidebar (Wider Right Column) — docked in-flow only
-            while expanded; while collapsed this stays width:0 and the
-            flyout overlay below (position: fixed) takes over on hover */}
-            <Box
-                sx={{
-                    flex: 1,
-                    height: '100%',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    transition: (theme) => theme.transitions.create(['width', 'opacity'], { duration: theme.transitions.duration.shortest }),
-                    width: hasSubmenus && !collapsed ? SIDEBAR_WIDTH - SIDEBAR_WIDTH_ICON : 0,
-                    opacity: hasSubmenus && !collapsed ? 1 : 0,
-                    overflow: 'hidden',
-                    bgcolor: FIORI.surface,
-                }}
-            >
-                {renderSecondaryPanelContent(selectedGroup)}
-            </Box>
-        </Box>
-    );
-
-    if (isMobile) {
-        return (
-            <ThemeProvider theme={sidebarTheme}>
-                <Drawer
-                    anchor="left"
-                    open={openMobile}
-                    onClose={() => setOpenMobile(false)}
-                    ModalProps={{ keepMounted: true }}
-                    sx={{ '& .MuiDrawer-paper': { width: SIDEBAR_WIDTH, backgroundColor: FIORI.surface } }}
-                >
-                    {content}
-                </Drawer>
-            </ThemeProvider>
-        );
+function readExpanded(): Record<string, boolean> {
+    try {
+        const saved = window.localStorage.getItem(STORAGE_KEY);
+        return saved ? (JSON.parse(saved) as Record<string, boolean>) : {};
+    } catch {
+        return {}; // private mode / disabled storage
     }
+}
+
+/**
+ * SAP Fiori Side Navigation on the official UI5 `SideNavigation`, placed in
+ * NavigationLayout's `sideContent` slot by AppShell. Items are filtered by
+ * the viewer's permissions, the item matching the current URL is selected
+ * (and its branch force-expanded), and clicks go through Inertia's
+ * `router.visit` so navigation stays client-side — each leaf still carries a
+ * real `href`, so ctrl/⌘/shift-click opens it in a new tab as before.
+ *
+ * Collapsed mode (icon rail with a flyout per item) and the small-screen
+ * overlay are the control's own behaviour, driven by NavigationLayout's
+ * `mode` (see app-shell.tsx).
+ */
+export function AppSidebar({ slot }: { slot?: string }) {
+    const { t } = useTranslation('nav');
+    const page = usePage<SharedData>();
+    const { auth } = page.props;
+    const { isMobile, setOpenMobile } = useSidebar();
+    const mainNavItems = useMainNavItems();
+
+    const tree = useMemo(() => toSideNavTree(filterNavItemsByPermission(mainNavItems, auth.permissions)), [mainNavItems, auth.permissions]);
+
+    const currentPath = page.url.split('?')[0];
+    const selected = useMemo(() => findSelected(tree, currentPath), [tree, currentPath]);
+
+    const [expanded, setExpanded] = useState<Record<string, boolean>>(() => {
+        const initial = readExpanded();
+        selected.branch.forEach((k) => (initial[k] = true));
+        return initial;
+    });
+
+    // Keep the active branch open as the route changes without disturbing
+    // whatever else the user has expanded or collapsed.
+    useEffect(() => {
+        setExpanded((prev) => {
+            if (selected.branch.every((k) => prev[k])) return prev;
+            const next = { ...prev };
+            selected.branch.forEach((k) => (next[k] = true));
+            return next;
+        });
+    }, [selected.branch]);
+
+    const isExpanded = (node: SideNode) => expanded[node.key] ?? node.kind === 'group';
+
+    const onItemToggle: SideNavigationPropTypes['onItemToggle'] = (e) => {
+        const item = e.detail.item as unknown as HTMLElement & { expanded: boolean };
+        const key = item.dataset.key;
+        if (!key) return;
+        // fired *before* UI5 flips `expanded`, so the new value is the inverse
+        const value = !item.expanded;
+        setExpanded((prev) => {
+            const next = { ...prev, [key]: value };
+            try {
+                window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+            } catch {
+                /* ignore */
+            }
+            return next;
+        });
+    };
+
+    const visit =
+        (url: string) =>
+        (e: { detail: { altKey?: boolean; ctrlKey?: boolean; metaKey?: boolean; shiftKey?: boolean }; preventDefault: () => void }) => {
+            const { altKey, ctrlKey, metaKey, shiftKey } = e.detail;
+            if (altKey || ctrlKey || metaKey || shiftKey) return; // let the real href open a new tab/window
+            e.preventDefault();
+            if (isMobile) setOpenMobile(false);
+            router.visit(url);
+        };
+
+    const renderItem = (node: SideNode) => {
+        const hasSubs = node.children.length > 0;
+        return (
+            <SideNavigationItem
+                key={node.key}
+                data-key={node.key}
+                text={node.title}
+                tooltip={node.title}
+                icon={node.icon}
+                href={node.url}
+                selected={selected.key === node.key}
+                expanded={hasSubs ? isExpanded(node) : undefined}
+                // Parent items without a page of their own (Master, Attributes,
+                // Marketplace) only expand/collapse their sub-items.
+                unselectable={hasSubs && !node.url}
+                onClick={node.url ? visit(node.url) : undefined}
+            >
+                {node.children.map((sub) => (
+                    <SideNavigationSubItem
+                        key={sub.key}
+                        data-key={sub.key}
+                        text={sub.title}
+                        tooltip={sub.title}
+                        href={sub.url}
+                        selected={selected.key === sub.key}
+                        onClick={sub.url ? visit(sub.url) : undefined}
+                    />
+                ))}
+            </SideNavigationItem>
+        );
+    };
 
     return (
-        <ThemeProvider theme={sidebarTheme}>
-            <Drawer
-                variant="permanent"
-                sx={{
-                    width,
-                    flexShrink: 0,
-                    whiteSpace: 'nowrap',
-                    '& .MuiDrawer-paper': {
-                        width,
-                        boxSizing: 'border-box',
-                        overflowX: 'hidden',
-                        boxShadow: 'none',
-                        borderRight: `1px solid ${FIORI.border}`,
-                        backgroundColor: FIORI.surface,
-                        transition: (theme) => theme.transitions.create('width', { duration: theme.transitions.duration.shortest }),
-                    },
-                }}
-            >
-                {content}
-            </Drawer>
-
-            {/* Fiori collapsed-rail flyout — position:fixed (not inside the
-            Drawer's own paper, which clips at SIDEBAR_WIDTH_ICON while
-            collapsed) so it floats OVER page content instead of pushing it,
-            anchored right at the rail's edge. Only ever mounted while
-            collapsed + hovering/focusing a rail item with children. */}
-            {collapsed && flyoutGroup && (
-                <Box
-                    onMouseEnter={clearFlyoutCloseTimer}
-                    onMouseLeave={scheduleFlyoutClose}
-                    sx={{
-                        position: 'fixed',
-                        top: 0,
-                        left: SIDEBAR_WIDTH_ICON,
-                        height: '100vh',
-                        width: SIDEBAR_WIDTH - SIDEBAR_WIDTH_ICON,
-                        display: 'flex',
-                        flexDirection: 'column',
-                        bgcolor: FIORI.surface,
-                        borderRight: `1px solid ${FIORI.border}`,
-                        // ลอยเหนือเนื้อหาหน้า (ไม่ได้ดันเนื้อหา) เลยต้องมีเงาให้รู้สึกว่า
-                        // "ลอย" อยู่จริง ต่างจากแผงที่ docked ในโหมด expanded ที่ไม่ต้องมี
-                        boxShadow: '2px 0 10px rgba(0,0,0,0.18)',
-                        zIndex: (theme) => theme.zIndex.drawer + 1,
-                    }}
-                >
-                    {renderSecondaryPanelContent(flyoutGroup)}
-                </Box>
+        <SideNavigation slot={slot} onItemToggle={onItemToggle} accessibleName={t('mainNavigation')}>
+            {tree.map((node) =>
+                node.kind === 'group' ? (
+                    <SideNavigationGroup key={node.key} data-key={node.key} text={node.title} expanded={isExpanded(node)}>
+                        {node.children.map(renderItem)}
+                    </SideNavigationGroup>
+                ) : (
+                    renderItem(node)
+                ),
             )}
-        </ThemeProvider>
+        </SideNavigation>
     );
 }

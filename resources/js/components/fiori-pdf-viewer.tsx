@@ -1,8 +1,10 @@
-import { FIORI, fioriCardSx } from '@/lib/fiori-style';
-import CloseIcon from '@mui/icons-material/Close';
-import DownloadIcon from '@mui/icons-material/Download';
-import PictureAsPdfOutlinedIcon from '@mui/icons-material/PictureAsPdfOutlined';
-import { Box, IconButton, Paper, Stack, Typography, type SxProps, type Theme } from '@mui/material';
+import '@ui5/webcomponents-icons/dist/decline.js';
+import '@ui5/webcomponents-icons/dist/download.js';
+import '@ui5/webcomponents-icons/dist/pdf-attachment.js';
+import { Button, Icon, Link } from '@ui5/webcomponents-react';
+import type { CSSProperties } from 'react';
+
+import styles from './fiori-pdf-viewer.module.css';
 
 interface FioriPdfViewerProps {
     /** URL (server path or a local `URL.createObjectURL(file)` blob) the embedded frame loads. */
@@ -15,7 +17,8 @@ interface FioriPdfViewerProps {
     onClose?: () => void;
     /** Height of the embedded frame on tablet/desktop. Default 480. */
     height?: number | string;
-    sx?: SxProps<Theme>;
+    style?: CSSProperties;
+    className?: string;
 }
 
 /**
@@ -39,76 +42,53 @@ interface FioriPdfViewerProps {
  *
  * ref: sap.com/design-system/fiori-design-web → UI elements → PDF Viewer
  */
-export function FioriPdfViewer({ src, title, downloadUrl, onClose, height = 480, sx }: FioriPdfViewerProps) {
+export function FioriPdfViewer({ src, title, downloadUrl, onClose, height = 480, style, className }: FioriPdfViewerProps) {
     const resolvedDownloadUrl = downloadUrl ?? src;
 
+    // UI5 Button can't render as an <a download>, so trigger the download via a temporary anchor.
+    const download = () => {
+        const anchor = document.createElement('a');
+        anchor.href = resolvedDownloadUrl;
+        anchor.download = title;
+        anchor.target = '_blank';
+        anchor.rel = 'noopener noreferrer';
+        anchor.click();
+    };
+
     return (
-        <Paper elevation={0} sx={[fioriCardSx, { overflow: 'hidden' }, sx] as SxProps<Theme>}>
-            <Stack
-                direction="row"
-                alignItems="center"
-                justifyContent="space-between"
-                sx={{ px: 2, py: 1, borderBottom: `1px solid ${FIORI.border}`, bgcolor: FIORI.headerBg, gap: 1 }}
-            >
-                <Stack direction="row" alignItems="center" spacing={1} sx={{ minWidth: 0 }}>
-                    <PictureAsPdfOutlinedIcon sx={{ fontSize: 18, color: FIORI.textSecondary, flexShrink: 0 }} />
-                    <Typography variant="body2" noWrap sx={{ color: FIORI.textPrimary, fontWeight: 600 }}>
+        <div className={[styles.viewer, className].filter(Boolean).join(' ')} style={style}>
+            <div className={styles.toolbar}>
+                <div className={styles.title}>
+                    <Icon name="pdf-attachment" className={styles.icon} />
+                    <span className={styles.titleText} title={title}>
                         {title}
-                    </Typography>
-                </Stack>
-                <Stack direction="row" spacing={0.5} sx={{ flexShrink: 0 }}>
-                    <IconButton
-                        component="a"
-                        href={resolvedDownloadUrl}
-                        download={title}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        size="small"
-                        title="Download"
-                        aria-label="download pdf"
-                        sx={{ color: FIORI.textSecondary, '&:hover': { color: FIORI.brand } }}
-                    >
-                        <DownloadIcon fontSize="small" />
-                    </IconButton>
-                    {onClose && (
-                        <IconButton size="small" onClick={onClose} aria-label="close" sx={{ color: FIORI.textSecondary, '&:hover': { color: FIORI.error } }}>
-                            <CloseIcon fontSize="small" />
-                        </IconButton>
-                    )}
-                </Stack>
-            </Stack>
+                    </span>
+                </div>
+                <div className={styles.actions}>
+                    <Button design="Transparent" icon="download" tooltip="Download" accessibleName="download pdf" onClick={download} />
+                    {onClose && <Button design="Transparent" icon="decline" tooltip="Close" accessibleName="close" onClick={onClose} />}
+                </div>
+            </div>
 
             {/* Desktop/tablet: embed the PDF — the browser's own plugin gives paging/zoom/print for free. */}
-            <Box
-                component="iframe"
-                src={src}
-                title={title}
-                sx={{ display: { xs: 'none', sm: 'block' }, width: '100%', height, border: 0, bgcolor: FIORI.surface }}
-            />
+            <iframe src={src} title={title} className={styles.frame} style={{ height }} />
 
             {/* Mobile: no inline rendering per the guideline — a download prompt instead. */}
-            <Stack
-                spacing={1}
-                alignItems="center"
-                justifyContent="center"
-                sx={{ display: { xs: 'flex', sm: 'none' }, py: 4, px: 2 }}
-            >
-                <PictureAsPdfOutlinedIcon sx={{ fontSize: 32, color: FIORI.textSecondary }} />
-                <Typography variant="body2" sx={{ color: FIORI.textSecondary, textAlign: 'center' }}>
-                    Preview isn't available on this device.
-                </Typography>
-                <Typography
-                    component="a"
+            <div className={styles.mobile}>
+                <Icon name="pdf-attachment" className={styles.icon} style={{ width: '2rem', height: '2rem' }} />
+                <span>Preview isn't available on this device.</span>
+                <Link
                     href={resolvedDownloadUrl}
-                    download={title}
                     target="_blank"
-                    rel="noopener noreferrer"
-                    variant="body2"
-                    sx={{ color: FIORI.brand, fontWeight: 600, textDecoration: 'none', '&:hover': { textDecoration: 'underline' } }}
+                    style={{ fontWeight: 600 }}
+                    onClick={(e) => {
+                        e.preventDefault();
+                        download();
+                    }}
                 >
                     Download to view
-                </Typography>
-            </Stack>
-        </Paper>
+                </Link>
+            </div>
+        </div>
     );
 }

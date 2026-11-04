@@ -1,255 +1,83 @@
-import { FIORI, fioriCardSx } from '@/lib/fiori-style';
-import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
-import CloseIcon from '@mui/icons-material/Close';
-import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
-import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
-import WarningAmberOutlinedIcon from '@mui/icons-material/WarningAmberOutlined';
-import { Box, IconButton, Paper, Typography, type SxProps, type Theme } from '@mui/material';
-import { forwardRef, type ReactNode } from 'react';
+import { Label, MessageStrip, Title, type MessageStripDomRef } from '@ui5/webcomponents-react';
+import { forwardRef, type CSSProperties, type ReactElement, type ReactNode } from 'react';
+
+import styles from './fiori-form.module.css';
 
 /**
- * SAP Fiori "Form" + "Form Field Validation" primitives.
+ * SAP Fiori "Form" + "Form Field Validation" primitives, built on UI5 Web
+ * Components (`Label`, `Title`, `MessageStrip`).
  * ref: sap.com/design-system/fiori-design-web → UI elements → Form / Form Field Validation
  *
  *  - <FioriFormGroup>   = Form container (titled section, header rule, compact row rhythm)
  *  - <FioriField>       = label / control / value-state message row
- *                         (label left on md+, stacked on xs; required "*" AFTER the label per SAPUI5)
- *  - fioriFieldStateSx  = full Fiori (Horizon) field look for a MUI TextField/Select:
- *                         compact 2rem height, 0.375rem corners, darker border, brand hover/focus,
- *                         plus the 2px border + tint for a non-None value state
- *  - valueStateOf       = map an Inertia error string → value state
- *  - <FioriMessageStrip>    = Message Strip (ref: UI elements → Message Strip) — inline,
- *                         dismissible banner for information/success/warning/error,
- *                         reused anywhere a page needs to talk to the user in-context
- *                         (status checks, background-job results, form-level errors)
- *                         instead of a plain MUI <Alert>
+ *                         (label left on ≥900px, stacked above on narrow; required "*" AFTER the label per SAPUI5)
+ *  - valueStateOf       = map an Inertia error string → FioriValueState
+ *  - ui5ValueState      = FioriValueState → UI5 `valueState` literal for Input/Select/ComboBox/…
+ *  - <FioriMessageStrip>    = UI5 Message Strip — inline, dismissible banner for
+ *                         information/success/warning/error, reused anywhere a
+ *                         page needs to talk to the user in-context
  *  - <FioriFormErrorSummary> = the error-severity Message Strip shown on submit when
- *                         fields need fixing (kept as its own component since every
- *                         master form already calls it with this exact narrow API)
+ *                         fields need fixing
  */
 
 export type FioriValueState = 'none' | 'error' | 'warning' | 'success' | 'information';
 
-// Fiori Horizon: Error & Warning draw a 2px (0.125rem) border, Success & Information 1px.
-const STATE_COLOR: Record<Exclude<FioriValueState, 'none'>, { fg: string; bg: string; borderWidth: string }> = {
-    error: { fg: FIORI.error, bg: FIORI.errorBg, borderWidth: '2px' },
-    warning: { fg: FIORI.warning, bg: FIORI.warningBg, borderWidth: '2px' },
-    success: { fg: FIORI.success, bg: FIORI.successBg, borderWidth: '1px' },
-    information: { fg: FIORI.information, bg: FIORI.neutralBg, borderWidth: '1px' },
+export type Ui5ValueState = 'None' | 'Negative' | 'Critical' | 'Positive' | 'Information';
+
+const UI5_VALUE_STATE: Record<FioriValueState, Ui5ValueState> = {
+    none: 'None',
+    error: 'Negative',
+    warning: 'Critical',
+    success: 'Positive',
+    information: 'Information',
 };
 
 export function valueStateOf(error?: string | null): FioriValueState {
     return error ? 'error' : 'none';
 }
 
-/**
- * Base Fiori (Horizon) input styling shared by every field: compact density
- * (2rem / 32px control height), 0.375rem corner radius, a darker-than-divider
- * border, and brand-coloured hover/focus — mirrors `--sapField_*` tokens.
- */
-const fioriInputBaseSx = {
-    '& .MuiOutlinedInput-root': {
-        bgcolor: FIORI.surface,
-        borderRadius: '0.375rem',
-        fontSize: '0.875rem',
-        '& fieldset': { borderColor: FIORI.borderStrong, transition: 'border-color 0.1s ease' },
-        '&:hover fieldset': { borderColor: FIORI.brand },
-        '&.Mui-focused fieldset': { borderColor: FIORI.brand, borderWidth: '1px' },
-        '&.Mui-disabled': { bgcolor: FIORI.headerBg },
-        '&.Mui-disabled fieldset': { borderColor: FIORI.border },
-    },
-    // compact single-line height ≈ 2rem — via padding only, no explicit height
-    // (an explicit height + border-box clips the text and the value looks blank)
-    '& .MuiOutlinedInput-input': {
-        paddingTop: '6px',
-        paddingBottom: '6px',
-        paddingLeft: '8px',
-        lineHeight: '1.4375em',
-        '&::placeholder': { color: FIORI.placeholder, opacity: 1 },
-    },
-    '& .MuiSelect-select.MuiOutlinedInput-input': { paddingTop: '6px', paddingBottom: '6px', paddingLeft: '8px' },
-    // multiline: MUI keeps the padding on the root, the textarea is flush already
-    '& .MuiOutlinedInput-root.MuiInputBase-multiline': { paddingTop: '6px', paddingBottom: '6px' },
-} as const;
-
-/**
- * `sx` for a MUI outlined `TextField` / `Select` / `FormControl` giving it the
- * full Fiori Horizon field look plus the border/tint for its value state.
- * Spread onto the component's `sx`.
- */
-export function fioriFieldStateSx(state: FioriValueState): SxProps<Theme> {
-    if (state === 'none') {
-        return fioriInputBaseSx;
-    }
-
-    const { fg, bg, borderWidth } = STATE_COLOR[state];
-
-    return {
-        ...fioriInputBaseSx,
-        '& .MuiOutlinedInput-root': {
-            ...fioriInputBaseSx['& .MuiOutlinedInput-root'],
-            bgcolor: bg,
-            '& fieldset': { borderColor: fg, borderWidth },
-            '&:hover fieldset': { borderColor: fg, borderWidth },
-            '&.Mui-focused fieldset': { borderColor: fg, borderWidth },
-        },
-    };
+/** FioriValueState → the `valueState` literal UI5 inputs expect. */
+export function ui5ValueState(state: FioriValueState): Ui5ValueState {
+    return UI5_VALUE_STATE[state];
 }
 
-/**
- * `sx` for a MUI multi-select `Autocomplete` styled as a SAP Fiori
- * "MultiInput": squared-off tokens (not pills) with a thin border sitting
- * inside a compact Fiori field, plus the value-state border/tint on error.
- * ref: sap.com/design-system/fiori-design-web → UI elements → MultiInput
- */
-export function fioriMultiInputSx(state: FioriValueState): SxProps<Theme> {
-    const base = {
-        '& .MuiAutocomplete-inputRoot': {
-            bgcolor: FIORI.surface,
-            borderRadius: '0.375rem',
-            padding: '3px 8px',
-            gap: '4px',
-            '& fieldset': { borderColor: FIORI.borderStrong, transition: 'border-color 0.1s ease' },
-            '&:hover fieldset': { borderColor: FIORI.brand },
-            '&.Mui-focused fieldset': { borderColor: FIORI.brand, borderWidth: '1px' },
-        },
-        '& .MuiAutocomplete-input': { minWidth: 60, fontSize: '0.875rem', padding: '4px 0' },
-        // Fiori token: rectangular, subtle fill, 1px border — never a pill
-        '& .MuiAutocomplete-tag': {
-            margin: 0,
-            height: 22,
-            borderRadius: '0.25rem',
-            backgroundColor: FIORI.brandBg,
-            border: `1px solid ${FIORI.borderStrong}`,
-            color: FIORI.textPrimary,
-            fontSize: '0.8125rem',
-            '& .MuiChip-deleteIcon': { color: FIORI.textSecondary, fontSize: 16, '&:hover': { color: FIORI.error } },
-        },
-    } as const;
-
-    if (state === 'none') {
-        return base;
-    }
-
-    const { fg, bg, borderWidth } = STATE_COLOR[state];
-
-    return {
-        ...base,
-        '& .MuiAutocomplete-inputRoot': {
-            ...base['& .MuiAutocomplete-inputRoot'],
-            bgcolor: bg,
-            '& fieldset': { borderColor: fg, borderWidth },
-            '&:hover fieldset': { borderColor: fg, borderWidth },
-            '&.Mui-focused fieldset': { borderColor: fg, borderWidth },
-        },
-    };
-}
-
-/**
- * `sx` for a single-select MUI `Autocomplete` styled as a SAP Fiori Horizon
- * **ComboBox** web component: compact 2rem field, 0.375rem corners, darker
- * border with brand hover/focus, a chevron popup button and a subtle clear
- * button, plus the value-state border/tint. Pair with
- * `popupIcon={<KeyboardArrowDownIcon />}` and
- * `slotProps={{ paper: { sx: fioriComboBoxPaperSx } }}`.
- * ref: sap.com/design-system/fiori-design-web → UI elements → ComboBox
- */
-export function fioriComboBoxSx(state: FioriValueState): SxProps<Theme> {
-    const border = state === 'none' ? FIORI.borderStrong : STATE_COLOR[state].fg;
-    const borderWidth = state === 'none' ? '1px' : STATE_COLOR[state].borderWidth;
-    const bg = state === 'none' ? FIORI.surface : STATE_COLOR[state].bg;
-
-    return {
-        // Match the exact rendered height of a fiori Text/Select field (2rem):
-        // same 6px top/bottom input padding + 0.875rem/1.4375 line-height, with
-        // no extra vertical padding on the flex row. Nested one level deeper
-        // than MUI's own `.MuiAutocomplete-inputRoot .MuiAutocomplete-input`
-        // rule so this wins on specificity.
-        '& .MuiOutlinedInput-root.MuiAutocomplete-inputRoot': {
-            bgcolor: bg,
-            borderRadius: '0.375rem',
-            fontSize: '0.875rem',
-            minHeight: '2rem',
-            paddingTop: 0,
-            paddingBottom: 0,
-            paddingLeft: 0,
-            '& .MuiAutocomplete-input': {
-                padding: '6px 4px 6px 8px',
-                lineHeight: '1.4375em',
-                '&::placeholder': { color: FIORI.placeholder, opacity: 1 },
-            },
-            '& fieldset': { borderColor: border, borderWidth, transition: 'border-color 0.1s ease' },
-            '&:hover fieldset': { borderColor: state === 'none' ? FIORI.brand : border, borderWidth },
-            '&.Mui-focused fieldset': { borderColor: state === 'none' ? FIORI.brand : border, borderWidth },
-            '&.Mui-disabled': { bgcolor: FIORI.headerBg },
-            '&.Mui-disabled fieldset': { borderColor: FIORI.border },
-        },
-        '& .MuiAutocomplete-endAdornment': { right: 6 },
-        '& .MuiAutocomplete-popupIndicator, & .MuiAutocomplete-clearIndicator': {
-            color: FIORI.textSecondary,
-            '&:hover': { backgroundColor: 'transparent', color: FIORI.brand },
-            '& svg': { fontSize: 18 },
-        },
-    };
-}
-
-/** `sx` for the ComboBox dropdown surface — a Fiori popover list. */
-export const fioriComboBoxPaperSx: SxProps<Theme> = {
-    mt: '2px',
-    borderRadius: '0.375rem',
-    border: `1px solid ${FIORI.borderStrong}`,
-    boxShadow: '0 4px 12px rgba(0,0,0,0.12)',
-    '& .MuiAutocomplete-listbox': { padding: 0 },
-    '& .MuiAutocomplete-option': {
-        fontSize: '0.875rem',
-        minHeight: 32,
-        color: FIORI.textPrimary,
-        '&.Mui-focused': { backgroundColor: FIORI.hover },
-        '&[aria-selected="true"]': { backgroundColor: FIORI.selected },
-        '&[aria-selected="true"].Mui-focused': { backgroundColor: FIORI.selected },
-    },
+const MESSAGE_CLASS: Record<FioriValueState, string | undefined> = {
+    none: undefined,
+    error: styles.messageError,
+    warning: styles.messageWarning,
+    success: styles.messageSuccess,
+    information: styles.messageInformation,
 };
+
+const cx = (...names: Array<string | false | null | undefined>) => names.filter(Boolean).join(' ');
 
 interface FioriFormGroupProps {
     title?: ReactNode;
     description?: ReactNode;
     actions?: ReactNode;
     children: ReactNode;
-    sx?: SxProps<Theme>;
+    style?: CSSProperties;
+    className?: string;
 }
 
-export function FioriFormGroup({ title, description, actions, children, sx }: FioriFormGroupProps) {
+export function FioriFormGroup({ title, description, actions, children, style, className }: FioriFormGroupProps) {
     return (
-        <Paper elevation={0} sx={[fioriCardSx, sx] as SxProps<Theme>}>
+        <section className={cx(styles.group, className)} style={style}>
             {(title || description || actions) && (
-                <Box
-                    sx={{
-                        px: 3,
-                        py: 1.75,
-                        borderBottom: `1px solid ${FIORI.border}`,
-                        display: 'flex',
-                        alignItems: 'flex-start',
-                        justifyContent: 'space-between',
-                        gap: 2,
-                    }}
-                >
-                    <Box sx={{ minWidth: 0 }}>
+                <div className={styles.groupHeader}>
+                    <div className={styles.groupHeaderText}>
                         {title && (
-                            <Typography variant="subtitle1" sx={{ fontWeight: 700, color: FIORI.textPrimary, lineHeight: 1.4 }}>
+                            <Title level="H5" size="H5" wrappingType="Normal">
                                 {title}
-                            </Typography>
+                            </Title>
                         )}
-                        {description && (
-                            <Typography variant="body2" sx={{ color: FIORI.textSecondary, mt: 0.25 }}>
-                                {description}
-                            </Typography>
-                        )}
-                    </Box>
-                    {actions && <Box sx={{ flexShrink: 0 }}>{actions}</Box>}
-                </Box>
+                        {description && <span className={styles.groupDescription}>{description}</span>}
+                    </div>
+                    {actions && <div className={styles.groupActions}>{actions}</div>}
+                </div>
             )}
-            <Box sx={{ p: 3, display: 'flex', flexDirection: 'column', rowGap: 1.75 }}>{children}</Box>
-        </Paper>
+            <div className={styles.groupBody}>{children}</div>
+        </section>
     );
 }
 
@@ -263,13 +91,15 @@ interface FioriFieldProps {
     message?: ReactNode;
     /** neutral hint shown below the control when there is no message */
     hint?: ReactNode;
-    /** width of the label column on md+ (px) */
+    /** width of the label column on wide screens (px) */
     labelWidth?: number;
     /** max width of the control column (px) — ignored when `fullWidth` is set */
     fieldMaxWidth?: number;
     /** let the control fill the whole field column (for tree pickers, long textareas, galleries) */
     fullWidth?: boolean;
     children: ReactNode;
+    style?: CSSProperties;
+    className?: string;
 }
 
 export function FioriField({
@@ -283,130 +113,75 @@ export function FioriField({
     fieldMaxWidth = 400,
     fullWidth = false,
     children,
+    style,
+    className,
 }: FioriFieldProps) {
-    const stateFg = valueState === 'none' ? FIORI.textSecondary : STATE_COLOR[valueState].fg;
+    const vars = {
+        '--fiori-label-width': `${labelWidth}px`,
+        '--fiori-field-max-width': `${fieldMaxWidth}px`,
+    } as CSSProperties;
 
     return (
-        <Box
-            sx={{
-                display: 'grid',
-                gridTemplateColumns: { xs: '1fr', md: `${labelWidth}px minmax(0, 1fr)` },
-                columnGap: 3,
-                rowGap: 0.5,
-                alignItems: 'start',
-            }}
-        >
-            <Box
-                component="label"
-                htmlFor={htmlFor}
-                sx={{
-                    fontSize: '0.8125rem',
-                    fontWeight: 500,
-                    color: FIORI.textPrimary,
-                    lineHeight: 1.4,
-                    pt: { md: '7px' },
-                    textAlign: { md: 'right' },
-                    mb: { xs: 0.5, md: 0 },
-                }}
-            >
+        <div className={cx(styles.field, className)} style={{ ...vars, ...style }}>
+            <Label for={htmlFor} required={required} showColon={false} wrappingType="Normal" className={styles.label}>
                 {label}
-                {required && (
-                    <Box component="span" aria-hidden sx={{ color: FIORI.error, ml: 0.25 }}>
-                        *
-                    </Box>
-                )}
-            </Box>
+            </Label>
 
-            <Box sx={{ maxWidth: fullWidth ? '100%' : fieldMaxWidth, minWidth: 0 }}>
+            <div className={cx(styles.control, fullWidth && styles.controlFull)}>
                 {children}
-                {(message || hint) && (
-                    <Typography
-                        variant="caption"
-                        sx={{ display: 'block', mt: 0.5, color: message ? stateFg : FIORI.textSecondary }}
-                    >
-                        {message ?? hint}
-                    </Typography>
-                )}
-            </Box>
-        </Box>
+                {(message || hint) && <span className={cx(styles.message, message ? MESSAGE_CLASS[valueState] : undefined)}>{message ?? hint}</span>}
+            </div>
+        </div>
     );
 }
 
 export type FioriMessageStripSeverity = 'information' | 'success' | 'warning' | 'error';
 
-const MESSAGE_STRIP_ICON: Record<FioriMessageStripSeverity, typeof ErrorOutlineIcon> = {
-    information: InfoOutlinedIcon,
-    success: CheckCircleOutlineIcon,
-    warning: WarningAmberOutlinedIcon,
-    error: ErrorOutlineIcon,
+const MESSAGE_STRIP_DESIGN: Record<FioriMessageStripSeverity, 'Information' | 'Positive' | 'Critical' | 'Negative'> = {
+    information: 'Information',
+    success: 'Positive',
+    warning: 'Critical',
+    error: 'Negative',
 };
 
 interface FioriMessageStripProps {
     severity?: FioriMessageStripSeverity;
     /** shown as a trailing "×" button; omit for a non-dismissible strip */
     onClose?: () => void;
-    /** override the default per-severity icon, or pass `false` to hide it */
-    icon?: ReactNode | false;
+    /** override the default per-severity icon (pass a UI5 `<Icon name="..." />`), or `false` to hide it */
+    icon?: ReactElement | false;
     children: ReactNode;
-    sx?: SxProps<Theme>;
+    style?: CSSProperties;
+    className?: string;
 }
 
 /**
- * SAP Fiori "Message Strip" — a compact, inline banner for talking to the
- * user in-context (validation feedback, a background job's result, a
- * status check inside a dialog) rather than a full-page toast. Reuses the
- * same value-state palette as the form fields above so a strip and the
- * field it's commenting on always agree on what "error"/"warning"/etc. look
- * like. Drop-in replacement for a plain MUI `<Alert severity="...">` —
- * same `severity` values (MUI's "info" is spelled "information" here to
- * match `FioriValueState`).
+ * SAP Fiori "Message Strip" (UI5 `MessageStrip`) — a compact, inline banner
+ * for talking to the user in-context (validation feedback, a background
+ * job's result, a status check inside a dialog) rather than a full-page
+ * toast. `severity` keeps the old MUI-Alert-like spelling ("information"
+ * matches FioriValueState) and maps onto the UI5 `design`.
  * ref: sap.com/design-system/fiori-design-web → UI elements → Message Strip
  */
-// forwardRef: ต้องมี เพราะตอนนี้ถูกใช้เป็น direct child ของ MUI <Snackbar>
-// (ดู products/edit.tsx's push-result snackbar) — Snackbar ต้องใช้ ref ไปหา DOM
-// node จริงของลูกตัวเองเพื่อผูก transition (Grow/Fade) ด้วย ถ้าไม่ forward ref
-// ให้ ref ที่ Snackbar cloneElement ใส่มาจะ resolve เป็น null (function component
-// เฉยๆ รับ ref ไม่ได้) แล้วพอ transition พยายาม reflow (อ่าน node.scrollTop เพื่อ
-// บังคับ reflow ก่อนเริ่ม animation — เทคนิคมาตรฐานของ react-transition-group)
-// จะเจอ "Cannot read properties of null (reading 'scrollTop')" ทำ React tree
-// ทั้งหน้าล่มเป็นจอขาวทันที (ไม่มี error boundary ดักไว้) — เกิดขึ้นทุกครั้งที่
-// snackbar นี้เปิด (พอ push/deactivate เสร็จ) ไม่ว่าผลจะสำเร็จหรือ error ก็ตาม
-export const FioriMessageStrip = forwardRef<HTMLDivElement, FioriMessageStripProps>(function FioriMessageStrip(
-    { severity = 'information', onClose, icon, children, sx },
+// forwardRef kept so the strip can still be the direct child of something that
+// needs the DOM node (it used to sit inside a MUI <Snackbar> transition).
+export const FioriMessageStrip = forwardRef<MessageStripDomRef, FioriMessageStripProps>(function FioriMessageStrip(
+    { severity = 'information', onClose, icon, children, style, className },
     ref,
 ) {
-    const { fg, bg } = STATE_COLOR[severity];
-    const Icon = MESSAGE_STRIP_ICON[severity];
-
     return (
-        <Box
+        <MessageStrip
             ref={ref}
-            role="alert"
-            sx={{
-                display: 'flex',
-                alignItems: 'flex-start',
-                gap: 1,
-                px: 2,
-                py: 1.25,
-                borderRadius: '8px',
-                bgcolor: bg,
-                border: `1px solid ${fg}`,
-                color: FIORI.textPrimary,
-                ...sx,
-            }}
+            design={MESSAGE_STRIP_DESIGN[severity]}
+            hideCloseButton={!onClose}
+            hideIcon={icon === false}
+            icon={icon || undefined}
+            onClose={onClose ? () => onClose() : undefined}
+            className={className}
+            style={style}
         >
-            {icon !== false && (icon ?? <Icon sx={{ fontSize: 18, color: fg, flexShrink: 0, mt: '1px' }} />)}
-            <Box sx={{ flex: 1, minWidth: 0 }}>
-                <Typography variant="body2" component="div">
-                    {children}
-                </Typography>
-            </Box>
-            {onClose && (
-                <IconButton size="small" onClick={onClose} sx={{ mt: '-4px', mr: '-4px', color: fg, flexShrink: 0 }}>
-                    <CloseIcon sx={{ fontSize: 16 }} />
-                </IconButton>
-            )}
-        </Box>
+            {children}
+        </MessageStrip>
     );
 });
 
@@ -414,16 +189,17 @@ interface FioriFormErrorSummaryProps {
     /** the Inertia `errors` object; the strip only renders when it has keys */
     errors: Record<string, string | undefined>;
     message: ReactNode;
-    sx?: SxProps<Theme>;
+    style?: CSSProperties;
+    className?: string;
 }
 
 /** The error-severity Message Strip shown at the top/bottom of a form after a failed submit. */
-export function FioriFormErrorSummary({ errors, message, sx }: FioriFormErrorSummaryProps) {
+export function FioriFormErrorSummary({ errors, message, style, className }: FioriFormErrorSummaryProps) {
     const count = Object.keys(errors).filter((k) => errors[k]).length;
     if (count === 0) return null;
 
     return (
-        <FioriMessageStrip severity="error" sx={sx}>
+        <FioriMessageStrip severity="error" style={style} className={className}>
             {message}
         </FioriMessageStrip>
     );

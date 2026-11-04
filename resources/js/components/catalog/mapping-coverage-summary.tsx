@@ -1,6 +1,7 @@
-import { Chip, Stack, Tooltip, Typography } from '@mui/material';
+import { Tag } from '@ui5/webcomponents-react';
 import { useTranslation } from 'react-i18next';
-import { percentTone } from '@/lib/ui-style';
+
+import { percentToneFiori } from '@/lib/fiori-tokens';
 
 export interface CoverageStat {
     total: number;
@@ -18,46 +19,25 @@ interface MappingCoverageSummaryProps {
 // ได้เกิน 60 รายการแล้ว (ส่วนใหญ่เป็น spec/ใบรับรองเฉพาะ category)
 const MAX_TOOLTIP_ITEMS = 15;
 
+const TONE_DESIGN = { success: 'Positive', warning: 'Critical', error: 'Negative' } as const;
+
 function CoverageChip({ label, stat }: { label: string; stat: CoverageStat }) {
     const percent = stat.total > 0 ? Math.round((stat.mapped / stat.total) * 100) : 100;
-    const tone = percentTone(percent);
+    const design = TONE_DESIGN[percentToneFiori(percent)];
     const { t } = useTranslation('catalog');
 
-    const chip = (
-        <Chip
-            label={`${label}: ${stat.mapped}/${stat.total}`}
-            size="small"
-            sx={{ bgcolor: tone.bg, color: tone.fg, fontWeight: 600 }}
-        />
-    );
-
-    if (stat.missing.length === 0) {
-        return chip;
-    }
-
+    // tooltip แบบ native (title) — หนึ่งบรรทัดต่อหนึ่งรายการที่ยังไม่ได้ map
     const shown = stat.missing.slice(0, MAX_TOOLTIP_ITEMS);
     const remaining = stat.missing.length - shown.length;
+    const tooltip =
+        stat.missing.length === 0 ? undefined : [...shown, ...(remaining > 0 ? [t('coverageMoreItems', { count: remaining })] : [])].join('\n');
 
     return (
-        <Tooltip
-            arrow
-            title={
-                <Stack spacing={0.25} sx={{ py: 0.5 }}>
-                    {shown.map((item) => (
-                        <Typography key={item} variant="caption">
-                            {item}
-                        </Typography>
-                    ))}
-                    {remaining > 0 && (
-                        <Typography variant="caption" sx={{ fontStyle: 'italic', opacity: 0.8 }}>
-                            {t('coverageMoreItems', { count: remaining })}
-                        </Typography>
-                    )}
-                </Stack>
-            }
-        >
-            <span>{chip}</span>
-        </Tooltip>
+        <span title={tooltip} style={{ display: 'inline-flex' }}>
+            <Tag design={design} hideStateIcon>
+                {`${label}: ${stat.mapped}/${stat.total}`}
+            </Tag>
+        </span>
     );
 }
 
@@ -66,9 +46,9 @@ export function MappingCoverageSummary({ payloadFields, platformAttributes }: Ma
     const { t } = useTranslation('catalog');
 
     return (
-        <Stack direction="row" spacing={1.5} sx={{ mb: 2 }} alignItems="center">
+        <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '1rem' }}>
             <CoverageChip label={t('coveragePayloadLabel')} stat={payloadFields} />
             <CoverageChip label={t('coveragePlatformAttributesLabel')} stat={platformAttributes} />
-        </Stack>
+        </div>
     );
 }

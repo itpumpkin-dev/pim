@@ -1,0 +1,11 @@
+/* pinned "new option" row at the top of the options grid */
+.newRow {
+    background: var(--sapList_Hover_Background);
+}
+
+.emptyNote {
+    display: block;
+    padding: 1.5rem 0;
+    text-align: center;
+    color: var(--sapContent_LabelColor);
+}

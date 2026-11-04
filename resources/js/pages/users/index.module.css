@@ -1,0 +1,32 @@
+.page {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    padding: 1rem;
+    background: var(--sapBackgroundColor);
+    min-height: 100%;
+    box-sizing: border-box;
+}
+
+@media (min-width: 900px) {
+    .page {
+        padding: 1.5rem;
+    }
+}
+
+.card {
+    background: var(--sapGroup_ContentBackground);
+    border: 1px solid var(--sapGroup_ContentBorderColor);
+    border-radius: var(--sapElement_BorderCornerRadius);
+    overflow: hidden;
+}
+
+.pagination {
+    gap: 0.5rem;
+    padding: 0.25rem 0.5rem;
+    border-top: 1px solid var(--sapGroup_ContentBorderColor);
+}
+
+.deleteButton:hover {
+    color: var(--sapNegativeColor);
+}

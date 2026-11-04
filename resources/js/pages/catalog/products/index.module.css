@@ -1,0 +1,191 @@
+/* Product list page (catalog/products/index.tsx). */
+
+.page {
+    box-sizing: border-box;
+    min-height: 100%;
+    padding: 1rem;
+    background: var(--sapBackgroundColor);
+}
+
+@media (min-width: 900px) {
+    .page {
+        padding: 2rem;
+    }
+}
+
+.header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.results {
+    display: block;
+    margin-top: 0.125rem;
+    color: var(--sapContent_LabelColor);
+    font-size: var(--sapFontSize);
+}
+
+.headerActions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+}
+
+/* Card surface that holds the toolbar + table. */
+.card {
+    background: var(--sapList_Background);
+    border: 1px solid var(--sapGroup_ContentBorderColor);
+    border-radius: var(--sapElement_BorderCornerRadius, 0.5rem);
+    overflow: hidden;
+}
+
+.toolbar {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 1rem;
+    border-bottom: 1px solid var(--sapGroup_ContentBorderColor);
+}
+
+.toolbarStart,
+.toolbarEnd {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem 0.75rem;
+}
+
+.toolbarEnd {
+    justify-content: space-between;
+}
+
+.search {
+    width: 100%;
+    min-width: 240px;
+}
+
+@media (min-width: 900px) {
+    .toolbar {
+        flex-direction: row;
+        align-items: center;
+    }
+
+    .toolbarEnd {
+        justify-content: flex-end;
+    }
+
+    .search {
+        width: auto;
+    }
+}
+
+.categoryFilter {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0 0.125rem 0 0.5rem;
+    border: 1px solid var(--sapGroup_ContentBorderColor);
+    border-radius: 6px;
+    color: var(--sapTextColor);
+    font-size: var(--sapFontSmallSize);
+}
+
+.perPage {
+    width: 5rem;
+}
+
+.muted {
+    color: var(--sapContent_LabelColor);
+    font-size: var(--sapFontSize);
+}
+
+.disabledText {
+    color: var(--sapContent_DisabledTextColor, var(--sapContent_LabelColor));
+}
+
+.caption {
+    color: var(--sapContent_LabelColor);
+    font-size: var(--sapFontSmallSize);
+}
+
+.currentPage {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 2rem;
+    padding: 0.25rem 0.75rem;
+    border: 1px solid var(--sapGroup_ContentBorderColor);
+    border-radius: var(--sapElement_BorderCornerRadius, 0.5rem);
+    background: var(--sapGroup_ContentBackground);
+    color: var(--sapTextColor);
+    font-size: var(--sapFontSize);
+}
+
+.pagerButtons {
+    display: flex;
+    align-items: center;
+    gap: 0.125rem;
+}
+
+.skuLink {
+    color: var(--sapLinkColor);
+    font-weight: 600;
+    white-space: nowrap;
+    text-decoration: none;
+}
+
+.skuLink:hover {
+    text-decoration: underline;
+}
+
+.inlineRow {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.rowActions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.25rem;
+}
+
+.dialog {
+    width: min(600px, calc(100vw - 2rem));
+}
+
+.dialogBody {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+    padding: 0.5rem 0;
+}
+
+.fullWidth {
+    width: 100%;
+}
+
+.shopGroupTitle {
+    margin-bottom: 0.25rem;
+    font-weight: 700;
+    font-size: var(--sapFontSize);
+    color: var(--sapTextColor);
+}
+
+.shopRow {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: var(--sapFontSize);
+    color: var(--sapTextColor);
+}
+
+.italic {
+    font-style: italic;
+}

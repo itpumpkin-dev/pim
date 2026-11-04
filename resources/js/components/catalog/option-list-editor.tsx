@@ -1,4 +1,5 @@
-import { Button, Chip, Stack, TextField, Typography } from '@mui/material';
+import '@ui5/webcomponents-icons/dist/add.js';
+import { Button, FlexBox, Input, Label, Text, Token, Tokenizer } from '@ui5/webcomponents-react';
 import { useState } from 'react';
 
 /**
@@ -16,19 +17,21 @@ export function OptionListEditor({ value, onChange }: { value: string[]; onChang
         setDraft('');
     };
 
-    const removeOption = (option: string) => {
-        onChange(value.filter((o) => o !== option));
+    const removeOptions = (options: string[]) => {
+        onChange(value.filter((o) => !options.includes(o)));
     };
 
     return (
-        <Stack spacing={1}>
-            <Stack direction="row" spacing={1}>
-                <TextField
-                    size="small"
-                    fullWidth
-                    label="Add option"
+        <FlexBox direction="Column" style={{ gap: '0.5rem', width: '100%' }}>
+            <Label for="option-list-editor-draft" showColon={false}>
+                Add option
+            </Label>
+            <FlexBox alignItems="Center" style={{ gap: '0.5rem' }}>
+                <Input
+                    id="option-list-editor-draft"
+                    style={{ flex: 1, minWidth: 0 }}
                     value={draft}
-                    onChange={(e) => setDraft(e.target.value)}
+                    onInput={(e) => setDraft(e.target.value)}
                     onKeyDown={(e) => {
                         if (e.key === 'Enter') {
                             e.preventDefault();
@@ -36,20 +39,19 @@ export function OptionListEditor({ value, onChange }: { value: string[]; onChang
                         }
                     }}
                 />
-                <Button variant="outlined" onClick={addOption}>
+                <Button icon="add" onClick={addOption}>
                     Add
                 </Button>
-            </Stack>
-            <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-                {value.map((option) => (
-                    <Chip key={option} label={option} onDelete={() => removeOption(option)} />
-                ))}
-                {value.length === 0 && (
-                    <Typography variant="caption" color="text.secondary">
-                        No options yet
-                    </Typography>
-                )}
-            </Stack>
-        </Stack>
+            </FlexBox>
+            {value.length > 0 ? (
+                <Tokenizer multiLine style={{ width: '100%' }} onTokenDelete={(e) => removeOptions(e.detail.tokens.map((token) => token.text ?? ''))}>
+                    {value.map((option) => (
+                        <Token key={option} text={option} />
+                    ))}
+                </Tokenizer>
+            ) : (
+                <Text style={{ fontSize: 'var(--sapFontSmallSize)', color: 'var(--sapContent_LabelColor)' }}>No options yet</Text>
+            )}
+        </FlexBox>
     );
 }

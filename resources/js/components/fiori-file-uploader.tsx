@@ -1,8 +1,9 @@
-import { FIORI } from '@/lib/fiori-style';
-import AttachFileIcon from '@mui/icons-material/AttachFile';
-import CloseIcon from '@mui/icons-material/Close';
-import { Box, FormHelperText, IconButton, Stack, Typography } from '@mui/material';
+import '@ui5/webcomponents-icons/dist/attachment.js';
+import '@ui5/webcomponents-icons/dist/decline.js';
+import { Button } from '@ui5/webcomponents-react';
 import { useRef, useState, type DragEvent } from 'react';
+
+import styles from './fiori-file-uploader.module.css';
 
 interface FioriFileUploaderProps {
     placeholder: string;
@@ -78,9 +79,14 @@ export function FioriFileUploader({
           ? [{ key: 'value', label: valueLabel, onRemove: !disabled && onClear ? onClear : undefined }]
           : [];
 
+    const fieldClass = [styles.field, dragging ? styles.dragging : error ? styles.error : '', disabled ? styles.disabled : '']
+        .filter(Boolean)
+        .join(' ');
+
     return (
-        <Box>
-            <Box
+        <div>
+            <div
+                className={fieldClass}
                 onDragOver={(e: DragEvent<HTMLElement>) => {
                     e.preventDefault();
                     if (!disabled) setDragging(true);
@@ -91,71 +97,45 @@ export function FioriFileUploader({
                     setDragging(false);
                     if (!disabled) handleList(e.dataTransfer.files);
                 }}
-                sx={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 0.75,
-                    minHeight: 40,
-                    pl: 1.25,
-                    pr: 0.5,
-                    py: 0.5,
-                    border: '1px solid',
-                    borderColor: dragging ? FIORI.brand : error ? FIORI.error : FIORI.borderStrong,
-                    borderRadius: '0.375rem',
-                    bgcolor: dragging ? FIORI.selected : error ? FIORI.errorBg : FIORI.surface,
-                    opacity: disabled ? 0.6 : 1,
-                    transition: 'border-color 0.15s, background-color 0.15s',
-                    '&:hover': disabled ? undefined : { borderColor: FIORI.brand },
-                }}
             >
-                <Stack direction="row" spacing={0.75} alignItems="center" flexWrap="wrap" sx={{ flex: 1, minWidth: 0, rowGap: 0.5, py: 0.25 }}>
-                    {tokens.length === 0 && (
-                        <Typography variant="body2" sx={{ color: FIORI.textSecondary }}>
-                            {placeholder}
-                        </Typography>
-                    )}
+                <div className={styles.tokens}>
+                    {tokens.length === 0 && <span className={styles.placeholder}>{placeholder}</span>}
                     {tokens.map((token) => (
-                        <Stack
-                            key={token.key}
-                            direction="row"
-                            alignItems="center"
-                            spacing={0.5}
-                            sx={{
-                                bgcolor: FIORI.hover,
-                                border: `1px solid ${FIORI.border}`,
-                                borderRadius: '0.25rem',
-                                pl: 1,
-                                pr: token.onRemove ? 0.25 : 1,
-                                py: 0.25,
-                                maxWidth: '100%',
-                            }}
-                        >
-                            <Typography variant="caption" noWrap sx={{ color: FIORI.textPrimary, maxWidth: 240 }}>
+                        <span key={token.key} className={[styles.token, token.onRemove ? styles.tokenRemovable : ''].filter(Boolean).join(' ')}>
+                            <span className={styles.tokenLabel} title={token.label}>
                                 {token.label}
-                            </Typography>
+                            </span>
                             {token.onRemove && (
-                                <IconButton size="small" onClick={token.onRemove} sx={{ p: 0.25, color: FIORI.textSecondary }} aria-label="remove file">
-                                    <CloseIcon sx={{ fontSize: 14 }} />
-                                </IconButton>
+                                <Button
+                                    design="Transparent"
+                                    icon="decline"
+                                    accessibleName="remove file"
+                                    tooltip="Remove"
+                                    onClick={token.onRemove}
+                                    style={{ minWidth: '1.5rem', width: '1.5rem', height: '1.5rem' }}
+                                />
                             )}
-                        </Stack>
+                        </span>
                     ))}
-                </Stack>
+                </div>
 
                 {controlled && (files ?? []).length > 0 && !disabled && (
-                    <IconButton size="small" onClick={() => onFilesChange?.([])} sx={{ color: FIORI.textSecondary }} aria-label="remove all files" title="Remove all">
-                        <CloseIcon fontSize="small" />
-                    </IconButton>
+                    <Button
+                        design="Transparent"
+                        icon="decline"
+                        accessibleName="remove all files"
+                        tooltip="Remove all"
+                        onClick={() => onFilesChange?.([])}
+                    />
                 )}
-                <IconButton
-                    size="small"
-                    onClick={() => inputRef.current?.click()}
+                <Button
+                    design="Transparent"
+                    icon="attachment"
+                    accessibleName="browse files"
+                    tooltip="Browse"
                     disabled={disabled}
-                    sx={{ color: FIORI.textSecondary }}
-                    aria-label="browse files"
-                >
-                    <AttachFileIcon fontSize="small" />
-                </IconButton>
+                    onClick={() => inputRef.current?.click()}
+                />
                 <input
                     ref={inputRef}
                     type="file"
@@ -167,8 +147,8 @@ export function FioriFileUploader({
                         e.target.value = '';
                     }}
                 />
-            </Box>
-            {error && <FormHelperText error>{error}</FormHelperText>}
-        </Box>
+            </div>
+            {error && <span className={styles.errorText}>{error}</span>}
+        </div>
     );
 }

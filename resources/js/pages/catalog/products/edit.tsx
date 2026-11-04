@@ -1,98 +1,79 @@
 import { isReviewablePlatform, MarketplacePushReview } from '@/components/catalog/marketplace-push-review';
-import { QuickAddOptionDialog } from '@/components/catalog/quick-add-option-dialog';
-import { FioriFormGroup, FioriMessageStrip, fioriComboBoxPaperSx, fioriComboBoxSx, fioriFieldStateSx, valueStateOf } from '@/components/fiori-form';
-import { FioriMessageBox } from '@/components/fiori-message-box';
 import { NewProductSkuField, useSkuAvailability } from '@/components/catalog/new-product-sku-field';
+import { QuickAddOptionDialog } from '@/components/catalog/quick-add-option-dialog';
+import { FioriFormGroup, FioriMessageStrip, ui5ValueState, valueStateOf } from '@/components/fiori-form';
+import { FioriMessageBox } from '@/components/fiori-message-box';
 import { FioriPdfViewer } from '@/components/fiori-pdf-viewer';
 import { FioriResponsiveColumn, FioriResponsiveTable } from '@/components/fiori-responsive-table';
 import { FileUploadRowsList, FioriUploadDropzoneTile } from '@/components/fiori-upload-dropzone';
+import { FLOATING_STRIP_STYLE } from '@/components/flash-toast';
 import { HistoryPanel } from '@/components/history-panel';
 import { type ProductOption } from '@/components/product-picker';
 import RichTextEditor from '@/components/rich-text-editor';
 import { TimelinePanel } from '@/components/timeline-panel';
-import { useLocale } from '@/hooks/use-locale';
 import { useDraftAutosave } from '@/hooks/use-draft-autosave';
 import { useFileUploadRows } from '@/hooks/use-file-upload-rows';
+import { useLocale } from '@/hooks/use-locale';
 import { useUnsavedChangesGuard } from '@/hooks/use-unsaved-changes-guard';
 import AppLayout from '@/layouts/app-layout';
-import {
-    FIORI,
-    FioriStatus,
-    fioriCardSx,
-    fioriDefaultSx,
-    fioriEmphasizedSx,
-    fioriGhostSx,
-    fioriIconButtonSx,
-    fioriNegativeSx,
-    fioriSwitchSx,
-    fioriTabsFilledSx,
-    fioriToggleButtonGroupSx,
-} from '@/lib/fiori-style';
+import { FioriStatus } from '@/lib/fiori-style';
 import { localizedLabel, type Translation } from '@/lib/localized-label';
 import { PRODUCT_STATUS_LABEL_KEYS, PRODUCT_STATUS_TONES, PRODUCT_STATUSES, type ProductStatus } from '@/lib/product-status';
-import { mappedChipSx, UI_BORDER } from '@/lib/ui-style';
 import { type BreadcrumbItem, type SharedData } from '@/types';
 import type { FormDataConvertible } from '@inertiajs/core';
-import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
-import AddIcon from '@mui/icons-material/Add';
-import ArrowBackIcon from '@mui/icons-material/ArrowBack';
-import AutorenewIcon from '@mui/icons-material/Autorenew';
-import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
-import ChevronRightIcon from '@mui/icons-material/ChevronRight';
-import CloseIcon from '@mui/icons-material/Close';
-import ContentCopyIcon from '@mui/icons-material/ContentCopy';
-import DeleteForeverIcon from '@mui/icons-material/DeleteForever';
-import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
-import DraftsIcon from '@mui/icons-material/Drafts';
-import EditIcon from '@mui/icons-material/Edit';
-import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
-import FilterListIcon from '@mui/icons-material/FilterList';
-import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
-import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
-import PublishIcon from '@mui/icons-material/Publish';
-import SearchIcon from '@mui/icons-material/Search';
-import TranslateIcon from '@mui/icons-material/Translate';
-import TuneIcon from '@mui/icons-material/Tune';
-import UnpublishedIcon from '@mui/icons-material/Unpublished';
-import VisibilityIcon from '@mui/icons-material/Visibility';
+import { Head, router, useForm, usePage } from '@inertiajs/react';
+import '@ui5/webcomponents-icons/dist/action-settings.js';
+import '@ui5/webcomponents-icons/dist/add.js';
+import '@ui5/webcomponents-icons/dist/calendar.js';
+import '@ui5/webcomponents-icons/dist/copy.js';
+import '@ui5/webcomponents-icons/dist/decline.js';
+import '@ui5/webcomponents-icons/dist/delete.js';
+import '@ui5/webcomponents-icons/dist/edit.js';
+import '@ui5/webcomponents-icons/dist/filter.js';
+import '@ui5/webcomponents-icons/dist/hide.js';
+import '@ui5/webcomponents-icons/dist/information.js';
+import '@ui5/webcomponents-icons/dist/nav-back.js';
+import '@ui5/webcomponents-icons/dist/refresh.js';
+import '@ui5/webcomponents-icons/dist/search.js';
+import '@ui5/webcomponents-icons/dist/show.js';
+import '@ui5/webcomponents-icons/dist/slim-arrow-down.js';
+import '@ui5/webcomponents-icons/dist/slim-arrow-right.js';
+import '@ui5/webcomponents-icons/dist/translate.js';
+import '@ui5/webcomponents-icons/dist/upload-to-cloud.js';
+import '@ui5/webcomponents-icons/dist/write-new-document.js';
 import {
-    Autocomplete,
-    Box,
+    Bar,
+    BusyIndicator,
     Button,
-    ButtonGroup,
-    Checkbox,
-    Chip,
-    CircularProgress,
-    Collapse,
+    CheckBox,
+    ComboBox,
+    ComboBoxItem,
+    DatePicker,
+    DateTimePicker,
     Dialog,
-    DialogActions,
-    DialogContent,
-    DialogContentText,
-    DialogTitle,
-    Divider,
-    Drawer,
-    FormControl,
-    FormControlLabel,
-    Grid,
-    IconButton,
-    InputAdornment,
-    ListSubheader,
+    Icon,
+    Input,
+    Label,
     Menu,
     MenuItem,
-    Paper,
-    Snackbar,
-    Stack,
+    MenuSeparator,
+    MultiComboBox,
+    MultiComboBoxItem,
+    Option,
+    OptionGroup,
+    SegmentedButton,
+    SegmentedButtonItem,
+    Select,
     Switch,
     Tab,
-    Tabs,
-    TextField,
-    ToggleButton,
-    ToggleButtonGroup,
-    Tooltip,
-    Typography,
-} from '@mui/material';
+    TabContainer,
+    Tag,
+    Title,
+} from '@ui5/webcomponents-react';
 import { FormEvent, memo, useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
+
+import styles from './edit.module.css';
 
 // ระยะห่างจากขอบบนของพื้นที่ scroll ที่ section ของแต่ละ Attribute Group จะไปจอด
 // เมื่อคลิกแท็บ (scrollMarginTop ของ Paper) — ใช้ร่วมกับ scroll-spy ที่คำนวณว่า
@@ -717,9 +698,8 @@ export default function ProductEdit({
         // ฟังก์ชันนี้ตัดสินว่าจะโชว์ฟิลด์ "หมวดหมู่ย่อย"/"กลุ่มสินค้า" หรือไม่)
         // มองว่าหมวดหมู่ยังไม่ถูกเลือก เลยซ่อนฟิลด์ถัดไปทั้งชุดไปเลย ทั้งที่ค่าจริง
         // มีอยู่และแสดงผลถูกต้องในฟิลด์แรกอยู่แล้ว
-        const val = data.values[attr.id]?.['ungrouped']?.[channelKey]?.[localeKey]
-            ?? data.values[attr.id]?.['ungrouped']?.[channelKey]?.['default']
-            ?? '';
+        const val =
+            data.values[attr.id]?.['ungrouped']?.[channelKey]?.[localeKey] ?? data.values[attr.id]?.['ungrouped']?.[channelKey]?.['default'] ?? '';
         return typeof val === 'string' ? val : '';
     };
 
@@ -780,21 +760,20 @@ export default function ProductEdit({
         }
 
         return (
-            <Stack key={attr.id} direction="row" spacing={1} alignItems="flex-end">
-                <Box sx={{ flex: 1, minWidth: 0 }}>{field}</Box>
-                <Tooltip title={t('editProductGroup')}>
-                    <span>
-                        <IconButton
-                            size="small"
-                            disabled={!selectedCode || resolvingProductGroupEdit}
-                            onClick={() => goToProductGroupEdit(selectedCode)}
-                            sx={{ ...fioriIconButtonSx, mb: '1px' }}
-                        >
-                            {resolvingProductGroupEdit ? <CircularProgress size={16} /> : <EditIcon fontSize="small" />}
-                        </IconButton>
-                    </span>
-                </Tooltip>
-            </Stack>
+            <div key={attr.id} style={{ display: 'flex', alignItems: 'flex-end', gap: '0.5rem' }}>
+                <div style={{ flex: 1, minWidth: 0 }}>{field}</div>
+                <Button
+                    design="Transparent"
+                    icon="edit"
+                    tooltip={t('editProductGroup')}
+                    accessibleName={t('editProductGroup')}
+                    disabled={!selectedCode || resolvingProductGroupEdit}
+                    loading={resolvingProductGroupEdit}
+                    loadingDelay={0}
+                    onClick={() => goToProductGroupEdit(selectedCode)}
+                    style={{ marginBottom: '1px' }}
+                />
+            </div>
         );
     };
 
@@ -860,16 +839,17 @@ export default function ProductEdit({
                     .then((res) => (res.ok ? res.json() : { options: [] }))
                     .then((body: { options: AttributeOption[] }) => ({ key: `${code}:${parent}`, options: body.options })),
             ),
-        ).then((results) => {
-            if (cancelled) return;
-            setMasterCategoryChildOptions((prev) => {
-                const next = { ...prev };
-                results.forEach(({ key, options }) => {
-                    next[key] = options;
+        )
+            .then((results) => {
+                if (cancelled) return;
+                setMasterCategoryChildOptions((prev) => {
+                    const next = { ...prev };
+                    results.forEach(({ key, options }) => {
+                        next[key] = options;
+                    });
+                    return next;
                 });
-                return next;
-            });
-        })
+            })
             .catch(() => undefined)
             .finally(() => bumpLoading(-1));
 
@@ -1077,26 +1057,22 @@ export default function ProductEdit({
                 key: 'option',
                 header: t('variantColumnOption'),
                 priority: 'always',
-                render: ({ v }: VariantRow) => (
-                    <Typography component="span" fontWeight={600}>
-                        {variantLabel(v)}
-                    </Typography>
-                ),
+                render: ({ v }: VariantRow) => <span style={{ fontWeight: 600 }}>{variantLabel(v)}</span>,
             },
             {
                 key: 'sku',
                 header: (
                     <>
-                        SKU <Box component="span" sx={{ color: 'error.main' }}>*</Box>
+                        SKU <span style={{ color: 'var(--sapNegativeColor)' }}>*</span>
                     </>
                 ),
                 priority: 'high',
                 render: ({ v, index }: VariantRow) => (
-                    <TextField
-                        size="small"
+                    <Input
                         required
                         value={v.sku}
-                        onChange={(e) => {
+                        style={{ width: '100%' }}
+                        onInput={(e) => {
                             const newSku = e.target.value;
                             setDataRef.current((prev) => {
                                 const updated = [...prev.variants];
@@ -1104,7 +1080,8 @@ export default function ProductEdit({
                                 return { ...prev, variants: updated };
                             });
                         }}
-                        onBlur={(e) => {
+                        // UI5 change = commit (blur/Enter) — ตรงกับ onBlur trim เดิม
+                        onChange={(e) => {
                             const trimmedSku = e.target.value.trim();
                             setDataRef.current((prev) => {
                                 const updated = [...prev.variants];
@@ -1120,11 +1097,11 @@ export default function ProductEdit({
                 header: t('price'),
                 priority: 'medium',
                 render: ({ v, index }: VariantRow) => (
-                    <TextField
-                        size="small"
-                        type="number"
+                    <Input
+                        type="Number"
                         value={v.price}
-                        onChange={(e) => {
+                        style={{ width: '100%' }}
+                        onInput={(e) => {
                             const newPrice = e.target.value;
                             setDataRef.current((prev) => {
                                 const updated = [...prev.variants];
@@ -1141,11 +1118,11 @@ export default function ProductEdit({
                 header: t('variantColumnQty'),
                 priority: 'medium',
                 render: ({ v, index }: VariantRow) => (
-                    <TextField
-                        size="small"
-                        type="number"
+                    <Input
+                        type="Number"
                         value={v.qty}
-                        onChange={(e) => {
+                        style={{ width: '100%' }}
+                        onInput={(e) => {
                             const newQty = e.target.value;
                             setDataRef.current((prev) => {
                                 const updated = [...prev.variants];
@@ -1163,9 +1140,14 @@ export default function ProductEdit({
                 priority: 'always',
                 align: 'right',
                 render: ({ index }: VariantRow) => (
-                    <IconButton size="small" color="error" onClick={() => handleRemoveVariant(index)} aria-label={t('removeVariantAriaLabel')}>
-                        <DeleteOutlineIcon fontSize="small" />
-                    </IconButton>
+                    <Button
+                        design="Transparent"
+                        icon="delete"
+                        style={{ color: 'var(--sapNegativeColor)' }}
+                        onClick={() => handleRemoveVariant(index)}
+                        accessibleName={t('removeVariantAriaLabel')}
+                        tooltip={t('removeVariantAriaLabel')}
+                    />
                 ),
             },
         ],
@@ -1217,6 +1199,12 @@ export default function ProductEdit({
     const [pushReviewReady, setPushReviewReady] = useState(false);
     const pushNeedsReview = pushConfirmShop !== null && isReviewablePlatform(pushConfirmShop.platform);
     const [pushResult, setPushResult] = useState<{ severity: 'success' | 'error'; message: string } | null>(null);
+    // ซ่อนแถบแจ้งผลเองหลัง 20 วินาที (เท่ากับ autoHideDuration ของ Snackbar เดิม)
+    useEffect(() => {
+        if (!pushResult) return;
+        const timer = setTimeout(() => setPushResult(null), 20000);
+        return () => clearTimeout(timer);
+    }, [pushResult]);
 
     // เฉพาะ WooCommerce เท่านั้น: push แค่ชื่อภาษาอังกฤษของสินค้านี้เข้า dictionary
     // ของ TranslatePress — เป็นคนละ action กับการ push listing ด้านบน แต่โชว์อยู่
@@ -1391,7 +1379,7 @@ export default function ProductEdit({
         if (!routes) return;
 
         fetch(`/catalog/products/${product.id}/${routes.status}/${shopId}`, { headers: { Accept: 'application/json' } })
-            .catch(() => { })
+            .catch(() => {})
             .finally(() => router.reload({ only: ['channelGroups'] }));
     };
 
@@ -1916,7 +1904,7 @@ export default function ProductEdit({
         open();
     };
     const duplicateSkuField = (
-        <Box sx={{ mt: 2 }}>
+        <div style={{ marginTop: '1rem' }}>
             <NewProductSkuField
                 value={duplicateSku}
                 onChange={(value) => {
@@ -1926,7 +1914,7 @@ export default function ProductEdit({
                 status={duplicateSkuStatus}
                 serverError={duplicateSkuError}
             />
-        </Box>
+        </div>
     );
     const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
     const [deleting, setDeleting] = useState(false);
@@ -1999,9 +1987,7 @@ export default function ProductEdit({
                 if (ch.shop_id != null) shopMeta.set(ch.shop_id, { name: ch.name || ch.code, platform: group.platform });
             });
         });
-        return data.published_shop_ids
-            .map((id) => shopMeta.get(id))
-            .filter((meta): meta is { name: string; platform: string } => Boolean(meta));
+        return data.published_shop_ids.map((id) => shopMeta.get(id)).filter((meta): meta is { name: string; platform: string } => Boolean(meta));
     }, [channelGroups, data.published_shop_ids]);
     // ร้านที่จะถูกยกเลิกการขายอัตโนมัติหลังบันทึกร่าง — ร้านที่ติ๊กไว้ (ชุดเดียวกับที่จะ
     // ถูกบันทึกไปพร้อมกัน) เฉพาะเมื่อเปิด auto-sync ไว้เท่านั้น
@@ -2078,12 +2064,11 @@ export default function ProductEdit({
 
     const sectionSaveButton = (section: 'channels' | 'master-categories', onClick: () => void) => (
         <Button
-            size="small"
-            variant="outlined"
             onClick={onClick}
             disabled={savingSection !== null || processing}
-            startIcon={savingSection === section ? <CircularProgress size={13} color="inherit" /> : undefined}
-            sx={{ ...fioriDefaultSx, ml: 'auto', minWidth: 0 }}
+            loading={savingSection === section}
+            loadingDelay={0}
+            style={{ marginLeft: 'auto', minWidth: 0 }}
         >
             {savingSection === section ? t('saving') : t('save')}
         </Button>
@@ -2092,314 +2077,286 @@ export default function ProductEdit({
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={t('editProductHeading', { sku: data.sku })} />
-            <Box
-                component="form"
+            <form
                 onSubmit={submit}
-                sx={{ bgcolor: 'background.default', height: '100%', minHeight: 0, display: 'flex', flexDirection: 'column' }}
+                style={{ background: 'var(--sapBackgroundColor)', height: '100%', minHeight: 0, display: 'flex', flexDirection: 'column' }}
             >
                 {/* แถบแท็บบนสุด */}
-                <Box
-                    sx={{
-                        bgcolor: FIORI.surface,
-                        // borderBottom: `1px solid ${UI_BORDER}`,
-                        px: { xs: 2, md: 4 },
-                    }}
-                >
-                    <Tabs value={tabIndex} onChange={(_, v) => setTabIndex(v)} sx={fioriTabsFilledSx}>
-                        <Tab label={t('generalTitle')} />
-                        {canViewHistory && <Tab label={t('historyTab')} />}
-                    </Tabs>
-                </Box>
+                <div className={styles.pagePad} style={{ background: 'var(--sapGroup_ContentBackground)' }}>
+                    <TabContainer
+                        collapsed
+                        contentBackgroundDesign="Transparent"
+                        headerBackgroundDesign="Transparent"
+                        onTabSelect={(e) => setTabIndex(e.detail.tabIndex)}
+                    >
+                        <Tab text={t('generalTitle')} selected={tabIndex === 0} />
+                        {canViewHistory && <Tab text={t('historyTab')} selected={tabIndex === 1} />}
+                    </TabContainer>
+                </div>
 
                 {/* แถบเครื่องมือย่อยใต้หัวข้อ */}
-                <Box sx={{ px: { xs: 2, md: 4 }, py: 1.5, bgcolor: FIORI.surface, borderBottom: `1px solid ${FIORI.border}`, mb: 0.5 }}>
-                    <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" alignItems="center" spacing={2}>
-                        <Stack direction="row" spacing={1} alignItems="center">
+                <div
+                    className={styles.pagePad}
+                    style={{
+                        paddingTop: '0.75rem',
+                        paddingBottom: '0.75rem',
+                        background: 'var(--sapGroup_ContentBackground)',
+                        borderBottom: '1px solid var(--sapGroup_ContentBorderColor)',
+                        marginBottom: '0.25rem',
+                    }}
+                >
+                    <div className={styles.toolbar}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                             {/* ย้ายมาจากปุ่มข้อความฝั่งขวา (เดิมอยู่รวมกับ Publish/Save Product) มา
                                 ไว้เป็นไอคอนหน้าหัวข้อแทน ตามที่ขอมาเฉพาะหน้านี้ — หน้า catalog
-                                CRUD อื่นๆ (เช่น brands/edit.tsx) ยังใช้ปุ่มข้อความ + startIcon
+                                CRUD อื่นๆ (เช่น brands/edit.tsx) ยังใช้ปุ่มข้อความ + icon
                                 ฝั่งขวาคู่กับ Save เหมือนเดิม ไม่ได้เปลี่ยนตาม */}
-                            <Tooltip title={t('back')}>
-                                <IconButton component={Link} href="/catalog/products" size="small">
-                                    <ArrowBackIcon
-                                        fontSize="small"
-                                        sx={{
-                                            stroke: "currentColor",
-                                            strokeWidth: 1
-                                        }}
-                                    />
-                                </IconButton>
-                            </Tooltip>
-                            <Typography variant="h5" fontWeight={700} color="text.primary">
+                            <Button
+                                design="Transparent"
+                                icon="nav-back"
+                                tooltip={t('back')}
+                                accessibleName={t('back')}
+                                onClick={() => router.visit('/catalog/products')}
+                            />
+                            <Title level="H3" size="H4" wrappingType="Normal">
                                 {t('editProductHeading', { sku: data.sku })}
-                            </Typography>
-                        </Stack>
+                            </Title>
+                        </div>
 
-                        <Stack direction="row" spacing={1.5} alignItems="center">
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
                             {/* ขอบเขตการแก้ไขปัจจุบัน (ภาษา · ช่องทาง) — ตัวเลือกจริงย้ายไปอยู่ใน
                                 แผง "เพิ่มเติม" แล้ว แต่ยังต้องเห็นตลอดว่ากำลังแก้ค่าของภาษา/ร้านไหนอยู่
-                                ไม่งั้นจะแก้ราคาของร้านหนึ่งโดยไม่รู้ตัว — กดแล้วเปิดแผงนั้น */}
-                            {/* ปุ่มขนาดปกติทั้งแถว (ไม่ใช้ size="small"/Chip) — ให้สูงเท่าปุ่ม "บันทึกสินค้า" */}
-                            <Tooltip title={t('editScopeChipTooltip')}>
-                                <Button
-                                    variant="outlined"
-                                    startIcon={<TuneIcon fontSize="small" />}
-                                    onClick={() => setMoreDrawerOpen(true)}
-                                    sx={{
-                                        ...fioriDefaultSx,
-                                        maxWidth: 360,
-                                        '& .MuiButton-startIcon': { flexShrink: 0 },
-                                        ...(activeChannelId !== null && {
-                                            bgcolor: FIORI.brandBg,
-                                            borderColor: FIORI.brand,
-                                            color: FIORI.brand,
-                                        }),
-                                    }}
-                                >
-                                    <Box component="span" sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                        {activeLocaleLabel} · {activeChannelLabel}
-                                    </Box>
-                                </Button>
-                            </Tooltip>
-                            {isFieldAreaBusy && <CircularProgress size={18} thickness={5} />}
-                            <Button variant="outlined" sx={fioriDefaultSx} onClick={() => setMoreDrawerOpen(true)}>
-                                {t('more')}
+                                ไม่งั้นจะแก้ราคาของร้านหนึ่งโดยไม่รู้ตัว — กดแล้วเปิดแผงนั้น
+                                (ช่องทางเฉพาะร้าน = design Attention ให้เห็นชัดว่าไม่ใช่ค่า default) */}
+                            <Button
+                                icon="action-settings"
+                                design={activeChannelId !== null ? 'Attention' : 'Default'}
+                                tooltip={t('editScopeChipTooltip')}
+                                onClick={() => setMoreDrawerOpen(true)}
+                                style={{ maxWidth: 360 }}
+                            >
+                                {activeLocaleLabel} · {activeChannelLabel}
                             </Button>
-                            {/* แผง "เพิ่มเติม" ด้านขวา — รวมการตั้งค่าขอบเขตการแก้ไข (ภาษา/ช่องทาง)
+                            {isFieldAreaBusy && <BusyIndicator active delay={0} size="S" />}
+                            <Button onClick={() => setMoreDrawerOpen(true)}>{t('more')}</Button>
+                            {/* แผง "เพิ่มเติม" — รวมการตั้งค่าขอบเขตการแก้ไข (ภาษา/ช่องทาง)
                                 กับ action ระดับสินค้า (ทำสำเนา/แปลภาษา/ลบ) ไว้ที่เดียว แทนที่จะเรียง
-                                เป็น dropdown หลายอันบนแถบเครื่องมือ */}
-                            <Drawer
-                                anchor="right"
+                                เป็น dropdown หลายอันบนแถบเครื่องมือ (UI5 ไม่มี Drawer → Dialog) */}
+                            <Dialog
                                 open={moreDrawerOpen}
                                 onClose={() => setMoreDrawerOpen(false)}
-                                PaperProps={{ sx: { width: { xs: '100%', sm: 380 }, bgcolor: FIORI.surface } }}
+                                className={styles.sidePanel}
+                                header={
+                                    <div style={{ display: 'flex', alignItems: 'center', width: '100%', padding: '0.5rem 0' }}>
+                                        <Title level="H5" size="H5" style={{ flex: 1 }}>
+                                            {t('more')}
+                                        </Title>
+                                        <Button
+                                            design="Transparent"
+                                            icon="decline"
+                                            tooltip={t('close')}
+                                            accessibleName={t('close')}
+                                            onClick={() => setMoreDrawerOpen(false)}
+                                        />
+                                    </div>
+                                }
                             >
-                                <Stack direction="row" alignItems="center" sx={{ px: 3, py: 2, borderBottom: `1px solid ${FIORI.border}` }}>
-                                    <Typography variant="h6" fontWeight={700} sx={{ flex: 1, color: FIORI.textPrimary }}>
-                                        {t('more')}
-                                    </Typography>
-                                    <IconButton size="small" onClick={() => setMoreDrawerOpen(false)} aria-label={t('close')}>
-                                        <CloseIcon fontSize="small" />
-                                    </IconButton>
-                                </Stack>
-
-                                <Stack spacing={3} sx={{ p: 3, overflowY: 'auto' }}>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', padding: '0.5rem 0' }}>
                                     {/* ขอบเขตการแก้ไข */}
-                                    <Stack spacing={2}>
-                                        <Typography variant="subtitle2" fontWeight={700} sx={{ color: FIORI.textPrimary }}>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                                        <Title level="H6" size="H6">
                                             {t('editScopeTitle')}
-                                        </Typography>
+                                        </Title>
 
-                                        <Box>
-                                            <Typography variant="caption" fontWeight={600} color="text.secondary" display="block" sx={{ mb: 0.5 }}>
+                                        <div>
+                                            <Label for="edit-scope-locale" showColon={false} style={{ display: 'block', marginBottom: '0.25rem' }}>
                                                 {t('editingLocale')}
-                                            </Typography>
-                                            <TextField
-                                                select
-                                                fullWidth
-                                                size="small"
-                                                value={activeLocaleId}
+                                            </Label>
+                                            <Select
+                                                id="edit-scope-locale"
+                                                style={{ width: '100%' }}
+                                                value={String(activeLocaleId)}
                                                 onChange={(e) => {
                                                     // เปลี่ยนตรงนี้จะเปลี่ยนภาษา UI ของทั้งแอปไปด้วย — "ภาษาที่กำลังแก้ไข"
                                                     // ของหน้านี้ตั้งใจให้ตาม global locale ตัวเดียวกันเลย (ดู setLocale
                                                     // ของ useLocale() ด้านล่าง) ไม่ได้เป็นตัวเลือกแยกเฉพาะหน้านี้
-                                                    const loc = locales.find((l) => l.id === Number(e.target.value));
+                                                    const loc = locales.find((l) => l.id === Number(e.detail.selectedOption.value));
                                                     if (loc) setLocale(loc.code);
                                                 }}
-                                                sx={fioriFieldStateSx('none')}
-                                                SelectProps={{ IconComponent: KeyboardArrowDownIcon }}
                                             >
                                                 {locales.map((loc) => (
-                                                    <MenuItem key={loc.id} value={loc.id}>
+                                                    <Option key={loc.id} value={String(loc.id)}>
                                                         {loc.display_name || loc.code}
-                                                    </MenuItem>
+                                                    </Option>
                                                 ))}
-                                            </TextField>
-                                            <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.5 }}>
-                                                {t('editingLocaleHelp')}
-                                            </Typography>
-                                        </Box>
+                                            </Select>
+                                            <div className={styles.caption}>{t('editingLocaleHelp')}</div>
+                                        </div>
 
                                         {/* "แก้ค่าสำหรับช่องทาง" — ย้ายมาจากการคลิกแถวร้านในแผง Sales Channels
                                             (เดิมคลิกชื่อร้าน = สลับ scope ของฟิลด์ channel-based ทั้งฟอร์มโดยไม่รู้ตัว) */}
                                         {channelGroups.length > 0 && (
-                                            <Box>
-                                                <Typography variant="caption" fontWeight={600} color="text.secondary" display="block" sx={{ mb: 0.5 }}>
-                                                    {t('editingChannel')}
-                                                </Typography>
-                                                <TextField
-                                                    select
-                                                    fullWidth
-                                                    size="small"
-                                                    value={activeChannelId === null ? '' : String(activeChannelId)}
-                                                    onChange={(e) => handleChannelChange(e.target.value === '' ? null : Number(e.target.value))}
-                                                    sx={fioriFieldStateSx('none')}
-                                                    SelectProps={{ IconComponent: KeyboardArrowDownIcon, displayEmpty: true }}
+                                            <div>
+                                                <Label
+                                                    for="edit-scope-channel"
+                                                    showColon={false}
+                                                    style={{ display: 'block', marginBottom: '0.25rem' }}
                                                 >
-                                                    <MenuItem value="">{t('defaultAllChannelsLabel')}</MenuItem>
-                                                    {channelGroups.flatMap((group) => [
-                                                        <ListSubheader key={`h-${group.platform}`}>{group.platform}</ListSubheader>,
-                                                        ...group.channels.map((ch) => (
-                                                            <MenuItem key={ch.id} value={String(ch.id)} sx={{ pl: 4 }}>
-                                                                {ch.name || ch.code}
-                                                            </MenuItem>
-                                                        )),
-                                                    ])}
-                                                </TextField>
-                                                <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.5 }}>
-                                                    {t('editingChannelHelp')}
-                                                </Typography>
-                                            </Box>
+                                                    {t('editingChannel')}
+                                                </Label>
+                                                <Select
+                                                    id="edit-scope-channel"
+                                                    style={{ width: '100%' }}
+                                                    value={activeChannelId === null ? '' : String(activeChannelId)}
+                                                    onChange={(e) => {
+                                                        const v = e.detail.selectedOption.value ?? '';
+                                                        handleChannelChange(v === '' ? null : Number(v));
+                                                    }}
+                                                >
+                                                    <Option value="">{t('defaultAllChannelsLabel')}</Option>
+                                                    {channelGroups.map((group) => (
+                                                        <OptionGroup key={`h-${group.platform}`} headerText={group.platform}>
+                                                            {group.channels.map((ch) => (
+                                                                <Option key={ch.id} value={String(ch.id)}>
+                                                                    {ch.name || ch.code}
+                                                                </Option>
+                                                            ))}
+                                                        </OptionGroup>
+                                                    ))}
+                                                </Select>
+                                                <div className={styles.caption}>{t('editingChannelHelp')}</div>
+                                            </div>
                                         )}
-                                    </Stack>
+                                    </div>
 
                                     {/* action ระดับสินค้า */}
                                     {(canDuplicateProduct || canQueueTranslations) && (
                                         <>
-                                            <Divider />
-                                            <Stack spacing={1.5}>
-                                                <Typography variant="subtitle2" fontWeight={700} sx={{ color: FIORI.textPrimary }}>
+                                            <div className={styles.divider} />
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                                                <Title level="H6" size="H6">
                                                     {t('productActionsTitle')}
-                                                </Typography>
+                                                </Title>
                                                 {canDuplicateProduct && (
-                                                    <Box>
+                                                    <div>
                                                         <Button
-                                                            fullWidth
-                                                            variant="outlined"
-                                                            startIcon={<ContentCopyIcon fontSize="small" />}
+                                                            icon="copy"
+                                                            className={styles.panelAction}
                                                             onClick={() => {
                                                                 setMoreDrawerOpen(false);
                                                                 openDuplicateSkuDialog(() => setDuplicateConfirmOpen(true));
                                                             }}
-                                                            sx={{ ...fioriDefaultSx, justifyContent: 'flex-start' }}
                                                         >
                                                             {t('duplicateProduct')}
                                                         </Button>
-                                                        <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.5 }}>
-                                                            {t('duplicateProductHelp')}
-                                                        </Typography>
-                                                    </Box>
+                                                        <div className={styles.caption}>{t('duplicateProductHelp')}</div>
+                                                    </div>
                                                 )}
                                                 {/* "ทำสำเนาเฉพาะโครงสร้าง" (เดิม "บันทึกเป็นเทมเพลต" ในเมนูของปุ่มบันทึก) —
                                                     ย้ายมาไว้คู่กับ "ทำสำเนา" เพราะเป็นการทำสำเนาเหมือนกัน ต่างแค่ไม่คัดลอก
                                                     ค่าใดๆ (asTemplate — ดู saveAsTemplate()) gate ด้วย canDuplicateProduct
                                                     ตัวเดียวกันเพราะ endpoint duplicate เช็ค products.create_products */}
                                                 {canDuplicateProduct && (
-                                                    <Box>
+                                                    <div>
                                                         <Button
-                                                            fullWidth
-                                                            variant="outlined"
-                                                            startIcon={<ContentCopyIcon fontSize="small" />}
+                                                            icon="copy"
+                                                            className={styles.panelAction}
                                                             onClick={() => {
                                                                 setMoreDrawerOpen(false);
                                                                 openDuplicateSkuDialog(() => setSaveAsTemplateConfirmOpen(true));
                                                             }}
-                                                            sx={{ ...fioriDefaultSx, justifyContent: 'flex-start' }}
                                                         >
                                                             {t('saveAsTemplate')}
                                                         </Button>
-                                                        <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.5 }}>
-                                                            {t('saveAsTemplateHelp')}
-                                                        </Typography>
-                                                    </Box>
+                                                        <div className={styles.caption}>{t('saveAsTemplateHelp')}</div>
+                                                    </div>
                                                 )}
                                                 {canQueueTranslations && (
-                                                    <Box>
+                                                    <div>
                                                         <Button
-                                                            fullWidth
-                                                            variant="outlined"
+                                                            icon="translate"
+                                                            className={styles.panelAction}
                                                             disabled={queuingTranslations}
-                                                            startIcon={
-                                                                queuingTranslations ? <CircularProgress size={16} /> : <TranslateIcon fontSize="small" />
-                                                            }
+                                                            loading={queuingTranslations}
+                                                            loadingDelay={0}
                                                             onClick={queueMissingTranslations}
-                                                            sx={{ ...fioriDefaultSx, justifyContent: 'flex-start' }}
                                                         >
                                                             {t('missingTranslationsTranslateAction')}
                                                         </Button>
-                                                        <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.5 }}>
-                                                            {t('queueTranslationsHelp')}
-                                                        </Typography>
-                                                    </Box>
+                                                        <div className={styles.caption}>{t('queueTranslationsHelp')}</div>
+                                                    </div>
                                                 )}
-                                            </Stack>
+                                            </div>
                                         </>
                                     )}
 
                                     {/* ลบ — แยกไว้ท้ายสุดเป็นโซนอันตราย */}
                                     {canDeleteProduct && (
                                         <>
-                                            <Divider />
-                                            <Box>
+                                            <div className={styles.divider} />
+                                            <div>
                                                 <Button
-                                                    fullWidth
-                                                    variant="outlined"
-                                                    color="error"
-                                                    startIcon={<DeleteForeverIcon fontSize="small" />}
+                                                    icon="delete"
+                                                    design="Negative"
+                                                    className={styles.panelAction}
                                                     onClick={() => {
                                                         setMoreDrawerOpen(false);
                                                         setDeleteConfirmOpen(true);
                                                     }}
-                                                    sx={{ justifyContent: 'flex-start', textTransform: 'none' }}
                                                 >
                                                     {t('delete')}
                                                 </Button>
-                                                <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.5 }}>
-                                                    {t('deleteProductHelp')}
-                                                </Typography>
-                                            </Box>
+                                                <div className={styles.caption}>{t('deleteProductHelp')}</div>
+                                            </div>
                                         </>
                                     )}
-                                </Stack>
-                            </Drawer>
+                                </div>
+                            </Dialog>
 
-                            {/* Save Product เป็น split-button สไตล์ WordPress: ปุ่มหลักยัง submit
+                            {/* Save Product เป็น split-button สไตล์ WordPress: ปุ่มหลัก save
                                 ฟอร์มตามปกติ ลูกศรข้างๆ เปิดเมนู Save Draft / Save and Publish /
-                                Save as Template / View Page — action ระดับ "วิธี save" ที่ไม่อยาก
-                                ให้ toolbar รกด้วยปุ่มแยกอีกหลายปุ่ม (View Page ย้ายมาจากปุ่ม
-                                "ดูสินค้า" เดิมที่เคยแยกอยู่ต่างหากตรงนี้ — Publish ก็ย้ายเข้ามารวมที่
-                                นี่เหมือนกัน ดู saveAndPublish() ด้านล่าง) */}
-                            {/* เส้นคั่นระหว่างปุ่มของ ButtonGroup ใช้สี theme.primary (ส้ม) เป็นค่าตั้งต้น — ปุ่มถูก
-                                ทาสีแบรนด์ Fiori (น้ำเงิน) ทับไว้ เส้นเลยโผล่เป็นสีส้มแดง ใช้เส้นขาวโปร่งแทน */}
-                            <ButtonGroup
-                                variant="contained"
-                                sx={{ '& .MuiButtonGroup-grouped:not(:last-of-type)': { borderColor: 'rgba(255, 255, 255, 0.35)' } }}
-                            >
+                                View Page — action ระดับ "วิธี save" ที่ไม่อยากให้ toolbar รกด้วยปุ่ม
+                                แยกอีกหลายปุ่ม (ดู saveAndPublish() ด้านล่าง) — ไม่ใช้ UI5 SplitButton
+                                เพราะลูกศรต้องกดได้แม้ปุ่มหลักจะ disabled (ยังไม่มีอะไรให้บันทึก) */}
+                            <div style={{ display: 'inline-flex', gap: 1 }}>
                                 {/* กัน traffic ตอนไม่มีอะไรให้บันทึกจริงๆ — isDirty มาจาก useForm()
                                     เทียบ data ปัจจุบันกับค่าตั้งต้นตอนโหลดหน้า (รวมถึง data.values
                                     ที่ทุกฟิลด์ attribute เขียนผ่าน setAttributeValue อยู่แล้ว) ปุ่มนี้
                                     เลย disabled โดยอัตโนมัติจนกว่าจะมีการแก้ไขจริงสักฟิลด์ */}
                                 <Button
-                                    type="submit"
+                                    design="Emphasized"
                                     disabled={processing || checkingMasterImpact || !isDirty}
-                                    startIcon={processing ? <CircularProgress size={16} color="inherit" /> : undefined}
-                                    sx={{ ...fioriEmphasizedSx, px: 2.5 }}
+                                    loading={processing}
+                                    loadingDelay={0}
+                                    onClick={() => performSave()}
+                                    style={{ borderTopRightRadius: 0, borderBottomRightRadius: 0 }}
                                 >
                                     {processing ? t('saving') : t('saveProduct')}
                                 </Button>
                                 <Button
-                                    size="small"
+                                    design="Emphasized"
+                                    icon="slim-arrow-down"
+                                    accessibleName={t('more')}
                                     disabled={processing}
-                                    onClick={(e) => setSaveMenuAnchor(e.currentTarget)}
-                                    sx={{ ...fioriEmphasizedSx, px: 0.5 }}
-                                >
-                                    <KeyboardArrowDownIcon fontSize="small" />
-                                </Button>
-                            </ButtonGroup>
-                            <Menu anchorEl={saveMenuAnchor} open={Boolean(saveMenuAnchor)} onClose={() => setSaveMenuAnchor(null)}>
+                                    onClick={(e) => setSaveMenuAnchor(e.currentTarget as HTMLElement)}
+                                    style={{ minWidth: 0, borderTopLeftRadius: 0, borderBottomLeftRadius: 0 }}
+                                />
+                            </div>
+                            <Menu opener={saveMenuAnchor ?? undefined} open={Boolean(saveMenuAnchor)} onClose={() => setSaveMenuAnchor(null)}>
                                 <MenuItem
+                                    icon="write-new-document"
+                                    text={t('saveDraft')}
                                     onClick={() => {
                                         setSaveMenuAnchor(null);
                                         setSaveDraftConfirmOpen(true);
                                     }}
-                                >
-                                    <DraftsIcon fontSize="small" sx={{ mr: 1.5 }} />
-                                    {t('saveDraft')}
-                                </MenuItem>
+                                />
                                 {/* บันทึกแล้วสั่งแปลจากภาษาที่กำลังแก้ ไปยังภาษาอื่นที่เปิดใช้งานและยังว่าง —
                                     gate ด้วยสิทธิ์เดียวกับ "สั่งแปลส่วนที่ขาด" ในเมนู More */}
                                 {canQueueTranslations && (
                                     <MenuItem
+                                        icon="translate"
+                                        text={t('saveAndTranslate')}
                                         disabled={processing}
                                         onClick={() => {
                                             setSaveMenuAnchor(null);
@@ -2408,10 +2365,7 @@ export default function ProductEdit({
                                                 onSuccess: () => setPushResult({ severity: 'success', message: t('productSavedTranslationQueued') }),
                                             });
                                         }}
-                                    >
-                                        <TranslateIcon fontSize="small" sx={{ mr: 1.5 }} />
-                                        {t('saveAndTranslate')}
-                                    </MenuItem>
+                                    />
                                 )}
                                 {/* ย้ายมาจากปุ่ม "เผยแพร่" แยกต่างหากในทูลบาร์เดิม — gate ด้วย
                                     canEditSalesChannels ตัวเดียวกับปุ่มเดิมนั้น (คุม published_shop_ids
@@ -2419,123 +2373,96 @@ export default function ProductEdit({
                                     saveAndPublish() จริง */}
                                 {canEditSalesChannels && (
                                     <MenuItem
+                                        icon="upload-to-cloud"
+                                        text={t('saveAndPublish')}
+                                        tooltip={data.status !== 'active' ? t('publishingRequiresActive') : undefined}
+                                        additionalText={data.status !== 'active' ? t('publishingRequiresActive') : undefined}
                                         disabled={data.status !== 'active'}
                                         onClick={() => {
                                             setSaveMenuAnchor(null);
                                             setPublishConfirmOpen(true);
                                         }}
-                                    >
-                                        <PublishIcon fontSize="small" sx={{ mr: 1.5 }} />
-                                        <Box>
-                                            {t('saveAndPublish')}
-                                            {data.status !== 'active' && (
-                                                <Typography variant="caption" color="text.secondary" display="block">
-                                                    {t('publishingRequiresActive')}
-                                                </Typography>
-                                            )}
-                                        </Box>
-                                    </MenuItem>
+                                    />
                                 )}
-                                <Divider />
-                                {/* ลิงก์ไปหน้า products.show ของสินค้าที่ id นี้ตรงๆ (เปิดแท็บใหม่
-                                    ไม่ทับหน้าฟอร์มที่ยังแก้ไขค้างอยู่) — เพราะสินค้าตัวนี้ถูกบันทึกไว้
-                                    แล้ว (มี id ถึงมาถึงหน้า Edit ได้) ผู้ใช้เลยดูข้อมูลที่บันทึกไว้
-                                    ล่าสุดได้เลย โดยไม่ต้องกด Save Product ก่อน (จะเห็นเป็นค่าที่ยังไม่
-                                    ถูก save ล่าสุดถ้ามีการแก้ไขค้างอยู่ในฟอร์มนี้ ตามที่คาดหวังไว้) */}
+                                <MenuSeparator />
+                                {/* เปิดหน้า products.show ของสินค้าที่ id นี้ในแท็บใหม่ (ไม่ทับหน้าฟอร์มที่ยัง
+                                    แก้ไขค้างอยู่) — สินค้าตัวนี้ถูกบันทึกไว้แล้ว (มี id ถึงมาถึงหน้า Edit ได้)
+                                    ผู้ใช้เลยดูข้อมูลที่บันทึกไว้ล่าสุดได้เลย โดยไม่ต้องกด Save Product ก่อน */}
                                 <MenuItem
-                                    component={Link}
-                                    href={`/catalog/products/${product.id}`}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    onClick={() => setSaveMenuAnchor(null)}
-                                >
-                                    <VisibilityIcon fontSize="small" sx={{ mr: 1.5 }} />
-                                    {t('viewProduct')}
-                                </MenuItem>
+                                    icon="show"
+                                    text={t('viewProduct')}
+                                    onClick={() => {
+                                        setSaveMenuAnchor(null);
+                                        window.open(`/catalog/products/${product.id}`, '_blank', 'noopener,noreferrer');
+                                    }}
+                                />
                             </Menu>
-                        </Stack>
-                    </Stack>
-                </Box>
+                        </div>
+                    </div>
+                </div>
 
                 {/* Scrollable Body — พื้นที่เดียวในหน้านี้ที่ scroll ได้
                     ทุกอย่างที่อยู่เหนือมัน (header breadcrumb จาก layout, แท็บ
                     General/History, toolbar SKU/Save นี้) จะอยู่นอกกล่องนี้ทั้งหมด
                     เลยโชว์ตลอดโดยไม่ต้องใช้ sticky positioning หรือคำนวณความสูง
                     header ตอน runtime เลย */}
-                <Box ref={scrollBodyRef} sx={{ flex: 1, minHeight: 0, overflowY: 'auto', pb: 6 }}>
+                <div ref={scrollBodyRef} style={{ flex: 1, minHeight: 0, overflowY: 'auto', paddingBottom: '3rem' }}>
                     {/* พบร่างที่ useDraftAutosave เก็บไว้ใน localStorage จากรอบก่อน (เช่น
                         โดน logout กะทันหันตอนสิทธิ์เปลี่ยนกลางคัน) — ถามก่อนเสมอ ไม่กู้คืน
                         ให้อัตโนมัติ เผื่อข้อมูลในระบบเปลี่ยนไปแล้วตั้งแต่ตอนนั้น */}
                     {draftPrompt && (
-                        <Box sx={{ px: { xs: 2, md: 4 }, mb: 3 }}>
+                        <div className={styles.pagePad} style={{ marginBottom: '1.5rem' }}>
                             <FioriMessageStrip severity="warning">
-                                <Typography variant="body2" fontWeight={700} sx={{ mb: 0.5 }}>
-                                    {t('autosaveDraftFoundTitle')}
-                                </Typography>
-                                <Typography variant="body2" sx={{ mb: 1 }}>
+                                <div style={{ fontWeight: 700, marginBottom: '0.25rem' }}>{t('autosaveDraftFoundTitle')}</div>
+                                <div style={{ marginBottom: '0.5rem' }}>
                                     {t('autosaveDraftFoundMessage', { time: new Date(draftPrompt.savedAt).toLocaleString() })}
-                                </Typography>
-                                <Stack direction="row" spacing={1}>
-                                    <Button size="small" variant="contained" color="inherit" onClick={restoreDraft}>
+                                </div>
+                                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                    <Button design="Emphasized" onClick={restoreDraft}>
                                         {t('restoreDraft')}
                                     </Button>
-                                    <Button size="small" variant="outlined" color="inherit" onClick={discardDraft}>
-                                        {t('discardDraft')}
-                                    </Button>
-                                </Stack>
+                                    <Button onClick={discardDraft}>{t('discardDraft')}</Button>
+                                </div>
                             </FioriMessageStrip>
-                        </Box>
+                        </div>
                     )}
 
                     {/* Optimistic-concurrency conflict — แยกจากกล่อง error ทั่วไปด้านล่าง
                         เพราะกรณีนี้ "แก้ให้ถูกแล้วกดใหม่" ใช้ไม่ได้ ต้องโหลดหน้าใหม่ก่อน
                         ถึงจะเห็นข้อมูลล่าสุดจริงๆ เลยมีปุ่ม Reload ต่างหากให้ ไม่ใช่แค่ข้อความเฉยๆ */}
                     {conflictMessage && (
-                        <Box sx={{ px: { xs: 2, md: 4 }, mb: 3 }}>
+                        <div className={styles.pagePad} style={{ marginBottom: '1.5rem' }}>
                             <FioriMessageStrip severity="error">
-                                <Typography variant="body2" fontWeight={700} sx={{ mb: 0.5 }}>
-                                    {conflictMessage}
-                                </Typography>
-                                <Button
-                                    size="small"
-                                    variant="outlined"
-                                    color="inherit"
-                                    onClick={() => router.reload()}
-                                    sx={{ mt: 0.5 }}
-                                >
+                                <div style={{ fontWeight: 700, marginBottom: '0.25rem' }}>{conflictMessage}</div>
+                                <Button icon="refresh" onClick={() => router.reload()} style={{ marginTop: '0.25rem' }}>
                                     {t('reloadPage')}
                                 </Button>
                             </FioriMessageStrip>
-                        </Box>
+                        </div>
                     )}
 
                     {Object.entries(errors).filter(([key]) => key !== 'conflict').length > 0 && (
-                        <Box sx={{ px: { xs: 2, md: 4 }, mb: 3 }}>
+                        <div className={styles.pagePad} style={{ marginBottom: '1.5rem' }}>
                             <FioriMessageStrip severity="error">
-                                <Typography variant="body2" fontWeight={700}>
-                                    {t('correctErrorsBeforeSaving')}
-                                </Typography>
+                                <div style={{ fontWeight: 700 }}>{t('correctErrorsBeforeSaving')}</div>
                                 {Object.entries(errors)
                                     .filter(([key]) => key !== 'conflict')
                                     .map(([key, message]) => (
-                                        <Typography key={key} variant="body2">
-                                            {message}
-                                        </Typography>
+                                        <div key={key}>{message}</div>
                                     ))}
                             </FioriMessageStrip>
-                        </Box>
+                        </div>
                     )}
 
                     {/* Layout หลักแบบ 2 คอลัมน์ */}
                     {tabIndex === 0 && (
-                        <Box sx={{ px: { xs: 2, md: 4 } }}>
-                            <Paper
+                        <div className={styles.pagePad}>
+                            <div
                                 ref={groupTabBarRef}
-                                variant="outlined"
-                                sx={{
-                                    mb: 1,
-                                    borderRadius: 0,
-                                    bgcolor: FIORI.surface,
+                                style={{
+                                    marginBottom: '0.5rem',
+                                    background: 'var(--sapGroup_ContentBackground)',
+                                    border: '1px solid var(--sapGroup_ContentBorderColor)',
                                     position: 'sticky',
                                     // ติดอยู่บนสุดของ scroll container ของตัวเอง (กล่อง
                                     // "Scrollable Body" ด้านบน) — กล่องนั้นเป็นสิ่งเดียวที่
@@ -2545,110 +2472,109 @@ export default function ProductEdit({
                                     zIndex: 1,
                                 }}
                             >
-                                <Tabs
-                                    value={groupTabIndex}
-                                    onChange={(_, v) => scrollToGroup(v)}
-                                    variant="scrollable"
-                                    scrollButtons="auto"
-                                    sx={{ ...fioriTabsFilledSx, px: 2 }}
+                                <TabContainer
+                                    collapsed
+                                    contentBackgroundDesign="Transparent"
+                                    headerBackgroundDesign="Transparent"
+                                    style={{ padding: '0 1rem' }}
+                                    onTabSelect={(e) => scrollToGroup(e.detail.tabIndex)}
                                 >
-                                    {assignedGroups.map((group) => (
-                                        <Tab key={group.id} label={localizedLabel(group, activeLocaleId)} />
+                                    {assignedGroups.map((group, idx) => (
+                                        <Tab key={group.id} text={localizedLabel(group, activeLocaleId)} selected={groupTabIndex === idx} />
                                     ))}
-                                </Tabs>
+                                </TabContainer>
                                 {/* ตัวกรองฟิลด์ — กรองทุก group พร้อมกัน (ไม่ใช่แค่ group ที่ active
                                 อยู่) เพราะทุก panel render พร้อมกันหมดอยู่แล้วแบบ scroll-spy วางไว้ใน
-                                Paper เดียวกับแท็บกลุ่ม (sticky ตัวเดียวกัน) เพื่อให้กรองได้ตลอดเวลาที่
+                                กล่องเดียวกับแท็บกลุ่ม (sticky ตัวเดียวกัน) เพื่อให้กรองได้ตลอดเวลาที่
                                 เลื่อนดูอยู่ ไม่ต้องเลื่อนกลับขึ้นไปบนสุดก่อน ดู attributeFilters'
                                 state comment กับ visibleAttrs ใน assignedGroups.map() ด้านล่าง */}
-                                <Stack
-                                    direction="row"
-                                    spacing={1}
-                                    alignItems="center"
-                                    flexWrap="wrap"
-                                    sx={{ px: 2, py: 1, borderTop: `1px solid ${UI_BORDER}` }}
+                                <div
+                                    style={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        flexWrap: 'wrap',
+                                        gap: '0.5rem',
+                                        padding: '0.5rem 1rem',
+                                        borderTop: '1px solid var(--sapGroup_ContentBorderColor)',
+                                    }}
                                 >
-                                    <FilterListIcon fontSize="small" sx={{ color: 'text.secondary' }} />
-                                    <Typography variant="caption" fontWeight={600} color="text.secondary" sx={{ mr: 0.5 }}>
+                                    <Icon name="filter" style={{ color: 'var(--sapContent_LabelColor)' }} />
+                                    <Label showColon={false} style={{ fontWeight: 600 }}>
                                         {t('filterFieldsLabel')}
-                                    </Typography>
-                                    <ToggleButtonGroup
-                                        size="small"
-                                        value={attributeFilters}
-                                        onChange={(_, newFilters: string[]) => setAttributeFilters(newFilters)}
-                                        sx={fioriToggleButtonGroupSx}
+                                    </Label>
+                                    <SegmentedButton
+                                        selectionMode="Multiple"
+                                        onSelectionChange={(e) =>
+                                            setAttributeFilters(
+                                                e.detail.selectedItems.map((item) => (item as HTMLElement).dataset.value ?? '').filter(Boolean),
+                                            )
+                                        }
                                     >
-                                        <ToggleButton value="required">{t('filterRequired')}</ToggleButton>
-                                        <ToggleButton value="locale">{t('filterLocaleBased')}</ToggleButton>
-                                        <ToggleButton value="channel">{t('filterChannelBased')}</ToggleButton>
+                                        <SegmentedButtonItem data-value="required" selected={attributeFilters.includes('required')}>
+                                            {t('filterRequired')}
+                                        </SegmentedButtonItem>
+                                        <SegmentedButtonItem data-value="locale" selected={attributeFilters.includes('locale')}>
+                                            {t('filterLocaleBased')}
+                                        </SegmentedButtonItem>
+                                        <SegmentedButtonItem data-value="channel" selected={attributeFilters.includes('channel')}>
+                                            {t('filterChannelBased')}
+                                        </SegmentedButtonItem>
                                         {/* โผล่เฉพาะตอนหน้านี้เปิดมาจากปุ่มแก้ไขในหน้า Products Mapping ของ
                                         marketplace ไหนสักตัว (?platform=, ดู Props.platformContext) — ตัวกรองนี้
                                         ไม่มีความหมายอะไรเลยถ้าไม่มี platform ให้เทียบ เพราะ attr.platform_field_mapping
                                         จะเป็น null ทุกตัวอยู่แล้ว (ดู ProductController::platformFieldMappingsFor()) */}
                                         {platformContext && (
-                                            <ToggleButton value="platformMapped">
+                                            <SegmentedButtonItem data-value="platformMapped" selected={attributeFilters.includes('platformMapped')}>
                                                 {t('mappedToPlatformPayloadChip', { platform: PLATFORM_DISPLAY_NAMES[platformContext] })}
-                                            </ToggleButton>
+                                            </SegmentedButtonItem>
                                         )}
-                                    </ToggleButtonGroup>
-                                    <TextField
-                                        size="small"
+                                    </SegmentedButton>
+                                    <Input
                                         value={attributeSearchQuery}
-                                        onChange={(e) => setAttributeSearchQuery(e.target.value)}
+                                        onInput={(e) => setAttributeSearchQuery(e.target.value)}
                                         placeholder={t('searchAttributes')}
-                                        sx={{ width: 300, height: 32, '& .MuiInputBase-input': { py: 0.5 } }}
-                                        InputProps={{
-                                            startAdornment: (
-                                                <InputAdornment position="start">
-                                                    <SearchIcon fontSize="small" sx={{ color: 'text.secondary' }} />
-                                                </InputAdornment>
-                                            ),
-                                            endAdornment: attributeSearchQuery && (
-                                                <InputAdornment position="end">
-                                                    <IconButton size="small" onClick={() => setAttributeSearchQuery('')}>
-                                                        <CloseIcon fontSize="small" />
-                                                    </IconButton>
-                                                </InputAdornment>
-                                            ),
-                                        }}
+                                        showClearIcon
+                                        icon={<Icon name="search" />}
+                                        style={{ width: 300, maxWidth: '100%' }}
                                     />
                                     {(attributeFilters.length > 0 || attributeSearchQuery.length > 0) && (
                                         <Button
-                                            size="small"
+                                            design="Transparent"
                                             onClick={() => {
                                                 setAttributeFilters([]);
                                                 setAttributeSearchQuery('');
                                             }}
-                                            sx={{ textTransform: 'none' }}
                                         >
                                             {t('clearFilter')}
                                         </Button>
                                     )}
-                                </Stack>
-                            </Paper>
-                            <Grid container spacing={3}>
+                                </div>
+                            </div>
+                            <div className={styles.mainGrid}>
                                 {/* พื้นที่หลักฝั่งซ้าย: กลุ่ม Attribute จริงจากฐานข้อมูล */}
-                                <Grid item xs={12} md={8.5} sx={{ position: 'relative' }}>
+                                <div style={{ position: 'relative', minWidth: 0 }}>
                                     {isFieldAreaBusy && (
-                                        <Box
-                                            sx={{
+                                        <div
+                                            style={{
                                                 position: 'absolute',
                                                 inset: 0,
                                                 zIndex: 1,
                                                 display: 'flex',
                                                 alignItems: 'flex-start',
                                                 justifyContent: 'center',
-                                                pt: 8,
-                                                bgcolor: 'rgba(255,255,255,0.6)',
-                                                borderRadius: 2,
+                                                paddingTop: '4rem',
+                                                background: 'color-mix(in srgb, var(--sapBackgroundColor) 60%, transparent)',
+                                                borderRadius: 'var(--sapElement_BorderCornerRadius)',
                                             }}
                                         >
-                                            <CircularProgress size={32} />
-                                        </Box>
+                                            <BusyIndicator active delay={0} size="M" />
+                                        </div>
                                     )}
-                                    <Stack
-                                        spacing={3}
-                                        sx={{
+                                    <div
+                                        style={{
+                                            display: 'flex',
+                                            flexDirection: 'column',
+                                            gap: '1.5rem',
                                             opacity: isFieldAreaBusy ? 0.5 : 1,
                                             pointerEvents: isFieldAreaBusy ? 'none' : 'auto',
                                             transition: 'opacity 0.15s',
@@ -2705,34 +2631,35 @@ export default function ProductEdit({
                                             const groupKey = group.id === 0 ? 'ungrouped' : String(group.id);
 
                                             return (
-                                                <Paper
+                                                <div
                                                     key={group.id}
                                                     ref={(el: HTMLDivElement | null) => {
                                                         groupSectionRefs.current[idx] = el;
                                                     }}
-                                                    variant="outlined"
-                                                    sx={{ p: 3, borderRadius: 2, bgcolor: FIORI.surface, scrollMarginTop: `${GROUP_SECTION_SCROLL_MARGIN}px` }}
+                                                    className={styles.card}
+                                                    style={{ scrollMarginTop: `${GROUP_SECTION_SCROLL_MARGIN}px` }}
                                                 >
-                                                    <Stack
-                                                        direction="row"
-                                                        alignItems="center"
-                                                        justifyContent="space-between"
-                                                        spacing={1}
+                                                    <div
                                                         onClick={() => toggleGroupCollapse(group.id)}
-                                                        sx={{ mb: isGroupCollapsed ? 0 : 2.5, cursor: 'pointer', userSelect: 'none' }}
+                                                        style={{
+                                                            display: 'flex',
+                                                            alignItems: 'center',
+                                                            justifyContent: 'space-between',
+                                                            gap: '0.5rem',
+                                                            marginBottom: isGroupCollapsed ? 0 : '1.25rem',
+                                                            cursor: 'pointer',
+                                                            userSelect: 'none',
+                                                        }}
                                                     >
-                                                        <Stack direction="row" alignItems="center" spacing={0.5}>
-                                                            <IconButton size="small" sx={{ p: 0.5 }}>
-                                                                {isGroupCollapsed ? (
-                                                                    <ChevronRightIcon fontSize="small" />
-                                                                ) : (
-                                                                    <ExpandMoreIcon fontSize="small" />
-                                                                )}
-                                                            </IconButton>
-                                                            <Typography variant="h6" fontWeight={700} color="text.primary">
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                                                            <Icon
+                                                                name={isGroupCollapsed ? 'slim-arrow-right' : 'slim-arrow-down'}
+                                                                style={{ padding: '0.25rem', color: 'var(--sapContent_IconColor)' }}
+                                                            />
+                                                            <Title level="H4" size="H5" wrappingType="Normal">
                                                                 {localizedLabel(group, activeLocaleId)}
-                                                            </Typography>
-                                                        </Stack>
+                                                            </Title>
+                                                        </div>
                                                         {/* ทำให้เห็นว่าฟิลด์ในกลุ่มนี้มาจากตระกูลแอตทริบิวต์ไหนบ้าง — group
                                                         เดียวรับฟิลด์จากได้หลายตระกูล (เช่นแท็บ "Lazada" ที่ทุกตระกูล
                                                         Lazada ใช้ AttributeGroup row เดียวกันร่วมกันหมด ดู
@@ -2741,109 +2668,107 @@ export default function ProductEdit({
                                                         เพื่อไปหน้าแก้ไขตระกูลนั้นได้เลย — วางไว้ฝั่งขวาสุดของแถบหัวข้อ
                                                         แยกจากชื่อกลุ่มชัดเจน */}
                                                         {(group.families?.length ?? 0) > 0 && (
-                                                            <Stack direction="row" spacing={1} flexWrap="wrap" justifyContent="flex-end">
+                                                            <div
+                                                                style={{
+                                                                    display: 'flex',
+                                                                    gap: '0.5rem',
+                                                                    flexWrap: 'wrap',
+                                                                    justifyContent: 'flex-end',
+                                                                }}
+                                                            >
                                                                 {(group.families ?? []).map((family) => (
-                                                                    <Tooltip key={family.id} title={`ไปที่ตระกูลแอตทริบิวต์ "${family.name ?? family.code}"`}>
-                                                                        <Chip
-                                                                            size="small"
-                                                                            variant="outlined"
-                                                                            label={family.name ?? family.code}
-                                                                            onClick={(e) => {
-                                                                                e.stopPropagation();
-                                                                                router.visit(`/catalog/attributeFamilies/${family.id}/edit`);
-                                                                            }}
-                                                                            sx={{ bgcolor: FIORI.brandBg, color: FIORI.brand, fontWeight: 600, cursor: 'pointer' }}
-                                                                        />
-                                                                    </Tooltip>
-                                                                ))}
-                                                            </Stack>
-                                                        )}
-                                                    </Stack>
-                                                    {/* unmountOnExit — พอ collapse ค้างไว้แล้ว ฟิลด์หนักๆ ในกลุ่มนี้ (โดยเฉพาะ
-                                                    RichTextEditor/TinyMCE ที่ mount ทุกตัวไว้ตลอดปกติ ดูคอมเมนต์ setDataRef
-                                                    ด้านบนของไฟล์) จะถูกถอดออกจาก DOM จริงๆ ไม่ใช่แค่ซ่อนด้วย height:0 — ลด
-                                                    จำนวน editor/ResizeObserver ที่ยังทำงานอยู่พร้อมกันทั้งหน้า ซึ่งเป็นตัวที่
-                                                    ทำให้จังหวะพับ/กางกลุ่มอื่นๆ กระตุกไปด้วย (reflow สะสมจากของที่ซ่อนอยู่
-                                                    เยอะเกินจำเป็น) ข้อแลกเปลี่ยน: กางกลุ่มที่มี rich-text กลับมาอีกครั้งจะ
-                                                    ต้อง mount TinyMCE ใหม่ทุกครั้ง (มีดีเลย์โหลดสั้นๆ ให้เห็น ไม่ใช่ค้างค่าที่
-                                                    เคยพิมพ์ไว้หาย เพราะ value อ่านจาก data ของฟอร์มเสมอ ไม่ใช่จาก DOM)
-                                                    timeout สั้นและคงที่แทน 'auto' (ดีฟอลต์ของ MUI) — 'auto' คำนวณ
-                                                    ระยะเวลาจาก scrollHeight ของเนื้อหาจริง กลุ่มที่มี attribute เยอะๆ เลย
-                                                    ได้ duration ยาวกว่ากลุ่มเล็กๆ แบบไม่เท่ากันเอง ให้ค่าคงที่แทนจะได้รู้สึก
-                                                    accurate/สม่ำเสมอทุกกลุ่ม */}
-                                                    <Collapse in={!isGroupCollapsed} timeout={200} unmountOnExit mountOnEnter>
-                                                        <Stack spacing={2.5}>
-                                                            {isGeneral && (
-                                                                <Box>
-                                                                    <Typography
-                                                                        variant="caption"
-                                                                        fontWeight={600}
-                                                                        color="#334155"
-                                                                        sx={{ display: 'block', mb: 0.5 }}
+                                                                    <Tag
+                                                                        key={family.id}
+                                                                        design="Information"
+                                                                        interactive
+                                                                        hideStateIcon
+                                                                        title={`ไปที่ตระกูลแอตทริบิวต์ "${family.name ?? family.code}"`}
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation();
+                                                                            router.visit(`/catalog/attributeFamilies/${family.id}/edit`);
+                                                                        }}
                                                                     >
-                                                                        SKU <Box component="span" sx={{ color: 'error.main' }}>*</Box>
-                                                                    </Typography>
-                                                                    <TextField
-                                                                        fullWidth
+                                                                        {family.name ?? family.code}
+                                                                    </Tag>
+                                                                ))}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                    {/* พอ collapse แล้ว ฟิลด์หนักๆ ในกลุ่มนี้ (โดยเฉพาะ RichTextEditor/TinyMCE
+                                                    ที่ mount ทุกตัวไว้ตลอดปกติ ดูคอมเมนต์ setDataRef ด้านบนของไฟล์) จะถูกถอด
+                                                    ออกจาก DOM จริงๆ ไม่ใช่แค่ซ่อน — ลดจำนวน editor/ResizeObserver ที่ยังทำงาน
+                                                    อยู่พร้อมกันทั้งหน้า ข้อแลกเปลี่ยน: กางกลุ่มที่มี rich-text กลับมาอีกครั้งจะ
+                                                    ต้อง mount TinyMCE ใหม่ทุกครั้ง (value อ่านจาก data ของฟอร์มเสมอ ไม่หาย) */}
+                                                    {!isGroupCollapsed && (
+                                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                                                            {isGeneral && (
+                                                                <div>
+                                                                    <Label
+                                                                        for="product-edit-sku"
+                                                                        required
+                                                                        showColon={false}
+                                                                        style={{ display: 'block', marginBottom: '0.25rem', fontWeight: 600 }}
+                                                                    >
+                                                                        SKU
+                                                                    </Label>
+                                                                    <Input
+                                                                        id="product-edit-sku"
                                                                         required
                                                                         disabled
-                                                                        size="small"
+                                                                        style={{ width: '100%' }}
                                                                         value={data.sku}
-                                                                        error={Boolean(errors.sku)}
-                                                                        helperText={errors.sku}
-                                                                        sx={fioriFieldStateSx('none')}
+                                                                        valueState={ui5ValueState(valueStateOf(errors.sku))}
+                                                                        valueStateMessage={errors.sku ? <div>{errors.sku}</div> : undefined}
                                                                     />
-                                                                </Box>
+                                                                    {errors.sku && <div className={styles.errorText}>{errors.sku}</div>}
+                                                                </div>
                                                             )}
 
-                                                            {assignedAttrs.length === 0 &&
-                                                                isGeneral &&
-                                                                assignedGroups.length === 1 && (
-                                                                    <FioriMessageStrip severity="information">
-                                                                        <Trans
-                                                                            t={t}
-                                                                            i18nKey="noAttributeFamilyBoundYet"
-                                                                            components={{
-                                                                                groupLink: (
-                                                                                    <Box
-                                                                                        component="span"
-                                                                                        role="button"
-                                                                                        tabIndex={0}
-                                                                                        onClick={() => setMasterCategoryPickerOpen(true)}
-                                                                                        onKeyDown={(e) => {
-                                                                                            if (e.key === 'Enter' || e.key === ' ') {
-                                                                                                e.preventDefault();
-                                                                                                setMasterCategoryPickerOpen(true);
-                                                                                            }
-                                                                                        }}
-                                                                                        sx={{
-                                                                                            color: FIORI.brand,
-                                                                                            fontWeight: 700,
-                                                                                            textDecoration: 'underline',
-                                                                                            cursor: 'pointer',
-                                                                                        }}
-                                                                                    />
-                                                                                ),
-                                                                            }}
-                                                                        />
-                                                                    </FioriMessageStrip>
-                                                                )}
+                                                            {assignedAttrs.length === 0 && isGeneral && assignedGroups.length === 1 && (
+                                                                <FioriMessageStrip severity="information">
+                                                                    <Trans
+                                                                        t={t}
+                                                                        i18nKey="noAttributeFamilyBoundYet"
+                                                                        components={{
+                                                                            groupLink: (
+                                                                                <span
+                                                                                    role="button"
+                                                                                    tabIndex={0}
+                                                                                    onClick={() => setMasterCategoryPickerOpen(true)}
+                                                                                    onKeyDown={(e) => {
+                                                                                        if (
+                                                                                            e.code === 'Enter' ||
+                                                                                            e.code === 'NumpadEnter' ||
+                                                                                            e.code === 'Space'
+                                                                                        ) {
+                                                                                            e.preventDefault();
+                                                                                            setMasterCategoryPickerOpen(true);
+                                                                                        }
+                                                                                    }}
+                                                                                    style={{
+                                                                                        color: 'var(--sapLinkColor)',
+                                                                                        fontWeight: 700,
+                                                                                        textDecoration: 'underline',
+                                                                                        cursor: 'pointer',
+                                                                                    }}
+                                                                                />
+                                                                            ),
+                                                                        }}
+                                                                    />
+                                                                </FioriMessageStrip>
+                                                            )}
 
                                                             {assignedAttrs.length === 0 &&
                                                                 !isGeneral &&
                                                                 !(isSales && data.type.toLowerCase() === 'configurable') && (
-                                                                    <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic' }}>
-                                                                        {t('noAttributesAssignedToGroup')}
-                                                                    </Typography>
+                                                                    <div className={styles.emptyText}>{t('noAttributesAssignedToGroup')}</div>
                                                                 )}
 
                                                             {/* กลุ่มนี้มี field จริง แค่ไม่มีตัวไหนตรงกับตัวกรองที่เลือกไว้ —
                                                             คนละข้อความกับ 2 อันด้านบน (ซึ่งคือกลุ่มไม่มี field ผูกไว้เลย
                                                             จริงๆ) ไม่งั้นจะดูเหมือนกลุ่มนี้ไม่มี attribute ทั้งที่มีจริง */}
                                                             {assignedAttrs.length > 0 && visibleAttrs.length === 0 && (
-                                                                <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic' }}>
-                                                                    {t('noFieldsMatchFilter')}
-                                                                </Typography>
+                                                                <div className={styles.emptyText}>{t('noFieldsMatchFilter')}</div>
                                                             )}
 
                                                             {visibleAttrs.map((attr) => {
@@ -2890,47 +2815,25 @@ export default function ProductEdit({
                                                             })}
 
                                                             {isSales && data.type.toLowerCase() === 'configurable' && (
-                                                                <Box>
-                                                                    <Stack
-                                                                        direction={{ xs: 'column', sm: 'row' }}
-                                                                        justifyContent="space-between"
-                                                                        alignItems={{ sm: 'center' }}
-                                                                        spacing={1.5}
-                                                                        sx={{ mb: 2 }}
-                                                                    >
-                                                                        <Typography variant="subtitle1" fontWeight={700} color="text.primary">
+                                                                <div>
+                                                                    <div className={styles.variantHeader}>
+                                                                        <Title level="H5" size="H6">
                                                                             {t('variantsListSubtitle')}
-                                                                        </Typography>
-                                                                        <Stack direction="row" spacing={1}>
-                                                                            <Button
-                                                                                size="small"
-                                                                                variant="outlined"
-                                                                                startIcon={<AutorenewIcon fontSize="small" />}
-                                                                                onClick={openVariantDialog}
-                                                                                sx={fioriDefaultSx}
-                                                                            >
-                                                                                {data.variants.length > 0 ? t('editVariantSetButton') : t('createVariantSetButton')}
+                                                                        </Title>
+                                                                        <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                                                            <Button icon="refresh" onClick={openVariantDialog}>
+                                                                                {data.variants.length > 0
+                                                                                    ? t('editVariantSetButton')
+                                                                                    : t('createVariantSetButton')}
                                                                             </Button>
-                                                                            <Button
-                                                                                size="small"
-                                                                                variant="text"
-                                                                                startIcon={<AddIcon fontSize="small" />}
-                                                                                onClick={handleAddBlankVariant}
-                                                                                sx={fioriGhostSx}
-                                                                            >
+                                                                            <Button design="Transparent" icon="add" onClick={handleAddBlankVariant}>
                                                                                 {t('addBlankRowButton')}
                                                                             </Button>
-                                                                        </Stack>
-                                                                    </Stack>
+                                                                        </div>
+                                                                    </div>
 
                                                                     {data.variants.length === 0 ? (
-                                                                        <Typography
-                                                                            variant="body2"
-                                                                            color="text.secondary"
-                                                                            sx={{ fontStyle: 'italic' }}
-                                                                        >
-                                                                            {t('noVariantsEmptyState')}
-                                                                        </Typography>
+                                                                        <div className={styles.emptyText}>{t('noVariantsEmptyState')}</div>
                                                                     ) : (
                                                                         <FioriResponsiveTable
                                                                             variant="plain"
@@ -2940,102 +2843,85 @@ export default function ProductEdit({
                                                                             getRowKey={getVariantRowKey}
                                                                         />
                                                                     )}
-                                                                </Box>
+                                                                </div>
                                                             )}
-                                                        </Stack>
-                                                    </Collapse>
-                                                </Paper>
+                                                        </div>
+                                                    )}
+                                                </div>
                                             );
                                         })}
-                                    </Stack>
-                                </Grid>
+                                    </div>
+                                </div>
 
                                 {/* Sidebar ฝั่งขวา */}
-                                <Grid item xs={12} md={3.5}>
-                                    <Stack spacing={3}>
+                                <div style={{ minWidth: 0 }}>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
                                         {/* แผง Product Info — ฟอร์มสไตล์ Fiori: label ด้านบน + control
-                                            ทรง Horizon (สูง 2rem, ขอบเข้ม, hover/focus สีแบรนด์) + border/tint
-                                            ตาม value-state ตอน error. อยู่ใน sidebar แคบ เลยไม่ใช้ FioriField
+                                            UI5 (valueState ตอน error). อยู่ใน sidebar แคบ เลยไม่ใช้ FioriField
                                             แบบ label-ซ้าย (จะบีบเกินไป) */}
                                         <FioriFormGroup title={t('productInfo')}>
-                                            <Box>
-                                                <Typography
-                                                    variant="caption"
-                                                    fontWeight={600}
-                                                    color="text.secondary"
-                                                    display="block"
-                                                    sx={{ mb: 0.5 }}
-                                                >
+                                            <div>
+                                                <Label showColon={false} className={styles.fieldLabel}>
                                                     {t('publishing')}
-                                                </Typography>
+                                                </Label>
                                                 {/* เผยแพร่ได้เฉพาะสถานะ Active (backend บังคับซ้ำ — ดู Product::canPublishWithStatus()) */}
                                                 <Switch
-                                                    sx={fioriSwitchSx}
                                                     checked={data.enabled}
                                                     disabled={data.status !== 'active'}
+                                                    accessibleName={t('publishing')}
                                                     onChange={(e) => setData('enabled', e.target.checked)}
                                                 />
-                                                {/* <Typography variant="caption" color={data.status === 'active' ? 'text.secondary' : 'warning.main'} display="block">
-                                                    {data.status === 'active' ? t('publishingHelp') : t('publishingRequiresActive')}
-                                                </Typography> */}
-                                            </Box>
+                                            </div>
 
                                             {/* แสดงที่หน้า Home (products.show_on_home) — แยกจาก "การเผยแพร่"
                                                 (enabled) ด้านบนที่คุมแค่การ push/deactivate ไป Marketplace */}
-                                            <Box>
-                                                <Typography
-                                                    variant="caption"
-                                                    fontWeight={600}
-                                                    color="text.secondary"
-                                                    display="block"
-                                                    sx={{ mb: 0.5 }}
-                                                >
+                                            <div>
+                                                <Label showColon={false} className={styles.fieldLabel}>
                                                     {t('showOnHome')}
-                                                </Typography>
+                                                </Label>
                                                 <Switch
-                                                    sx={fioriSwitchSx}
                                                     checked={data.show_on_home}
+                                                    accessibleName={t('showOnHome')}
                                                     onChange={(e) => setData('show_on_home', e.target.checked)}
                                                 />
-                                                {/* <Typography variant="caption" color="text.secondary" display="block">
-                                                    {t('showOnHomeHelp')}
-                                                </Typography> */}
-                                            </Box>
+                                            </div>
 
                                             {/* สถานะสินค้าใน PIM (products.status) — แยกจาก Switch
                                                 enabled/show_on_home ด้านบน ตัวนี้เป็นแค่ป้าย
                                                 สถานะ ไม่ได้ไป push/deactivate อะไรเอง */}
-                                            <Box>
-                                                <Typography variant="caption" fontWeight={600} color="text.secondary" display="block" sx={{ mb: 0.5 }}>
+                                            <div>
+                                                <Label for="product-edit-status" showColon={false} className={styles.fieldLabel}>
                                                     {t('productStatus')}
-                                                </Typography>
-                                                <TextField
-                                                    select
+                                                </Label>
+                                                <Select
+                                                    id="product-edit-status"
+                                                    style={{ width: '100%' }}
                                                     value={data.status}
+                                                    valueState={ui5ValueState(valueStateOf(errors.status))}
+                                                    valueStateMessage={errors.status ? <div>{errors.status}</div> : undefined}
                                                     onChange={(e) => {
-                                                        const status = e.target.value as ProductStatus;
+                                                        const status = e.detail.selectedOption.value as ProductStatus;
                                                         // ไม่ใช่ Active (Hold/Delete) = ไม่เผยแพร่ทันที
                                                         setData((prev) => ({ ...prev, status, enabled: status === 'active' ? prev.enabled : false }));
                                                     }}
-                                                    size="small"
-                                                    fullWidth
-                                                    error={Boolean(errors.status)}
-                                                    helperText={errors.status}
-                                                    sx={fioriFieldStateSx(valueStateOf(errors.status))}
-                                                    SelectProps={{ IconComponent: KeyboardArrowDownIcon }}
                                                 >
-                                                    {PRODUCT_STATUSES.map((status) => (
+                                                    {PRODUCT_STATUSES
                                                         // ออกจาก New ไปแล้ว (สถานะที่บันทึกไว้) เลือก New กลับไม่ได้ — ดู Product::canChangeStatus()
-                                                        <MenuItem key={status} value={status} disabled={status === 'new' && product.status !== 'new'}>
-                                                            <FioriStatus label={t(PRODUCT_STATUS_LABEL_KEYS[status])} tone={PRODUCT_STATUS_TONES[status]} />
-                                                        </MenuItem>
-                                                    ))}
-                                                </TextField>
-                                                {/* สถานะนี้คนละเรื่องกับ 2 สวิตช์ด้านบน — บอกให้ชัด โดยเฉพาะ "Delete" ที่ไม่ได้ลบจริง */}
-                                                {/* <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.5 }}>
-                                                    {data.status === 'delete' ? t('productStatusDeleteHelp') : t('productStatusHelp')}
-                                                </Typography> */}
-                                            </Box>
+                                                        // (UI5 Option ไม่มี disabled เลยซ่อนตัวเลือกนั้นแทน)
+                                                        .filter((status) => !(status === 'new' && product.status !== 'new'))
+                                                        .map((status) => (
+                                                            <Option key={status} value={status}>
+                                                                {t(PRODUCT_STATUS_LABEL_KEYS[status])}
+                                                            </Option>
+                                                        ))}
+                                                </Select>
+                                                <div style={{ marginTop: '0.25rem' }}>
+                                                    <FioriStatus
+                                                        label={t(PRODUCT_STATUS_LABEL_KEYS[data.status])}
+                                                        tone={PRODUCT_STATUS_TONES[data.status]}
+                                                    />
+                                                </div>
+                                            </div>
 
                                             {/* เดิมมีช่อง "Product Type" (Simple/Configurable) เป็น dropdown ให้แก้
                                                 ตรงนี้ — ซ่อนออกตามที่ user ขอ เพราะชื่อชนกับฟิลด์ "ประเภทสินค้า"
@@ -3055,91 +2941,93 @@ export default function ProductEdit({
                                                 attribute อื่นๆ ทั่วไป บันทึกพร้อมปุ่ม Save Product หลักไปเลย
                                                 ไม่ต้องมีปุ่ม Save แยกของตัวเอง */}
                                             {productTypeAttribute && (
-                                                <Box>
-                                                    <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 0.5 }}>
-                                                        <Typography variant="caption" fontWeight={600} color="text.secondary">
+                                                <div>
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
+                                                        <Label for="product-edit-producttype" showColon={false} style={{ fontWeight: 600 }}>
                                                             {t('masterProductTypeFieldLabel')}
-                                                        </Typography>
+                                                        </Label>
                                                         {productTypeAttribute.master_source && (
-                                                            <Tooltip title={t('masterSourceChipTooltip')} arrow>
-                                                                <Chip
-                                                                    icon={<InfoOutlinedIcon sx={{ fontSize: 13, color: `${FIORI.brand} !important` }} />}
-                                                                    label={t(
-                                                                        masterSources.find((s) => s.value === productTypeAttribute.master_source)
-                                                                            ?.labelKey ?? productTypeAttribute.master_source,
-                                                                    )}
-                                                                    size="small"
-                                                                    sx={{
-                                                                        height: 18,
-                                                                        fontSize: '0.65rem',
-                                                                        bgcolor: FIORI.brandBg,
-                                                                        color: FIORI.brand,
-                                                                        fontWeight: 600,
-                                                                        '& .MuiChip-icon': { ml: '4px' },
-                                                                    }}
-                                                                />
-                                                            </Tooltip>
+                                                            <Tag
+                                                                design="Information"
+                                                                hideStateIcon
+                                                                size="S"
+                                                                title={t('masterSourceChipTooltip')}
+                                                                icon={<Icon name="information" />}
+                                                            >
+                                                                {t(
+                                                                    masterSources.find((s) => s.value === productTypeAttribute.master_source)
+                                                                        ?.labelKey ?? productTypeAttribute.master_source,
+                                                                )}
+                                                            </Tag>
                                                         )}
-                                                    </Stack>
-                                                    <TextField
-                                                        select
-                                                        value={(data.values[productTypeAttribute.id]?.['ungrouped']?.['global']?.['default'] as string) || ''}
-                                                        onChange={(e) => setAttributeValue(productTypeAttribute.id, 'ungrouped', 'global', 'default', e.target.value)}
-                                                        size="small"
-                                                        fullWidth
+                                                    </div>
+                                                    <Select
+                                                        id="product-edit-producttype"
+                                                        style={{ width: '100%' }}
+                                                        value={
+                                                            (data.values[productTypeAttribute.id]?.['ungrouped']?.['global']?.[
+                                                                'default'
+                                                            ] as string) || ''
+                                                        }
+                                                        onChange={(e) =>
+                                                            setAttributeValue(
+                                                                productTypeAttribute.id,
+                                                                'ungrouped',
+                                                                'global',
+                                                                'default',
+                                                                e.detail.selectedOption.value ?? '',
+                                                            )
+                                                        }
                                                         disabled={productTypeAttribute.editable === false}
-                                                        error={Boolean(errors[`values.${productTypeAttribute.id}`])}
-                                                        helperText={errors[`values.${productTypeAttribute.id}`]}
-                                                        sx={fioriFieldStateSx(valueStateOf(errors[`values.${productTypeAttribute.id}`]))}
-                                                        SelectProps={{ IconComponent: KeyboardArrowDownIcon, displayEmpty: true }}
+                                                        valueState={ui5ValueState(valueStateOf(errors[`values.${productTypeAttribute.id}`]))}
+                                                        valueStateMessage={
+                                                            errors[`values.${productTypeAttribute.id}`] ? (
+                                                                <div>{errors[`values.${productTypeAttribute.id}`]}</div>
+                                                            ) : undefined
+                                                        }
                                                     >
-                                                        <MenuItem value="">{t('masterProductTypeNone')}</MenuItem>
+                                                        <Option value="">{t('masterProductTypeNone')}</Option>
                                                         {(productTypeAttribute.options || [])
                                                             .filter(
                                                                 (opt) =>
                                                                     opt.is_active !== false ||
-                                                                    opt.code === (data.values[productTypeAttribute.id]?.['ungrouped']?.['global']?.['default'] as string),
+                                                                    opt.code ===
+                                                                        (data.values[productTypeAttribute.id]?.['ungrouped']?.['global']?.[
+                                                                            'default'
+                                                                        ] as string),
                                                             )
                                                             .map((opt) => (
-                                                                <MenuItem key={opt.id} value={opt.code || ''}>
+                                                                <Option key={opt.id} value={opt.code || ''}>
                                                                     {opt.admin_label || opt.code}
-                                                                </MenuItem>
+                                                                </Option>
                                                             ))}
-                                                    </TextField>
-                                                </Box>
+                                                    </Select>
+                                                </div>
                                             )}
 
-                                            <Box>
-                                                <Typography variant="caption" fontWeight={600} color="text.secondary" display="block" sx={{ mb: 0.5 }}>
+                                            <div>
+                                                <Label showColon={false} className={styles.fieldLabel}>
                                                     {t('updatedAt')}
-                                                </Typography>
-                                                <TextField
+                                                </Label>
+                                                <Input
                                                     value={formatLocalDateTime(product.updated_at)}
                                                     disabled
-                                                    size="small"
-                                                    fullWidth
-                                                    sx={fioriFieldStateSx('none')}
-                                                    InputProps={{
-                                                        endAdornment: <CalendarTodayIcon fontSize="small" sx={{ color: 'text.secondary' }} />,
-                                                    }}
+                                                    style={{ width: '100%' }}
+                                                    icon={<Icon name="calendar" />}
                                                 />
-                                            </Box>
+                                            </div>
 
-                                            <Box>
-                                                <Typography variant="caption" fontWeight={600} color="text.secondary" display="block" sx={{ mb: 0.5 }}>
+                                            <div>
+                                                <Label showColon={false} className={styles.fieldLabel}>
                                                     {t('createdAt')}
-                                                </Typography>
-                                                <TextField
+                                                </Label>
+                                                <Input
                                                     value={formatLocalDateTime(product.created_at)}
                                                     disabled
-                                                    size="small"
-                                                    fullWidth
-                                                    sx={fioriFieldStateSx('none')}
-                                                    InputProps={{
-                                                        endAdornment: <CalendarTodayIcon fontSize="small" sx={{ color: 'text.secondary' }} />,
-                                                    }}
+                                                    style={{ width: '100%' }}
+                                                    icon={<Icon name="calendar" />}
                                                 />
-                                            </Box>
+                                            </div>
                                         </FioriFormGroup>
 
                                         {/* แผง "Master Categories" — หมวดหมู่/หมวดหมู่ย่อย/กลุ่มสินค้า ย้ายมา
@@ -3165,11 +3053,11 @@ export default function ProductEdit({
                                         view แยกแบบ Sales Channels เพราะไม่มีเหตุผลต้องซ่อนจากการดู) แค่ไม่มีสิทธิ์
                                         แก้จะปิด Save + ปิด interaction ทั้งหมดในแผงแทน (pointerEvents) */}
                                         {cascadedMasterCategoryAttributes.length > 0 && (
-                                            <Paper sx={{ ...fioriCardSx, p: 3 }}>
-                                                <Stack direction="row" alignItems="center" sx={{ mb: 2 }}>
-                                                    <Typography variant="h6" fontWeight={700} sx={{ color: FIORI.textPrimary, flex: 1 }}>
+                                            <div className={styles.card}>
+                                                <div style={{ display: 'flex', alignItems: 'center', marginBottom: '1rem' }}>
+                                                    <Title level="H4" size="H5" wrappingType="Normal" style={{ flex: 1 }}>
                                                         {t('masterCategoriesBlockTitle')}
-                                                    </Typography>
+                                                    </Title>
                                                     {canEditMasterCategories &&
                                                         !canEditProducts &&
                                                         sectionSaveButton('master-categories', () => {
@@ -3179,22 +3067,29 @@ export default function ProductEdit({
                                                             });
                                                             saveSection('master-categories', payload);
                                                         })}
-                                                </Stack>
+                                                </div>
                                                 {sectionSaveError?.section === 'master-categories' && !masterCategoryPickerOpen && (
-                                                    <Box sx={{ mb: 2 }}>
+                                                    <div style={{ marginBottom: '1rem' }}>
                                                         <FioriMessageStrip severity="error">{sectionSaveError.message}</FioriMessageStrip>
-                                                    </Box>
+                                                    </div>
                                                 )}
                                                 {/* เตือนทันทีที่ค่าต่างจากที่บันทึกไว้ — รายละเอียดจริงจะถามอีกครั้งตอนกดบันทึก */}
                                                 {masterCategoryChanged && (
-                                                    <FioriMessageStrip severity="warning" sx={{ mb: 2 }}>
+                                                    <FioriMessageStrip severity="warning" style={{ marginBottom: '1rem' }}>
                                                         {t('masterCategoryChangedNotice')}
                                                     </FioriMessageStrip>
                                                 )}
-                                                <Stack spacing={2} sx={!canEditMasterCategories ? { pointerEvents: 'none', opacity: 0.6 } : undefined}>
+                                                <div
+                                                    style={{
+                                                        display: 'flex',
+                                                        flexDirection: 'column',
+                                                        gap: '1rem',
+                                                        ...(!canEditMasterCategories ? { pointerEvents: 'none', opacity: 0.6 } : {}),
+                                                    }}
+                                                >
                                                     {cascadedMasterCategoryAttributes.map(renderMasterCategoryField)}
-                                                </Stack>
-                                            </Paper>
+                                                </div>
+                                            </div>
                                         )}
 
                                         {/* แผง Sales Channels — มีสิทธิ์แยกของตัวเอง (sales_channels) ไม่ได้
@@ -3203,29 +3098,38 @@ export default function ProductEdit({
                                         (ปิด Save + ปิด interaction ทั้งหมดในแผงด้วย pointerEvents แทนที่จะ
                                         ไล่แก้ทีละ onClick เพราะแผงนี้มีปุ่ม/checkbox ซ้อนกันหลายชั้นมาก) */}
                                         {canViewSalesChannels && (
-                                            <Paper sx={{ ...fioriCardSx, p: 3 }}>
-                                                <Stack direction="row" alignItems="center" sx={{ mb: 2 }}>
-                                                    <Box sx={{ flex: 1 }}>
-                                                        <Typography variant="h6" fontWeight={700} sx={{ color: FIORI.textPrimary }}>
+                                            <div className={styles.card}>
+                                                <div style={{ display: 'flex', alignItems: 'center', marginBottom: '1rem' }}>
+                                                    <div style={{ flex: 1 }}>
+                                                        <Title level="H4" size="H5" wrappingType="Normal">
                                                             {t('salesChannels')}
-                                                        </Typography>
-                                                        <Typography variant="caption" color="text.secondary" display="block">
+                                                        </Title>
+                                                        <div className={styles.caption}>
                                                             {canEditProducts ? t('salesChannelsHelp') : t('salesChannelsHelpSectionSave')}
-                                                        </Typography>
-                                                    </Box>
+                                                        </div>
+                                                    </div>
                                                     {canEditSalesChannels &&
                                                         !canEditProducts &&
                                                         sectionSaveButton('channels', () =>
                                                             saveSection('channels', { published_shop_ids: data.published_shop_ids }),
                                                         )}
-                                                </Stack>
-                                                <Stack spacing={0.5} sx={!canEditSalesChannels ? { pointerEvents: 'none', opacity: 0.6 } : undefined}>
+                                                </div>
+                                                <div
+                                                    style={{
+                                                        display: 'flex',
+                                                        flexDirection: 'column',
+                                                        gap: '0.25rem',
+                                                        ...(!canEditSalesChannels ? { pointerEvents: 'none', opacity: 0.6 } : {}),
+                                                    }}
+                                                >
                                                     {channelGroups.map((group) => {
                                                         const isExpanded = expandedPlatforms.has(group.platform);
                                                         const groupShopIds = group.channels
                                                             .map((c) => c.shop_id)
                                                             .filter((id): id is number => id != null);
-                                                        const checkedInGroup = groupShopIds.filter((id) => data.published_shop_ids.includes(id)).length;
+                                                        const checkedInGroup = groupShopIds.filter((id) =>
+                                                            data.published_shop_ids.includes(id),
+                                                        ).length;
                                                         const allInGroupChecked = groupShopIds.length > 0 && checkedInGroup === groupShopIds.length;
                                                         const someInGroupChecked = checkedInGroup > 0 && !allInGroupChecked;
                                                         // แผงนี้เหลือแค่ "ติ๊กร้านที่จะขาย + Push" แล้ว — แพลตฟอร์มที่ไม่มีร้านให้ติ๊ก
@@ -3233,62 +3137,55 @@ export default function ProductEdit({
                                                         if (groupShopIds.length === 0) return null;
 
                                                         return (
-                                                            <Box key={group.platform}>
-                                                                <Box
+                                                            <div key={group.platform}>
+                                                                <div
+                                                                    className={styles.hoverRow}
                                                                     onClick={() => togglePlatform(group.platform)}
-                                                                    sx={{
+                                                                    style={{
                                                                         display: 'flex',
                                                                         alignItems: 'center',
-                                                                        gap: 0.5,
-                                                                        py: 0.75,
-                                                                        px: 1,
-                                                                        borderRadius: 1,
-                                                                        cursor: 'pointer',
-                                                                        '&:hover': { bgcolor: 'action.hover' },
+                                                                        gap: '0.25rem',
+                                                                        padding: '0.375rem 0.5rem',
                                                                     }}
                                                                 >
-                                                                    {isExpanded ? (
-                                                                        <ExpandMoreIcon fontSize="small" />
-                                                                    ) : (
-                                                                        <ChevronRightIcon fontSize="small" />
-                                                                    )}
+                                                                    <Icon name={isExpanded ? 'slim-arrow-down' : 'slim-arrow-right'} />
                                                                     {groupShopIds.length > 0 && (
-                                                                        <Checkbox
-                                                                            size="small"
+                                                                        <CheckBox
                                                                             checked={allInGroupChecked}
                                                                             indeterminate={someInGroupChecked}
+                                                                            accessibleName={group.platform}
                                                                             onClick={(e) => e.stopPropagation()}
                                                                             onChange={() => {
                                                                                 setData(
                                                                                     'published_shop_ids',
                                                                                     allInGroupChecked
                                                                                         ? data.published_shop_ids.filter(
-                                                                                            (id) => !groupShopIds.includes(id),
-                                                                                        )
+                                                                                              (id) => !groupShopIds.includes(id),
+                                                                                          )
                                                                                         : Array.from(
-                                                                                            new Set([...data.published_shop_ids, ...groupShopIds]),
-                                                                                        ),
+                                                                                              new Set([...data.published_shop_ids, ...groupShopIds]),
+                                                                                          ),
                                                                                 );
                                                                             }}
-                                                                            sx={{ p: 0.5 }}
                                                                         />
                                                                     )}
-                                                                    <Typography variant="body2" fontWeight={700}>
-                                                                        {group.platform}
-                                                                    </Typography>
-                                                                    <Chip
-                                                                        label={groupShopIds.length}
-                                                                        size="small"
-                                                                        sx={{ height: 18, fontSize: '0.7rem' }}
-                                                                    />
+                                                                    <span style={{ fontWeight: 700 }}>{group.platform}</span>
+                                                                    <Tag design="Neutral" hideStateIcon size="S">
+                                                                        {groupShopIds.length}
+                                                                    </Tag>
                                                                     {groupShopIds.length > 0 && (
-                                                                        <Typography variant="caption" color="text.secondary">
-                                                                            ({t('publishedCountLabel', { checked: checkedInGroup, total: groupShopIds.length })})
-                                                                        </Typography>
+                                                                        <span className={styles.captionInline}>
+                                                                            (
+                                                                            {t('publishedCountLabel', {
+                                                                                checked: checkedInGroup,
+                                                                                total: groupShopIds.length,
+                                                                            })}
+                                                                            )
+                                                                        </span>
                                                                     )}
-                                                                </Box>
-                                                                <Collapse in={isExpanded}>
-                                                                    <Stack sx={{ pl: 4 }}>
+                                                                </div>
+                                                                {isExpanded && (
+                                                                    <div style={{ display: 'flex', flexDirection: 'column', paddingLeft: '2rem' }}>
                                                                         {group.channels.map((ch) => {
                                                                             const isShop = ch.shop_id != null;
                                                                             if (!isShop) return null;
@@ -3314,7 +3211,9 @@ export default function ProductEdit({
                                                                             // ข้างบน — role ที่แก้ published_shop_ids ได้ อาจ push ได้แค่บาง
                                                                             // แพลตฟอร์มเท่านั้นก็ได้
                                                                             const canPushThisPlatform = Boolean(
-                                                                                canPushProducts[group.platform.toLowerCase() as keyof typeof canPushProducts],
+                                                                                canPushProducts[
+                                                                                    group.platform.toLowerCase() as keyof typeof canPushProducts
+                                                                                ],
                                                                             );
                                                                             const canPushOrDeactivate =
                                                                                 published &&
@@ -3328,90 +3227,85 @@ export default function ProductEdit({
                                                                             const hasUnsavedPublishChange = published && !savedPublished;
                                                                             return (
                                                                                 // คลิกที่ไหนในแถวก็ได้ = ติ๊ก/เอาติ๊กออก (ปุ่ม action ในแถว stopPropagation เอง)
-                                                                                <Box
+                                                                                <div
                                                                                     key={ch.id}
+                                                                                    className={styles.hoverRow}
                                                                                     onClick={() => toggleShopPublished(ch.shop_id as number)}
-                                                                                    sx={{
+                                                                                    style={{
                                                                                         display: 'flex',
                                                                                         alignItems: 'center',
-                                                                                        py: 0.25,
-                                                                                        pr: 1.5,
-                                                                                        pl: 0.5,
-                                                                                        borderRadius: 1,
-                                                                                        cursor: 'pointer',
-                                                                                        '&:hover': { bgcolor: 'action.hover' },
+                                                                                        padding: '0.125rem 0.75rem 0.125rem 0.25rem',
                                                                                     }}
                                                                                 >
-                                                                                    <Checkbox
-                                                                                        size="small"
+                                                                                    <CheckBox
                                                                                         checked={published}
+                                                                                        accessibleName={ch.name || ch.code}
                                                                                         onClick={(e) => e.stopPropagation()}
                                                                                         onChange={() => toggleShopPublished(ch.shop_id as number)}
                                                                                     />
-                                                                                    <Typography variant="body2" sx={{ flex: 1 }}>
-                                                                                        {ch.name || ch.code}
-                                                                                    </Typography>
+                                                                                    <span style={{ flex: 1 }}>{ch.name || ch.code}</span>
                                                                                     {ch.is_live && (
-                                                                                        <Chip
-                                                                                            label={t('liveLabel')}
-                                                                                            size="small"
+                                                                                        <Tag
+                                                                                            design="Positive"
+                                                                                            hideStateIcon
+                                                                                            size="S"
+                                                                                            style={{ marginRight: '0.5rem' }}
                                                                                             title={
                                                                                                 ch.live_synced_at
-                                                                                                    ? t('confirmedLiveAsOf', { date: new Date(ch.live_synced_at).toLocaleString() })
+                                                                                                    ? t('confirmedLiveAsOf', {
+                                                                                                          date: new Date(
+                                                                                                              ch.live_synced_at,
+                                                                                                          ).toLocaleString(),
+                                                                                                      })
                                                                                                     : t('confirmedLiveOnLastSync')
                                                                                             }
-                                                                                            sx={{
-                                                                                                ...mappedChipSx,
-                                                                                                height: 20,
-                                                                                                fontSize: '0.65rem',
-                                                                                                mr: 1,
-                                                                                            }}
-                                                                                        />
+                                                                                        >
+                                                                                            {t('liveLabel')}
+                                                                                        </Tag>
                                                                                     )}
                                                                                     {hasUnsavedPublishChange && (
-                                                                                        <Typography
-                                                                                            variant="caption"
-                                                                                            sx={{
-                                                                                                color: 'text.secondary',
-                                                                                                fontStyle: 'italic',
-                                                                                                whiteSpace: 'nowrap',
-                                                                                            }}
+                                                                                        <span
+                                                                                            className={styles.captionInline}
+                                                                                            style={{ fontStyle: 'italic', whiteSpace: 'nowrap' }}
                                                                                         >
                                                                                             {t('saveFirstHint')}
-                                                                                        </Typography>
+                                                                                        </span>
                                                                                     )}
                                                                                     {canPushOrDeactivate && (
                                                                                         // ปิด "การเผยแพร่" (ค่าที่บันทึกแล้ว — backend เช็คจาก DB) = push ไม่ได้
                                                                                         // ดู ProductController::queueMarketplaceSync()
-                                                                                        <Tooltip
+                                                                                        <span
+                                                                                            // ปุ่มที่ disabled ไม่รับ click — กันไม่ให้ click ทะลุไปติ๊กแถว
+                                                                                            onClick={(e) => e.stopPropagation()}
                                                                                             title={
                                                                                                 product.enabled
-                                                                                                    ? t('pushToPlatformIconTooltip', { platform: group.platform })
+                                                                                                    ? t('pushToPlatformIconTooltip', {
+                                                                                                          platform: group.platform,
+                                                                                                      })
                                                                                                     : t('pushDisabledNotPublishing')
                                                                                             }
                                                                                         >
-                                                                                            <span
-                                                                                                // ปุ่มที่ disabled ไม่รับ click — กันไม่ให้ click ทะลุไปติ๊กแถว
-                                                                                                onClick={(e) => e.stopPropagation()}
-                                                                                            >
-                                                                                                <IconButton
-                                                                                                    size="small"
-                                                                                                    disabled={!product.enabled}
-                                                                                                    onClick={(e) => {
-                                                                                                        e.stopPropagation();
-                                                                                                        setPushConfirmShop({
-                                                                                                            id: ch.shop_id as number,
-                                                                                                            name: ch.name || ch.code,
-                                                                                                            platform: group.platform,
-                                                                                                        });
-                                                                                                        checkPlatformStatus(ch.shop_id as number, group.platform);
-                                                                                                    }}
-                                                                                                    sx={{ color: FIORI.textSecondary }}
-                                                                                                >
-                                                                                                    <PublishIcon fontSize="small" />
-                                                                                                </IconButton>
-                                                                                            </span>
-                                                                                        </Tooltip>
+                                                                                            <Button
+                                                                                                design="Transparent"
+                                                                                                icon="upload-to-cloud"
+                                                                                                accessibleName={t('pushToPlatformIconTooltip', {
+                                                                                                    platform: group.platform,
+                                                                                                })}
+                                                                                                disabled={!product.enabled}
+                                                                                                onClick={(e) => {
+                                                                                                    e.stopPropagation();
+                                                                                                    setPushConfirmShop({
+                                                                                                        id: ch.shop_id as number,
+                                                                                                        name: ch.name || ch.code,
+                                                                                                        platform: group.platform,
+                                                                                                    });
+                                                                                                    checkPlatformStatus(
+                                                                                                        ch.shop_id as number,
+                                                                                                        group.platform,
+                                                                                                    );
+                                                                                                }}
+                                                                                            />
+                                                                                        </span>
                                                                                     )}
                                                                                     {/* ต่างจาก Push (โชว์ได้ตลอดอย่างปลอดภัย — เพราะมันแค่สร้าง
                                                                             หรืออัปเดต) ปุ่ม Deactivate จะมีความหมายก็ต่อเมื่อมีของ
@@ -3421,23 +3315,28 @@ export default function ProductEdit({
                                                                             "never been pushed — nothing to deactivate" จาก
                                                                             backend แทนที่จะไม่โชว์ปุ่มไปเลยตั้งแต่แรก */}
                                                                                     {canPushOrDeactivate && ch.is_live && (
-                                                                                        <Tooltip title={t('deactivateOnPlatformIconTooltip', { platform: group.platform })}>
-                                                                                            <IconButton
-                                                                                                size="small"
-                                                                                                onClick={(e) => {
-                                                                                                    e.stopPropagation();
-                                                                                                    setDeactivateConfirmShop({
-                                                                                                        id: ch.shop_id as number,
-                                                                                                        name: ch.name || ch.code,
-                                                                                                        platform: group.platform,
-                                                                                                    });
-                                                                                                    checkPlatformStatus(ch.shop_id as number, group.platform);
-                                                                                                }}
-                                                                                                sx={{ color: 'text.secondary' }}
-                                                                                            >
-                                                                                                <UnpublishedIcon fontSize="small" />
-                                                                                            </IconButton>
-                                                                                        </Tooltip>
+                                                                                        <Button
+                                                                                            design="Transparent"
+                                                                                            icon="hide"
+                                                                                            tooltip={t('deactivateOnPlatformIconTooltip', {
+                                                                                                platform: group.platform,
+                                                                                            })}
+                                                                                            accessibleName={t('deactivateOnPlatformIconTooltip', {
+                                                                                                platform: group.platform,
+                                                                                            })}
+                                                                                            onClick={(e) => {
+                                                                                                e.stopPropagation();
+                                                                                                setDeactivateConfirmShop({
+                                                                                                    id: ch.shop_id as number,
+                                                                                                    name: ch.name || ch.code,
+                                                                                                    platform: group.platform,
+                                                                                                });
+                                                                                                checkPlatformStatus(
+                                                                                                    ch.shop_id as number,
+                                                                                                    group.platform,
+                                                                                                );
+                                                                                            }}
+                                                                                        />
                                                                                     )}
                                                                                     {/* ตอนนี้รองรับแค่ Shopee เท่านั้น (ดู key `delete` ใน
                                                                             PLATFORM_ROUTES กับ ShopeeProductSyncService::delete()) —
@@ -3449,106 +3348,48 @@ export default function ProductEdit({
                                                                                     {canPushOrDeactivate &&
                                                                                         ch.is_live &&
                                                                                         group.platform.toLowerCase() === 'shopee' && (
-                                                                                            <Tooltip title={t('deleteListingButton') + ` — ${group.platform}`}>
-                                                                                                <IconButton
-                                                                                                    size="small"
-                                                                                                    onClick={(e) => {
-                                                                                                        e.stopPropagation();
-                                                                                                        setDeleteListingConfirmShop({
-                                                                                                            id: ch.shop_id as number,
-                                                                                                            name: ch.name || ch.code,
-                                                                                                            platform: group.platform,
-                                                                                                        });
-                                                                                                        checkPlatformStatus(
-                                                                                                            ch.shop_id as number,
-                                                                                                            group.platform,
-                                                                                                        );
-                                                                                                    }}
-                                                                                                    sx={{ color: 'error.main' }}
-                                                                                                >
-                                                                                                    <DeleteForeverIcon fontSize="small" />
-                                                                                                </IconButton>
-                                                                                            </Tooltip>
+                                                                                            <Button
+                                                                                                design="Transparent"
+                                                                                                icon="delete"
+                                                                                                className={styles.negativeIcon}
+                                                                                                tooltip={
+                                                                                                    t('deleteListingButton') + ` — ${group.platform}`
+                                                                                                }
+                                                                                                accessibleName={
+                                                                                                    t('deleteListingButton') + ` — ${group.platform}`
+                                                                                                }
+                                                                                                onClick={(e) => {
+                                                                                                    e.stopPropagation();
+                                                                                                    setDeleteListingConfirmShop({
+                                                                                                        id: ch.shop_id as number,
+                                                                                                        name: ch.name || ch.code,
+                                                                                                        platform: group.platform,
+                                                                                                    });
+                                                                                                    checkPlatformStatus(
+                                                                                                        ch.shop_id as number,
+                                                                                                        group.platform,
+                                                                                                    );
+                                                                                                }}
+                                                                                            />
                                                                                         )}
-                                                                                </Box>
+                                                                                </div>
                                                                             );
                                                                         })}
-                                                                    </Stack>
-                                                                </Collapse>
-                                                            </Box>
+                                                                    </div>
+                                                                )}
+                                                            </div>
                                                         );
                                                     })}
                                                     {channelGroups.length === 0 && (
-                                                        <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic' }}>
-                                                            {t('noSalesChannelsAvailableEdit')}
-                                                        </Typography>
+                                                        <div className={styles.emptyText}>{t('noSalesChannelsAvailableEdit')}</div>
                                                     )}
-                                                </Stack>
-                                            </Paper>
+                                                </div>
+                                            </div>
                                         )}
 
-                                        {/* แผง Associations */}
-                                        {/* <Paper sx={{ ...fioriCardSx, p: 3 }}>
-                                            <Typography variant="h6" fontWeight={700} sx={{ color: FIORI.textPrimary, mb: 2 }}>
-                                                Associations
-                                            </Typography>
-
-                                            <Stack spacing={2.5}>
-                                                <Box>
-                                                    <Typography
-                                                        variant="caption"
-                                                        fontWeight={600}
-                                                        color="text.secondary"
-                                                        sx={{ mb: 1, display: 'block' }}
-                                                    >
-                                                        Related Products
-                                                    </Typography>
-                                                    <ProductPicker
-                                                        value={relatedProducts}
-                                                        onChange={(next) => {
-                                                            setRelatedProducts(next);
-                                                            setData('associations', { ...data.associations, related: next.map((p) => p.id) });
-                                                        }}
-                                                    />
-                                                </Box>
-
-                                                <Box>
-                                                    <Typography
-                                                        variant="caption"
-                                                        fontWeight={600}
-                                                        color="text.secondary"
-                                                        sx={{ mb: 1, display: 'block' }}
-                                                    >
-                                                        Up-Sell Products
-                                                    </Typography>
-                                                    <ProductPicker
-                                                        value={upSellProducts}
-                                                        onChange={(next) => {
-                                                            setUpSellProducts(next);
-                                                            setData('associations', { ...data.associations, up_sell: next.map((p) => p.id) });
-                                                        }}
-                                                    />
-                                                </Box>
-
-                                                <Box>
-                                                    <Typography
-                                                        variant="caption"
-                                                        fontWeight={600}
-                                                        color="text.secondary"
-                                                        sx={{ mb: 1, display: 'block' }}
-                                                    >
-                                                        Cross-Sell Products
-                                                    </Typography>
-                                                    <ProductPicker
-                                                        value={crossSellProducts}
-                                                        onChange={(next) => {
-                                                            setCrossSellProducts(next);
-                                                            setData('associations', { ...data.associations, cross_sell: next.map((p) => p.id) });
-                                                        }}
-                                                    />
-                                                </Box>
-                                            </Stack>
-                                        </Paper> */}
+                                        {/* แผง Associations (ปิดไว้) — เดิมเป็น ProductPicker 3 ชุด
+                                        (Related / Up-Sell / Cross-Sell) ผูกกับ relatedProducts/upSellProducts/
+                                        crossSellProducts + setData('associations', ...) ดู git history ถ้าจะเปิดใช้ใหม่ */}
 
                                         {/* แผง "เส้นทางสินค้า" — timeline ของสินค้านี้ทั้งหมด (ใครแก้อะไร
                                         ตอนไหน) วางไว้เป็น block ข้าง sidebar ของแท็บ General แทนที่จะเป็น
@@ -3558,25 +3399,24 @@ export default function ProductEdit({
                                         ความสูงแล้วให้ scroll ในตัวเอง ไม่งั้น sidebar จะยาวเกินไปถ้าสินค้ามี
                                         ประวัติแก้ไขเยอะ */}
                                         {canViewHistory && (
-                                            <Paper sx={{ ...fioriCardSx, p: 3 }}>
-                                                <Typography variant="h6" fontWeight={700} sx={{ color: FIORI.textPrimary, mb: 2 }}>
+                                            <div className={styles.card}>
+                                                <Title level="H4" size="H5" wrappingType="Normal" style={{ marginBottom: '1rem' }}>
                                                     {t('timelineTitle')}
-                                                </Typography>
-                                                <Box sx={{ maxHeight: 480, overflowY: 'auto', pr: 0.5 }}>
+                                                </Title>
+                                                <div style={{ maxHeight: 480, overflowY: 'auto', paddingRight: '0.25rem' }}>
                                                     <TimelinePanel timelineUrl={`/catalog/products/${product.id}/timeline`} />
-                                                </Box>
-                                            </Paper>
+                                                </div>
+                                            </div>
                                         )}
-
-                                    </Stack>
-                                </Grid>
-                            </Grid>
-                        </Box>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     )}
 
                     {tabIndex === 1 && canViewHistory && <HistoryPanel historyUrl={`/catalog/products/${product.id}/history`} />}
-                </Box>
-            </Box>
+                </div>
+            </form>
 
             {/* Dialog ยืนยันการทำสำเนา (Duplicate) — ยิงจากเมนู "More" */}
             <FioriMessageBox
@@ -3621,71 +3461,83 @@ export default function ProductEdit({
                 cancelLabel={t('cancel')}
                 confirmLoading={publishing || processing}
             >
-                <Typography variant="body2">
-                    {tickedShopsForPublish.length > 0
-                        ? t('confirmPublishMessageWithChannels')
-                        : t('confirmPublishMessageNoChannels')}
-                </Typography>
+                <div>{tickedShopsForPublish.length > 0 ? t('confirmPublishMessageWithChannels') : t('confirmPublishMessageNoChannels')}</div>
                 {tickedShopsForPublish.length > 0 ? (
-                    <Stack component="ul" spacing={0.5} sx={{ mt: 1, mb: 0, pl: 3 }}>
+                    <ul className={styles.shopList}>
                         {tickedShopsForPublish.map((shop) => (
-                            <Typography key={shop.name} component="li" variant="body2">
-                                {shop.name} <Typography component="span" variant="caption" color="text.secondary">({shop.platform})</Typography>
-                            </Typography>
+                            <li key={shop.name}>
+                                {shop.name} <span className={styles.captionInline}>({shop.platform})</span>
+                            </li>
                         ))}
-                    </Stack>
+                    </ul>
                 ) : (
-                    <Typography variant="body2" sx={{ mt: 1 }}>{t('confirmPublishNoChannelsTicked')}</Typography>
+                    <div style={{ marginTop: '0.5rem' }}>{t('confirmPublishNoChannelsTicked')}</div>
                 )}
             </FioriMessageBox>
 
             {/* ตรวจข้อมูลแต่ละ marketplace หลังบันทึก — ดู saveAndPublish() */}
-            <Dialog open={publishReviewOpen} onClose={() => !publishing && setPublishReviewOpen(false)} fullWidth maxWidth="sm">
-                <DialogTitle>
-                    {t('publishReviewTitle')}
-                    <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 400, mt: 0.25 }}>
-                        {product.sku}
-                    </Typography>
-                </DialogTitle>
-                <DialogContent dividers>
-                    <FioriMessageStrip severity="information" sx={{ mb: 2 }}>
-                        {t('publishReviewIntro')}
-                    </FioriMessageStrip>
-                    {publishReviewPlatforms.map((platform, idx) => (
-                        <Box key={platform}>
-                            {idx > 0 && <Divider sx={{ my: 2.5 }} />}
-                            <Typography variant="subtitle1" fontWeight={700} sx={{ mb: 0.5 }}>
-                                {tickedShopsForPublish.find((shop) => shop.platform.toLowerCase() === platform)?.platform ?? platform}
-                            </Typography>
-                            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1.5 }}>
-                                {tickedShopsForPublish
-                                    .filter((shop) => shop.platform.toLowerCase() === platform)
-                                    .map((shop) => shop.name)
-                                    .join(', ')}
-                            </Typography>
-                            <MarketplacePushReview
-                                productId={product.id}
-                                platform={platform}
-                                showSavedDataNote={false}
-                                onReadyChange={(ready) => setPublishReviewReady((prev) => ({ ...prev, [platform]: ready }))}
-                            />
-                        </Box>
-                    ))}
-                </DialogContent>
-                <DialogActions>
-                    <Button onClick={() => setPublishReviewOpen(false)} disabled={publishing} sx={fioriGhostSx}>
-                        {t('cancel')}
-                    </Button>
-                    <Button
-                        onClick={publishProduct}
-                        variant="contained"
-                        disabled={publishing || !publishReviewAllReady}
-                        startIcon={publishing ? <CircularProgress size={16} /> : <PublishIcon />}
-                        sx={fioriEmphasizedSx}
-                    >
-                        {t('confirmPublish')}
-                    </Button>
-                </DialogActions>
+            <Dialog
+                open={publishReviewOpen}
+                style={{ width: 'min(600px, calc(100vw - 2rem))' }}
+                // ระหว่าง publish ห้ามปิด (รวม ESC) — เหมือน onClose เดิมที่เช็ค !publishing
+                onBeforeClose={(e) => {
+                    if (publishing) e.preventDefault();
+                }}
+                onClose={() => setPublishReviewOpen(false)}
+                header={
+                    <div style={{ padding: '0.5rem 0', width: '100%' }}>
+                        <Title level="H5" size="H5" wrappingType="Normal">
+                            {t('publishReviewTitle')}
+                        </Title>
+                        <div className={styles.caption}>{product.sku}</div>
+                    </div>
+                }
+                footer={
+                    <Bar
+                        design="Footer"
+                        endContent={
+                            <>
+                                <Button
+                                    design="Emphasized"
+                                    icon="upload-to-cloud"
+                                    onClick={publishProduct}
+                                    disabled={publishing || !publishReviewAllReady}
+                                    loading={publishing}
+                                    loadingDelay={0}
+                                >
+                                    {t('confirmPublish')}
+                                </Button>
+                                <Button design="Transparent" onClick={() => setPublishReviewOpen(false)} disabled={publishing}>
+                                    {t('cancel')}
+                                </Button>
+                            </>
+                        }
+                    />
+                }
+            >
+                <FioriMessageStrip severity="information" style={{ marginBottom: '1rem' }}>
+                    {t('publishReviewIntro')}
+                </FioriMessageStrip>
+                {publishReviewPlatforms.map((platform, idx) => (
+                    <div key={platform}>
+                        {idx > 0 && <div className={styles.divider} style={{ margin: '1.25rem 0' }} />}
+                        <Title level="H6" size="H6" style={{ marginBottom: '0.25rem' }}>
+                            {tickedShopsForPublish.find((shop) => shop.platform.toLowerCase() === platform)?.platform ?? platform}
+                        </Title>
+                        <div className={styles.caption} style={{ marginBottom: '0.75rem' }}>
+                            {tickedShopsForPublish
+                                .filter((shop) => shop.platform.toLowerCase() === platform)
+                                .map((shop) => shop.name)
+                                .join(', ')}
+                        </div>
+                        <MarketplacePushReview
+                            productId={product.id}
+                            platform={platform}
+                            showSavedDataNote={false}
+                            onReadyChange={(ready) => setPublishReviewReady((prev) => ({ ...prev, [platform]: ready }))}
+                        />
+                    </div>
+                ))}
             </Dialog>
 
             {/* ยืนยันการเปลี่ยนหมวดหมู่ — ดู performSave() */}
@@ -3703,52 +3555,44 @@ export default function ProductEdit({
                 cancelLabel={t('cancel')}
                 confirmLoading={processing}
             >
-                <Typography variant="body2">{t('masterCategoryChangeIntro')}</Typography>
-                {masterImpact?.error && (
-                    <Typography variant="body2" sx={{ mt: 1.5 }}>
-                        {t('masterCategoryImpactUnavailable')}
-                    </Typography>
-                )}
+                <div>{t('masterCategoryChangeIntro')}</div>
+                {masterImpact?.error && <div style={{ marginTop: '0.75rem' }}>{t('masterCategoryImpactUnavailable')}</div>}
                 {(masterImpact?.removed_families?.length ?? 0) > 0 && (
-                    <Box sx={{ mt: 1.5 }}>
-                        <Typography variant="body2" fontWeight={600}>
-                            {t('masterCategoryRemovedFamilies')}
-                        </Typography>
-                        <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap sx={{ mt: 0.5 }}>
+                    <div style={{ marginTop: '0.75rem' }}>
+                        <div style={{ fontWeight: 600 }}>{t('masterCategoryRemovedFamilies')}</div>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.25rem', marginTop: '0.25rem' }}>
                             {masterImpact?.removed_families?.map((f) => (
-                                <Chip key={f.id} size="small" label={f.name} sx={{ bgcolor: FIORI.errorBg, color: FIORI.error, fontWeight: 600 }} />
+                                <Tag key={f.id} design="Negative" hideStateIcon size="S">
+                                    {f.name}
+                                </Tag>
                             ))}
-                        </Stack>
-                    </Box>
+                        </div>
+                    </div>
                 )}
                 {(masterImpact?.added_families?.length ?? 0) > 0 && (
-                    <Box sx={{ mt: 1.5 }}>
-                        <Typography variant="body2" fontWeight={600}>
-                            {t('masterCategoryAddedFamilies')}
-                        </Typography>
-                        <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap sx={{ mt: 0.5 }}>
+                    <div style={{ marginTop: '0.75rem' }}>
+                        <div style={{ fontWeight: 600 }}>{t('masterCategoryAddedFamilies')}</div>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.25rem', marginTop: '0.25rem' }}>
                             {masterImpact?.added_families?.map((f) => (
-                                <Chip key={f.id} size="small" label={f.name} sx={{ bgcolor: FIORI.successBg, color: FIORI.success, fontWeight: 600 }} />
+                                <Tag key={f.id} design="Positive" hideStateIcon size="S">
+                                    {f.name}
+                                </Tag>
                             ))}
-                        </Stack>
-                    </Box>
+                        </div>
+                    </div>
                 )}
                 {(masterImpact?.hidden_filled_count ?? 0) > 0 && (
-                    <FioriMessageStrip severity="warning" sx={{ mt: 2 }}>
-                        <Typography variant="body2" fontWeight={600}>
-                            {t('masterCategoryHiddenFilled', { count: masterImpact?.hidden_filled_count ?? 0 })}
-                        </Typography>
-                        <Typography variant="body2" sx={{ mt: 0.5 }}>
+                    <FioriMessageStrip severity="warning" style={{ marginTop: '1rem' }}>
+                        <div style={{ fontWeight: 600 }}>{t('masterCategoryHiddenFilled', { count: masterImpact?.hidden_filled_count ?? 0 })}</div>
+                        <div style={{ marginTop: '0.25rem' }}>
                             {(masterImpact?.hidden_filled ?? []).join(', ')}
                             {(masterImpact?.hidden_filled_count ?? 0) > (masterImpact?.hidden_filled?.length ?? 0) ? ' …' : ''}
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.5 }}>
-                            {t('masterCategoryHiddenNote')}
-                        </Typography>
+                        </div>
+                        <div className={styles.caption}>{t('masterCategoryHiddenNote')}</div>
                     </FioriMessageStrip>
                 )}
                 {(masterImpact?.new_required_empty_count ?? 0) > 0 && (
-                    <FioriMessageStrip severity="information" sx={{ mt: 1.5 }}>
+                    <FioriMessageStrip severity="information" style={{ marginTop: '0.75rem' }}>
                         {t('masterCategoryNewRequired', { count: masterImpact?.new_required_empty_count ?? 0 })}
                     </FioriMessageStrip>
                 )}
@@ -3770,19 +3614,14 @@ export default function ProductEdit({
                     (QueueAutoMarketplaceSync) — บอกให้ชัดว่าร้านไหนบ้างก่อนกดยืนยัน */}
                 {draftTakedownShops.length > 0 && (
                     <>
-                        <Typography variant="body2" fontWeight={600} sx={{ mt: 1.5 }}>
-                            {t('saveDraftTakedownWarning')}
-                        </Typography>
-                        <Stack component="ul" spacing={0.5} sx={{ mt: 0.5, mb: 0, pl: 3 }}>
+                        <div style={{ fontWeight: 600, marginTop: '0.75rem' }}>{t('saveDraftTakedownWarning')}</div>
+                        <ul className={styles.shopList}>
                             {draftTakedownShops.map((shop) => (
-                                <Typography key={shop.name} component="li" variant="body2">
-                                    {shop.name}{' '}
-                                    <Typography component="span" variant="caption" color="text.secondary">
-                                        ({shop.platform})
-                                    </Typography>
-                                </Typography>
+                                <li key={shop.name}>
+                                    {shop.name} <span className={styles.captionInline}>({shop.platform})</span>
+                                </li>
                             ))}
-                        </Stack>
+                        </ul>
                     </>
                 )}
             </FioriMessageBox>
@@ -3803,268 +3642,283 @@ export default function ProductEdit({
                 {duplicateSkuField}
             </FioriMessageBox>
 
-            <Dialog open={pushConfirmShop !== null} onClose={closePushDialog} fullWidth={pushNeedsReview} maxWidth={pushNeedsReview ? 'sm' : 'xs'}>
-                <DialogTitle>
-                    {pushNeedsReview
-                        ? t('pushReviewTitle', { platform: pushConfirmShop?.platform })
-                        : t('pushToChannelTitle', { platform: pushConfirmShop?.platform })}
-                    {pushNeedsReview && (
-                        <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 400, mt: 0.25 }}>
-                            {product.sku} · {pushConfirmShop?.name}
-                        </Typography>
-                    )}
-                </DialogTitle>
-                <DialogContent dividers={pushNeedsReview}>
-                    <DialogContentText>
-                        {t('pushToChannelWarning', { platform: pushConfirmShop?.platform, name: pushConfirmShop?.name })}
-                    </DialogContentText>
-                    {pushStatusCheck && (
-                        <Box sx={{ mt: 2 }}>
-                            {pushStatusCheck.loading ? (
-                                <Stack direction="row" spacing={1} alignItems="center">
-                                    <CircularProgress size={14} />
-                                    <Typography variant="body2" color="text.secondary">
-                                        {t('checkingStatusOn', { platform: pushConfirmShop?.platform })}
-                                    </Typography>
-                                </Stack>
-                            ) : pushStatusCheck.error ? (
-                                <FioriMessageStrip severity="warning" sx={{ py: 0.5 }}>
-                                    {t('statusCheckFailed', { error: pushStatusCheck.error })}
-                                </FioriMessageStrip>
-                            ) : pushStatusCheck.never_pushed ? (
-                                <FioriMessageStrip severity="information" sx={{ py: 0.5 }}>
-                                    {t('neverPushedCreateNew')}
-                                </FioriMessageStrip>
-                            ) : pushStatusCheck.is_live ? (
-                                <FioriMessageStrip severity="success" sx={{ py: 0.5 }}>
-                                    {t('currentlyLiveWillUpdate', { platform: pushConfirmShop?.platform })}
-                                </FioriMessageStrip>
-                            ) : (
-                                <FioriMessageStrip severity="information" sx={{ py: 0.5 }}>
-                                    {t('existsNotActiveWillUpdate', {
-                                        platform: pushConfirmShop?.platform,
-                                        status: pushStatusCheck.status ?? t('statusUnknown'),
-                                    })}
-                                </FioriMessageStrip>
-                            )}
-                        </Box>
-                    )}
-                    {/* Push ส่งค่าที่ "บันทึกแล้ว" เสมอ — มีการแก้ไขค้างอยู่ = ต้องบันทึกก่อน ไม่งั้น
-                        ค่าเก่า (เช่น ราคาก่อนแก้) จะถูกส่งขึ้น marketplace โดยไม่รู้ตัว */}
-                    {isDirty && (
-                        <FioriMessageStrip severity="warning" sx={{ mt: 2 }}>
-                            <Typography variant="body2" sx={{ mb: 1 }}>
-                                {t('pushUnsavedChangesWarning')}
-                            </Typography>
-                            <Button
-                                size="small"
-                                variant="contained"
-                                onClick={() => performSave()}
-                                disabled={processing}
-                                startIcon={processing ? <CircularProgress size={14} color="inherit" /> : undefined}
-                                sx={fioriEmphasizedSx}
-                            >
-                                {processing ? t('saving') : t('saveProduct')}
-                            </Button>
-                        </FioriMessageStrip>
-                    )}
-                    {pushConfirmShop && isReviewablePlatform(pushConfirmShop.platform) && (
-                        <Box sx={{ mt: 2 }}>
-                            <MarketplacePushReview
-                                // remount (= ตรวจใหม่) ทุกครั้งที่บันทึกสินค้า จะได้เห็นผลของค่าที่เพิ่งบันทึก
-                                key={product.updated_at}
-                                productId={product.id}
-                                platform={pushConfirmShop.platform.toLowerCase() as 'lazada' | 'shopee' | 'tiktok'}
-                                onReadyChange={setPushReviewReady}
-                            />
-                        </Box>
-                    )}
-                    {pushConfirmShop?.platform.toLowerCase() === 'woocommerce' && (
-                        <>
-                            <Divider sx={{ my: 2 }} />
-                            <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 0.5 }}>
-                                {t('pushTranslationToTranslatePress')}
-                            </Typography>
-                            <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                                {t('pushTranslationHelp')}
-                            </Typography>
-                            <Stack direction="row" spacing={1.5} alignItems="center" flexWrap="wrap" useFlexGap>
-                                <Tooltip title={translationComplete ? '' : translationBlockedReason}>
-                                    <span>
-                                        <Button
-                                            onClick={confirmFillTranslation}
-                                            variant="outlined"
-                                            size="small"
-                                            disabled={!translationComplete || fillingTranslation}
-                                            startIcon={fillingTranslation ? <CircularProgress size={14} /> : <TranslateIcon fontSize="small" />}
-                                            sx={fioriDefaultSx}
-                                        >
-                                            {fillingTranslation ? t('pushingEllipsis') : t('pushTranslationButton')}
-                                        </Button>
-                                    </span>
-                                </Tooltip>
-                                {!translationComplete && (
-                                    <Typography variant="caption" color="text.secondary">
-                                        {translationBlockedReason}
-                                    </Typography>
-                                )}
-                            </Stack>
-                            {fillTranslationResult && (
-                                <FioriMessageStrip severity={fillTranslationResult.severity === 'info' ? 'information' : fillTranslationResult.severity} sx={{ mt: 1.5, py: 0.5 }}>
-                                    {fillTranslationResult.message}
-                                </FioriMessageStrip>
-                            )}
-                        </>
-                    )}
-                </DialogContent>
-                <DialogActions>
-                    <Button onClick={closePushDialog} disabled={pushing} sx={fioriGhostSx}>
-                        {t('cancel')}
-                    </Button>
-                    <Button
-                        onClick={confirmPush}
-                        variant="contained"
-                        disabled={pushing || isDirty || (pushNeedsReview && !pushReviewReady)}
-                        startIcon={pushing ? <CircularProgress size={16} /> : <PublishIcon />}
-                        sx={fioriEmphasizedSx}
-                    >
-                        {pushing ? t('pushingEllipsis') : t('push')}
-                    </Button>
-                </DialogActions>
-            </Dialog>
-
-            <Dialog open={deactivateConfirmShop !== null} onClose={() => setDeactivateConfirmShop(null)}>
-                <DialogTitle>{t('deactivateOnChannelTitle', { platform: deactivateConfirmShop?.platform })}</DialogTitle>
-                <DialogContent>
-                    <DialogContentText>
-                        {t('deactivateWarning', { platform: deactivateConfirmShop?.platform, name: deactivateConfirmShop?.name })}
-                    </DialogContentText>
-                    {deactivateStatusCheck && (
-                        <Box sx={{ mt: 2 }}>
-                            {deactivateStatusCheck.loading ? (
-                                <Stack direction="row" spacing={1} alignItems="center">
-                                    <CircularProgress size={14} />
-                                    <Typography variant="body2" color="text.secondary">
-                                        {t('checkingStatusOn', { platform: deactivateConfirmShop?.platform })}
-                                    </Typography>
-                                </Stack>
-                            ) : deactivateStatusCheck.error ? (
-                                <FioriMessageStrip severity="warning" sx={{ py: 0.5 }}>
-                                    {t('statusCheckFailed', { error: deactivateStatusCheck.error })}
-                                </FioriMessageStrip>
-                            ) : deactivateStatusCheck.never_pushed ? (
-                                <FioriMessageStrip severity="error" sx={{ py: 0.5 }}>
-                                    {t('neverPushedNothingToDeactivate')}
-                                </FioriMessageStrip>
-                            ) : !deactivateStatusCheck.is_live ? (
-                                <FioriMessageStrip severity="error" sx={{ py: 0.5 }}>
-                                    {t('alreadyNotActiveNothingToDeactivate', {
-                                        platform: deactivateConfirmShop?.platform,
-                                        status: deactivateStatusCheck.status ?? t('statusUnknown'),
-                                    })}
-                                </FioriMessageStrip>
-                            ) : (
-                                <FioriMessageStrip severity="success" sx={{ py: 0.5 }}>
-                                    {t('confirmedCurrentlyLive', { platform: deactivateConfirmShop?.platform })}
-                                </FioriMessageStrip>
-                            )}
-                        </Box>
-                    )}
-                </DialogContent>
-                <DialogActions>
-                    <Button onClick={() => setDeactivateConfirmShop(null)} disabled={deactivating} sx={fioriGhostSx}>
-                        {t('cancel')}
-                    </Button>
-                    <Button
-                        onClick={confirmDeactivate}
-                        variant="outlined"
-                        sx={fioriNegativeSx}
-                        disabled={
-                            deactivating ||
-                            !deactivateStatusCheck ||
-                            deactivateStatusCheck.loading ||
-                            (!deactivateStatusCheck.error && (deactivateStatusCheck.never_pushed || !deactivateStatusCheck.is_live))
+            <Dialog
+                open={pushConfirmShop !== null}
+                style={{ width: pushNeedsReview ? 'min(600px, calc(100vw - 2rem))' : 'min(444px, calc(100vw - 2rem))' }}
+                onClose={closePushDialog}
+                header={
+                    <div style={{ padding: '0.5rem 0', width: '100%' }}>
+                        <Title level="H5" size="H5" wrappingType="Normal">
+                            {pushNeedsReview
+                                ? t('pushReviewTitle', { platform: pushConfirmShop?.platform })
+                                : t('pushToChannelTitle', { platform: pushConfirmShop?.platform })}
+                        </Title>
+                        {pushNeedsReview && (
+                            <div className={styles.caption}>
+                                {product.sku} · {pushConfirmShop?.name}
+                            </div>
+                        )}
+                    </div>
+                }
+                footer={
+                    <Bar
+                        design="Footer"
+                        endContent={
+                            <>
+                                <Button
+                                    design="Emphasized"
+                                    icon="upload-to-cloud"
+                                    onClick={confirmPush}
+                                    disabled={pushing || isDirty || (pushNeedsReview && !pushReviewReady)}
+                                    loading={pushing}
+                                    loadingDelay={0}
+                                >
+                                    {pushing ? t('pushingEllipsis') : t('push')}
+                                </Button>
+                                <Button design="Transparent" onClick={closePushDialog} disabled={pushing}>
+                                    {t('cancel')}
+                                </Button>
+                            </>
                         }
-                        startIcon={deactivating ? <CircularProgress size={16} /> : <UnpublishedIcon />}
-                    >
-                        {deactivating ? t('deactivatingEllipsis') : t('deactivate')}
-                    </Button>
-                </DialogActions>
+                    />
+                }
+            >
+                <div className={styles.dialogText}>
+                    {t('pushToChannelWarning', { platform: pushConfirmShop?.platform, name: pushConfirmShop?.name })}
+                </div>
+                {pushStatusCheck && (
+                    <div style={{ marginTop: '1rem' }}>
+                        {pushStatusCheck.loading ? (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                <BusyIndicator active delay={0} size="S" />
+                                <span className={styles.captionInline}>{t('checkingStatusOn', { platform: pushConfirmShop?.platform })}</span>
+                            </div>
+                        ) : pushStatusCheck.error ? (
+                            <FioriMessageStrip severity="warning">{t('statusCheckFailed', { error: pushStatusCheck.error })}</FioriMessageStrip>
+                        ) : pushStatusCheck.never_pushed ? (
+                            <FioriMessageStrip severity="information">{t('neverPushedCreateNew')}</FioriMessageStrip>
+                        ) : pushStatusCheck.is_live ? (
+                            <FioriMessageStrip severity="success">
+                                {t('currentlyLiveWillUpdate', { platform: pushConfirmShop?.platform })}
+                            </FioriMessageStrip>
+                        ) : (
+                            <FioriMessageStrip severity="information">
+                                {t('existsNotActiveWillUpdate', {
+                                    platform: pushConfirmShop?.platform,
+                                    status: pushStatusCheck.status ?? t('statusUnknown'),
+                                })}
+                            </FioriMessageStrip>
+                        )}
+                    </div>
+                )}
+                {/* Push ส่งค่าที่ "บันทึกแล้ว" เสมอ — มีการแก้ไขค้างอยู่ = ต้องบันทึกก่อน ไม่งั้น
+                    ค่าเก่า (เช่น ราคาก่อนแก้) จะถูกส่งขึ้น marketplace โดยไม่รู้ตัว */}
+                {isDirty && (
+                    <FioriMessageStrip severity="warning" style={{ marginTop: '1rem' }}>
+                        <div style={{ marginBottom: '0.5rem' }}>{t('pushUnsavedChangesWarning')}</div>
+                        <Button design="Emphasized" onClick={() => performSave()} disabled={processing} loading={processing} loadingDelay={0}>
+                            {processing ? t('saving') : t('saveProduct')}
+                        </Button>
+                    </FioriMessageStrip>
+                )}
+                {pushConfirmShop && isReviewablePlatform(pushConfirmShop.platform) && (
+                    <div style={{ marginTop: '1rem' }}>
+                        <MarketplacePushReview
+                            // remount (= ตรวจใหม่) ทุกครั้งที่บันทึกสินค้า จะได้เห็นผลของค่าที่เพิ่งบันทึก
+                            key={product.updated_at}
+                            productId={product.id}
+                            platform={pushConfirmShop.platform.toLowerCase() as 'lazada' | 'shopee' | 'tiktok'}
+                            onReadyChange={setPushReviewReady}
+                        />
+                    </div>
+                )}
+                {pushConfirmShop?.platform.toLowerCase() === 'woocommerce' && (
+                    <>
+                        <div className={styles.divider} style={{ margin: '1rem 0' }} />
+                        <Title level="H6" size="H6" style={{ marginBottom: '0.25rem' }}>
+                            {t('pushTranslationToTranslatePress')}
+                        </Title>
+                        <div className={styles.dialogText} style={{ marginBottom: '0.5rem' }}>
+                            {t('pushTranslationHelp')}
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
+                            <Button
+                                icon="translate"
+                                onClick={confirmFillTranslation}
+                                disabled={!translationComplete || fillingTranslation}
+                                loading={fillingTranslation}
+                                loadingDelay={0}
+                                tooltip={translationComplete ? undefined : translationBlockedReason}
+                            >
+                                {fillingTranslation ? t('pushingEllipsis') : t('pushTranslationButton')}
+                            </Button>
+                            {!translationComplete && <span className={styles.captionInline}>{translationBlockedReason}</span>}
+                        </div>
+                        {fillTranslationResult && (
+                            <FioriMessageStrip
+                                severity={fillTranslationResult.severity === 'info' ? 'information' : fillTranslationResult.severity}
+                                style={{ marginTop: '0.75rem' }}
+                            >
+                                {fillTranslationResult.message}
+                            </FioriMessageStrip>
+                        )}
+                    </>
+                )}
             </Dialog>
 
-            <Dialog open={deleteListingConfirmShop !== null} onClose={closeDeleteListingDialog}>
-                <DialogTitle sx={{ color: 'error.main' }}>{t('deleteListingTitle', { platform: deleteListingConfirmShop?.platform })}</DialogTitle>
-                <DialogContent>
-                    <DialogContentText>
-                        {t('deleteListingWarning', { platform: deleteListingConfirmShop?.platform, name: deleteListingConfirmShop?.name })}
-                    </DialogContentText>
-                    {deleteListingStatusCheck && (
-                        <Box sx={{ mt: 2 }}>
-                            {deleteListingStatusCheck.loading ? (
-                                <Stack direction="row" spacing={1} alignItems="center">
-                                    <CircularProgress size={14} />
-                                    <Typography variant="body2" color="text.secondary">
-                                        {t('checkingStatusOn', { platform: deleteListingConfirmShop?.platform })}
-                                    </Typography>
-                                </Stack>
-                            ) : deleteListingStatusCheck.error ? (
-                                <FioriMessageStrip severity="warning" sx={{ py: 0.5 }}>
-                                    {t('statusCheckFailed', { error: deleteListingStatusCheck.error })}
-                                </FioriMessageStrip>
-                            ) : deleteListingStatusCheck.never_pushed ? (
-                                <FioriMessageStrip severity="error" sx={{ py: 0.5 }}>
-                                    {t('neverPushedNothingToDelete')}
-                                </FioriMessageStrip>
-                            ) : !deleteListingStatusCheck.is_live ? (
-                                <FioriMessageStrip severity="error" sx={{ py: 0.5 }}>
-                                    {t('alreadyNotActiveNothingToDelete', {
-                                        platform: deleteListingConfirmShop?.platform,
-                                        status: deleteListingStatusCheck.status ?? t('statusUnknown'),
-                                    })}
-                                </FioriMessageStrip>
-                            ) : (
-                                <FioriMessageStrip severity="success" sx={{ py: 0.5 }}>
-                                    {t('confirmedCurrentlyLive', { platform: deleteListingConfirmShop?.platform })}
-                                </FioriMessageStrip>
-                            )}
-                        </Box>
-                    )}
-                    {deleteListingStatusCheck &&
-                        !deleteListingStatusCheck.loading &&
-                        !deleteListingStatusCheck.error &&
-                        deleteListingStatusCheck.is_live && (
-                            <TextField
-                                fullWidth
-                                size="small"
-                                sx={{ mt: 2.5 }}
-                                label={t('deleteListingTypeToConfirm', { sku: product.sku })}
+            <Dialog
+                open={deactivateConfirmShop !== null}
+                headerText={t('deactivateOnChannelTitle', { platform: deactivateConfirmShop?.platform })}
+                style={{ width: 'min(444px, calc(100vw - 2rem))' }}
+                onClose={() => setDeactivateConfirmShop(null)}
+                footer={
+                    <Bar
+                        design="Footer"
+                        endContent={
+                            <>
+                                <Button
+                                    design="Negative"
+                                    icon="hide"
+                                    onClick={confirmDeactivate}
+                                    disabled={
+                                        deactivating ||
+                                        !deactivateStatusCheck ||
+                                        deactivateStatusCheck.loading ||
+                                        (!deactivateStatusCheck.error && (deactivateStatusCheck.never_pushed || !deactivateStatusCheck.is_live))
+                                    }
+                                    loading={deactivating}
+                                    loadingDelay={0}
+                                >
+                                    {deactivating ? t('deactivatingEllipsis') : t('deactivate')}
+                                </Button>
+                                <Button design="Transparent" onClick={() => setDeactivateConfirmShop(null)} disabled={deactivating}>
+                                    {t('cancel')}
+                                </Button>
+                            </>
+                        }
+                    />
+                }
+            >
+                <div className={styles.dialogText}>
+                    {t('deactivateWarning', { platform: deactivateConfirmShop?.platform, name: deactivateConfirmShop?.name })}
+                </div>
+                {deactivateStatusCheck && (
+                    <div style={{ marginTop: '1rem' }}>
+                        {deactivateStatusCheck.loading ? (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                <BusyIndicator active delay={0} size="S" />
+                                <span className={styles.captionInline}>{t('checkingStatusOn', { platform: deactivateConfirmShop?.platform })}</span>
+                            </div>
+                        ) : deactivateStatusCheck.error ? (
+                            <FioriMessageStrip severity="warning">{t('statusCheckFailed', { error: deactivateStatusCheck.error })}</FioriMessageStrip>
+                        ) : deactivateStatusCheck.never_pushed ? (
+                            <FioriMessageStrip severity="error">{t('neverPushedNothingToDeactivate')}</FioriMessageStrip>
+                        ) : !deactivateStatusCheck.is_live ? (
+                            <FioriMessageStrip severity="error">
+                                {t('alreadyNotActiveNothingToDeactivate', {
+                                    platform: deactivateConfirmShop?.platform,
+                                    status: deactivateStatusCheck.status ?? t('statusUnknown'),
+                                })}
+                            </FioriMessageStrip>
+                        ) : (
+                            <FioriMessageStrip severity="success">
+                                {t('confirmedCurrentlyLive', { platform: deactivateConfirmShop?.platform })}
+                            </FioriMessageStrip>
+                        )}
+                    </div>
+                )}
+            </Dialog>
+
+            <Dialog
+                open={deleteListingConfirmShop !== null}
+                state="Negative"
+                headerText={t('deleteListingTitle', { platform: deleteListingConfirmShop?.platform })}
+                style={{ width: 'min(444px, calc(100vw - 2rem))' }}
+                onClose={closeDeleteListingDialog}
+                footer={
+                    <Bar
+                        design="Footer"
+                        endContent={
+                            <>
+                                <Button
+                                    design="Negative"
+                                    icon="delete"
+                                    onClick={confirmDeleteListing}
+                                    disabled={
+                                        deletingListing ||
+                                        !deleteListingStatusCheck ||
+                                        deleteListingStatusCheck.loading ||
+                                        (!deleteListingStatusCheck.error &&
+                                            (deleteListingStatusCheck.never_pushed || !deleteListingStatusCheck.is_live)) ||
+                                        deleteConfirmText !== product.sku
+                                    }
+                                    loading={deletingListing}
+                                    loadingDelay={0}
+                                >
+                                    {deletingListing ? t('deletingListingEllipsis') : t('deleteListingButton')}
+                                </Button>
+                                <Button design="Transparent" onClick={closeDeleteListingDialog} disabled={deletingListing}>
+                                    {t('cancel')}
+                                </Button>
+                            </>
+                        }
+                    />
+                }
+            >
+                <div className={styles.dialogText}>
+                    {t('deleteListingWarning', { platform: deleteListingConfirmShop?.platform, name: deleteListingConfirmShop?.name })}
+                </div>
+                {deleteListingStatusCheck && (
+                    <div style={{ marginTop: '1rem' }}>
+                        {deleteListingStatusCheck.loading ? (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                <BusyIndicator active delay={0} size="S" />
+                                <span className={styles.captionInline}>
+                                    {t('checkingStatusOn', { platform: deleteListingConfirmShop?.platform })}
+                                </span>
+                            </div>
+                        ) : deleteListingStatusCheck.error ? (
+                            <FioriMessageStrip severity="warning">
+                                {t('statusCheckFailed', { error: deleteListingStatusCheck.error })}
+                            </FioriMessageStrip>
+                        ) : deleteListingStatusCheck.never_pushed ? (
+                            <FioriMessageStrip severity="error">{t('neverPushedNothingToDelete')}</FioriMessageStrip>
+                        ) : !deleteListingStatusCheck.is_live ? (
+                            <FioriMessageStrip severity="error">
+                                {t('alreadyNotActiveNothingToDelete', {
+                                    platform: deleteListingConfirmShop?.platform,
+                                    status: deleteListingStatusCheck.status ?? t('statusUnknown'),
+                                })}
+                            </FioriMessageStrip>
+                        ) : (
+                            <FioriMessageStrip severity="success">
+                                {t('confirmedCurrentlyLive', { platform: deleteListingConfirmShop?.platform })}
+                            </FioriMessageStrip>
+                        )}
+                    </div>
+                )}
+                {deleteListingStatusCheck &&
+                    !deleteListingStatusCheck.loading &&
+                    !deleteListingStatusCheck.error &&
+                    deleteListingStatusCheck.is_live && (
+                        <div style={{ marginTop: '1.25rem' }}>
+                            <Label
+                                for="delete-listing-confirm"
+                                showColon={false}
+                                wrappingType="Normal"
+                                style={{ display: 'block', marginBottom: '0.25rem' }}
+                            >
+                                {t('deleteListingTypeToConfirm', { sku: product.sku })}
+                            </Label>
+                            <Input
+                                id="delete-listing-confirm"
+                                style={{ width: '100%' }}
                                 placeholder={t('deleteListingConfirmPlaceholder')}
                                 value={deleteConfirmText}
-                                onChange={(e) => setDeleteConfirmText(e.target.value)}
-                                autoComplete="off"
+                                onInput={(e) => setDeleteConfirmText(e.target.value)}
                             />
-                        )}
-                </DialogContent>
-                <DialogActions>
-                    <Button onClick={closeDeleteListingDialog} disabled={deletingListing} sx={fioriGhostSx}>
-                        {t('cancel')}
-                    </Button>
-                    <Button
-                        onClick={confirmDeleteListing}
-                        variant="outlined"
-                        sx={fioriNegativeSx}
-                        disabled={
-                            deletingListing ||
-                            !deleteListingStatusCheck ||
-                            deleteListingStatusCheck.loading ||
-                            (!deleteListingStatusCheck.error && (deleteListingStatusCheck.never_pushed || !deleteListingStatusCheck.is_live)) ||
-                            deleteConfirmText !== product.sku
-                        }
-                        startIcon={deletingListing ? <CircularProgress size={16} /> : <DeleteForeverIcon />}
-                    >
-                        {deletingListing ? t('deletingListingEllipsis') : t('deleteListingButton')}
-                    </Button>
-                </DialogActions>
+                        </div>
+                    )}
             </Dialog>
 
             <FioriMessageBox
@@ -4077,120 +3931,143 @@ export default function ProductEdit({
                 confirmLabel={t('confirmSwitchToSimpleButton')}
                 cancelLabel={t('cancel')}
             >
-                <Trans
-                    t={t}
-                    i18nKey="confirmSwitchToSimpleMessage"
-                    values={{ count: data.variants.length }}
-                    components={{ strong: <strong /> }}
-                />
+                <Trans t={t} i18nKey="confirmSwitchToSimpleMessage" values={{ count: data.variants.length }} components={{ strong: <strong /> }} />
             </FioriMessageBox>
 
             <Dialog
                 open={masterCategoryPickerOpen}
+                style={{ width: 'min(600px, calc(100vw - 2rem))' }}
                 onClose={() => setMasterCategoryPickerOpen(false)}
-                fullWidth
-                maxWidth="sm"
-                PaperProps={{ sx: { borderRadius: 2 } }}
-            >
-                <DialogTitle sx={{ m: 0, p: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <Typography variant="h6" fontWeight={700}>
-                        {t('masterCategoriesBlockTitle')}
-                    </Typography>
-                    <IconButton size="small" onClick={() => setMasterCategoryPickerOpen(false)}>
-                        <CloseIcon fontSize="small" />
-                    </IconButton>
-                </DialogTitle>
-                <DialogContent dividers>
-                    {(sectionSaveError?.section === 'master-categories' || conflictMessage) && (
-                        <Box sx={{ mb: 2 }}>
-                            <FioriMessageStrip severity="error">{conflictMessage ?? sectionSaveError?.message}</FioriMessageStrip>
-                        </Box>
-                    )}
-                    <Stack spacing={2} sx={!canEditMasterCategories ? { pointerEvents: 'none', opacity: 0.6 } : undefined}>
-                        {cascadedMasterCategoryAttributes.map(renderMasterCategoryField)}
-                    </Stack>
-                </DialogContent>
-                <DialogActions sx={{ p: 2 }}>
-                    <Button onClick={() => setMasterCategoryPickerOpen(false)}>{t('cancel')}</Button>
-                    {canEditMasterCategories && (
+                header={
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', padding: '0.5rem 0' }}>
+                        <Title level="H5" size="H5" wrappingType="Normal">
+                            {t('masterCategoriesBlockTitle')}
+                        </Title>
                         <Button
-                            variant="contained"
-                            disabled={savingSection === 'master-categories'}
-                            startIcon={savingSection === 'master-categories' ? <CircularProgress size={16} /> : undefined}
-                            onClick={() => {
-                                const payload: Record<string, FormDataConvertible> = {};
-                                masterCategoryAttributes.forEach((attr) => {
-                                    payload[attr.code] = selectedMasterCategoryCode(attr);
-                                });
-                                saveSection('master-categories', payload, { onSuccess: () => setMasterCategoryPickerOpen(false) });
-                            }}
-                        >
-                            {t('save')}
-                        </Button>
-                    )}
-                </DialogActions>
+                            design="Transparent"
+                            icon="decline"
+                            tooltip={t('close')}
+                            accessibleName={t('close')}
+                            onClick={() => setMasterCategoryPickerOpen(false)}
+                        />
+                    </div>
+                }
+                footer={
+                    <Bar
+                        design="Footer"
+                        endContent={
+                            <>
+                                {canEditMasterCategories && (
+                                    <Button
+                                        design="Emphasized"
+                                        disabled={savingSection === 'master-categories'}
+                                        loading={savingSection === 'master-categories'}
+                                        loadingDelay={0}
+                                        onClick={() => {
+                                            const payload: Record<string, FormDataConvertible> = {};
+                                            masterCategoryAttributes.forEach((attr) => {
+                                                payload[attr.code] = selectedMasterCategoryCode(attr);
+                                            });
+                                            saveSection('master-categories', payload, { onSuccess: () => setMasterCategoryPickerOpen(false) });
+                                        }}
+                                    >
+                                        {t('save')}
+                                    </Button>
+                                )}
+                                <Button design="Transparent" onClick={() => setMasterCategoryPickerOpen(false)}>
+                                    {t('cancel')}
+                                </Button>
+                            </>
+                        }
+                    />
+                }
+            >
+                {(sectionSaveError?.section === 'master-categories' || conflictMessage) && (
+                    <div style={{ marginBottom: '1rem' }}>
+                        <FioriMessageStrip severity="error">{conflictMessage ?? sectionSaveError?.message}</FioriMessageStrip>
+                    </div>
+                )}
+                <div
+                    style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '1rem',
+                        ...(!canEditMasterCategories ? { pointerEvents: 'none', opacity: 0.6 } : {}),
+                    }}
+                >
+                    {cascadedMasterCategoryAttributes.map(renderMasterCategoryField)}
+                </div>
             </Dialog>
 
             <Dialog
                 open={variantDialogOpen}
+                style={{ width: 'min(600px, calc(100vw - 2rem))' }}
                 onClose={() => setVariantDialogOpen(false)}
-                fullWidth
-                maxWidth="sm"
-                PaperProps={{ sx: { borderRadius: 2 } }}
-            >
-                <DialogTitle sx={{ m: 0, p: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <Typography variant="h6" fontWeight={700}>
-                        {t('selectVariantAttributesTitle')}
-                    </Typography>
-                    <IconButton onClick={() => setVariantDialogOpen(false)} size="small">
-                        <CloseIcon />
-                    </IconButton>
-                </DialogTitle>
-                <DialogContent dividers sx={{ p: 3 }}>
-                    {variantOverflow !== null && (
-                        <FioriMessageStrip severity="error" sx={{ mb: 2 }}>
-                            {t('tooManyVariantCombinations', { count: variantOverflow, max: MAX_VARIANT_COMBINATIONS })}
-                        </FioriMessageStrip>
-                    )}
-                    {data.variants.length > 0 && (
-                        <FioriMessageStrip severity="warning" sx={{ mb: 2 }}>
-                            {t('regenerateVariantsWarning')}
-                        </FioriMessageStrip>
-                    )}
-                    <Autocomplete
-                        multiple
-                        options={familyScopedVariantAttributes}
-                        getOptionLabel={(option) => option.name || option.code}
-                        value={selectedVariantAttributeObjects}
-                        onChange={(_, newValue) => setPendingVariantAttrIds(newValue.map((item) => item.id))}
-                        renderTags={(value, getTagProps) =>
-                            value.map((option, index) => (
-                                <Chip label={option.name || option.code} {...getTagProps({ index })} key={option.id} sx={mappedChipSx} />
-                            ))
+                header={
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', padding: '0.5rem 0' }}>
+                        <Title level="H5" size="H5" wrappingType="Normal">
+                            {t('selectVariantAttributesTitle')}
+                        </Title>
+                        <Button
+                            design="Transparent"
+                            icon="decline"
+                            tooltip={t('close')}
+                            accessibleName={t('close')}
+                            onClick={() => setVariantDialogOpen(false)}
+                        />
+                    </div>
+                }
+                footer={
+                    <Bar
+                        design="Footer"
+                        endContent={
+                            <>
+                                <Button design="Emphasized" onClick={applyVariantGeneration}>
+                                    {t('generateButton')}
+                                </Button>
+                                <Button design="Transparent" onClick={() => setVariantDialogOpen(false)}>
+                                    {t('cancel')}
+                                </Button>
+                            </>
                         }
-                        renderInput={(params) => <TextField {...params} placeholder={t('selectAttributesForVariantPlaceholder')} variant="outlined" />}
                     />
-                </DialogContent>
-                <DialogActions sx={{ px: 3, py: 2, justifyContent: 'flex-end', gap: 1 }}>
-                    <Button onClick={() => setVariantDialogOpen(false)} sx={fioriGhostSx}>
-                        {t('cancel')}
-                    </Button>
-                    <Button onClick={applyVariantGeneration} variant="contained" sx={fioriEmphasizedSx}>
-                        {t('generateButton')}
-                    </Button>
-                </DialogActions>
+                }
+            >
+                {variantOverflow !== null && (
+                    <FioriMessageStrip severity="error" style={{ marginBottom: '1rem' }}>
+                        {t('tooManyVariantCombinations', { count: variantOverflow, max: MAX_VARIANT_COMBINATIONS })}
+                    </FioriMessageStrip>
+                )}
+                {data.variants.length > 0 && (
+                    <FioriMessageStrip severity="warning" style={{ marginBottom: '1rem' }}>
+                        {t('regenerateVariantsWarning')}
+                    </FioriMessageStrip>
+                )}
+                <MultiComboBox
+                    style={{ width: '100%' }}
+                    placeholder={t('selectAttributesForVariantPlaceholder')}
+                    onSelectionChange={(e) =>
+                        setPendingVariantAttrIds(
+                            e.detail.items.map((item) => Number((item as HTMLElement).dataset.id)).filter((id) => !Number.isNaN(id)),
+                        )
+                    }
+                >
+                    {familyScopedVariantAttributes.map((option) => (
+                        <MultiComboBoxItem
+                            key={option.id}
+                            data-id={option.id}
+                            text={option.name || option.code}
+                            selected={selectedVariantAttributeObjects.some((attr) => attr.id === option.id)}
+                        />
+                    ))}
+                </MultiComboBox>
             </Dialog>
 
-            <Snackbar
-                open={pushResult !== null}
-                autoHideDuration={20000}
-                onClose={() => setPushResult(null)}
-                anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
-            >
-                <FioriMessageStrip onClose={() => setPushResult(null)} severity={pushResult?.severity ?? 'success'} sx={{ width: '100%', boxShadow: '0 4px 12px rgba(0,0,0,0.16)' }}>
-                    {pushResult?.message}
+            {pushResult !== null && (
+                <FioriMessageStrip onClose={() => setPushResult(null)} severity={pushResult.severity} style={FLOATING_STRIP_STYLE}>
+                    {pushResult.message}
                 </FioriMessageStrip>
-            </Snackbar>
+            )}
         </AppLayout>
     );
 }
@@ -4220,9 +4097,7 @@ function parseGalleryItems(value: AttributeValue): (string | File)[] {
             // เป็น array เดียวกันกับตอน parse fail ด้านล่าง (ไม่งั้นวิดีโอ/รูปเก่า
             // จะหายไปเงียบๆ แทนที่จะโชว์เป็น 1 รายการ) — เหมือน parseVideoPaths()
             // ของ show.tsx เป๊ะ
-            return Array.isArray(parsed)
-                ? parsed.filter((p): p is string => typeof p === 'string' && p !== '')
-                : [value];
+            return Array.isArray(parsed) ? parsed.filter((p): p is string => typeof p === 'string' && p !== '') : [value];
         } catch {
             // ไม่ใช่ JSON — เป็น string path เดี่ยวๆ แบบเก่า ให้ถือว่าเป็นรูปที่มีอยู่แล้วหนึ่งรูป
             return [value];
@@ -4250,37 +4125,18 @@ function GalleryThumb({ item, disabled, onRemove }: { item: string | File; disab
     const src = typeof item === 'string' ? (/^https?:\/\//.test(item) || item.startsWith('/') ? item : `/storage/${item}`) : previewUrl;
 
     return (
-        <Box sx={{ position: 'relative', width: 200, height: 200 }}>
+        <div style={{ position: 'relative', width: 200, height: 200 }}>
             {src ? (
-                <Box
-                    component="img"
-                    src={src}
-                    alt=""
-                    sx={{ width: 200, height: 200, objectFit: 'cover', borderRadius: 1, border: '1px solid #e2e8f0' }}
-                />
+                <img src={src} alt="" className={styles.thumbMedia} style={{ width: 200, height: 200, objectFit: 'cover' }} />
             ) : (
-                <Box sx={{ width: 200, height: 200, borderRadius: 1, border: '1px solid #e2e8f0', bgcolor: '#f1f5f9' }} />
+                <div className={styles.thumbPlaceholder} style={{ width: 200, height: 200 }} />
             )}
             {!disabled && (
-                <IconButton
-                    size="small"
-                    onClick={onRemove}
-                    aria-label="Remove image"
-                    sx={{
-                        position: 'absolute',
-                        top: -8,
-                        right: -8,
-                        bgcolor: FIORI.surface,
-                        border: `1px solid ${FIORI.border}`,
-                        width: 20,
-                        height: 20,
-                        '&:hover': { bgcolor: '#fee2e2' },
-                    }}
-                >
-                    <CloseIcon sx={{ fontSize: 14 }} />
-                </IconButton>
+                <button type="button" onClick={onRemove} aria-label="Remove image" className={styles.thumbRemove}>
+                    <Icon name="decline" style={{ width: 10, height: 10 }} />
+                </button>
             )}
-        </Box>
+        </div>
     );
 }
 
@@ -4303,32 +4159,18 @@ function VideoThumb({ item, disabled, onRemove }: { item: string | File; disable
     const src = typeof item === 'string' ? (/^https?:\/\//.test(item) || item.startsWith('/') ? item : `/storage/${item}`) : previewUrl;
 
     return (
-        <Box sx={{ position: 'relative', width: 160 }}>
+        <div style={{ position: 'relative', width: 160 }}>
             {src ? (
-                <Box component="video" src={src} controls sx={{ width: 160, maxHeight: 100, borderRadius: 1, border: '1px solid #e2e8f0' }} />
+                <video src={src} controls className={styles.thumbMedia} style={{ width: 160, maxHeight: 100 }} />
             ) : (
-                <Box sx={{ width: 160, height: 100, borderRadius: 1, border: '1px solid #e2e8f0', bgcolor: '#f1f5f9' }} />
+                <div className={styles.thumbPlaceholder} style={{ width: 160, height: 100 }} />
             )}
             {!disabled && (
-                <IconButton
-                    size="small"
-                    onClick={onRemove}
-                    aria-label="Remove video"
-                    sx={{
-                        position: 'absolute',
-                        top: -8,
-                        right: -8,
-                        bgcolor: FIORI.surface,
-                        border: `1px solid ${FIORI.border}`,
-                        width: 20,
-                        height: 20,
-                        '&:hover': { bgcolor: '#fee2e2' },
-                    }}
-                >
-                    <CloseIcon sx={{ fontSize: 14 }} />
-                </IconButton>
+                <button type="button" onClick={onRemove} aria-label="Remove video" className={styles.thumbRemove}>
+                    <Icon name="decline" style={{ width: 10, height: 10 }} />
+                </button>
             )}
-        </Box>
+        </div>
     );
 }
 
@@ -4376,37 +4218,22 @@ const SelectControl = memo(function SelectControl({
     // แต่ถ้าสินค้านี้เลือกค่านั้นไว้อยู่แล้วต้องยังคงโชว์ต่อไป ไม่งั้นค่าที่มีอยู่จะหายไปจาก dropdown
     const visibleOptions = options.filter((opt) => opt.is_active !== false || opt === selectedOption);
     return (
-        <Autocomplete
-            size="small"
-            fullWidth
+        <ComboBox
+            style={{ width: '100%' }}
             disabled={disabled}
-            options={visibleOptions}
-            value={selectedOption}
             loading={loading}
-            loadingText={t('loadingOptions')}
-            autoHighlight
-            popupIcon={<KeyboardArrowDownIcon />}
-            getOptionLabel={(opt) => opt.admin_label || opt.code || ''}
-            isOptionEqualToValue={(opt, val) => opt.id === val.id}
-            onChange={(_, newValue) => onValueChange(attributeId, groupKey, channelKey, localeKey, newValue ? optionValue(newValue) : '')}
-            sx={fioriComboBoxSx('none')}
-            slotProps={{ paper: { sx: fioriComboBoxPaperSx } }}
-            renderInput={(params) => (
-                <TextField
-                    {...params}
-                    placeholder={t('selectOption')}
-                    InputProps={{
-                        ...params.InputProps,
-                        endAdornment: (
-                            <>
-                                {loading && <CircularProgress size={16} thickness={4} sx={{ color: FIORI.brand, mr: 0.5 }} />}
-                                {params.InputProps.endAdornment}
-                            </>
-                        ),
-                    }}
-                />
-            )}
-        />
+            showClearIcon
+            placeholder={loading ? t('loadingOptions') : t('selectOption')}
+            selectedValue={selectedOption ? optionValue(selectedOption) : ''}
+            onSelectionChange={(e) => {
+                const item = e.detail.item;
+                onValueChange(attributeId, groupKey, channelKey, localeKey, item ? (item.value ?? '') : '');
+            }}
+        >
+            {visibleOptions.map((opt) => (
+                <ComboBoxItem key={opt.id} value={optionValue(opt)} text={opt.admin_label || opt.code || ''} />
+            ))}
+        </ComboBox>
     );
 });
 
@@ -4523,11 +4350,9 @@ const RenderAttributeInput = memo(function RenderAttributeInput({
         return (
             <>
                 {attr.is_locale_based ? (
-                    <Chip
-                        label={activeLocaleCode ? activeLocaleCode.toUpperCase() : 'LOCALE'}
-                        size="small"
-                        sx={{ height: 18, fontSize: '0.65rem', bgcolor: 'grey.600', color: '#fff', fontWeight: 700 }}
-                    />
+                    <Tag design="Set2" colorScheme="10" hideStateIcon size="S">
+                        {activeLocaleCode ? activeLocaleCode.toUpperCase() : 'LOCALE'}
+                    </Tag>
                 ) : attr.is_channel_based ? (
                     // แต่ก่อนตรงนี้จะโชว์ "DEFAULT" ตลอด ไม่ว่า channel ไหนจะ
                     // active อยู่จริง — ฟิลด์ที่เป็น channel-based (เช่น price_std)
@@ -4536,151 +4361,81 @@ const RenderAttributeInput = memo(function RenderAttributeInput({
                     // channel ผิด (หรือไม่มี channel เลย) เลยเปลี่ยนมาโชว์ชื่อ
                     // channel จริงแทน จะได้ไม่คลุมเครือแบบเงียบๆ อีกต่อไป
                     <>
-                        <Chip
-                            label={activeChannelName ? activeChannelName.toUpperCase() : 'CHANNEL'}
-                            size="small"
-                            sx={{ height: 18, fontSize: '0.65rem', bgcolor: 'grey.500', color: '#fff', fontWeight: 700 }}
-                        />
-                        <Tooltip
-                            title={t('channelValueTooltip')}
-                            arrow
-                        >
-                            <InfoOutlinedIcon sx={{ fontSize: 14, color: 'text.secondary', cursor: 'help' }} />
-                        </Tooltip>
+                        <Tag design="Set2" colorScheme="10" hideStateIcon size="S">
+                            {activeChannelName ? activeChannelName.toUpperCase() : 'CHANNEL'}
+                        </Tag>
+                        <Icon name="information" className={styles.chipInfoIcon} showTooltip accessibleName={t('channelValueTooltip')} />
                     </>
                 ) : (
                     <>
-                        <Chip
-                            label={t('defaultChipLabel')}
-                            size="small"
-                            sx={{ height: 18, fontSize: '0.65rem', bgcolor: 'grey.200', color: 'text.primary', fontWeight: 600 }}
-                        />
-                        <Tooltip title={t('defaultFieldChipTooltip')} arrow>
-                            <InfoOutlinedIcon sx={{ fontSize: 14, color: 'text.secondary', cursor: 'help' }} />
-                        </Tooltip>
+                        <Tag design="Neutral" hideStateIcon size="S">
+                            {t('defaultChipLabel')}
+                        </Tag>
+                        <Icon name="information" className={styles.chipInfoIcon} showTooltip accessibleName={t('defaultFieldChipTooltip')} />
                     </>
                 )}
                 {isReadOnly && (
-                    <Chip
-                        label={t('readOnlyChipLabel')}
-                        size="small"
-                        sx={{ height: 18, fontSize: '0.65rem', bgcolor: 'grey.900', color: '#fff', fontWeight: 700 }}
-                    />
+                    <Tag design="Set2" colorScheme="10" hideStateIcon size="S">
+                        {t('readOnlyChipLabel')}
+                    </Tag>
                 )}
                 {attr.master_source && (
-                    <Tooltip title={t('masterSourceChipTooltip')} arrow>
-                        <Chip
-                            icon={<InfoOutlinedIcon sx={{ fontSize: 13, color: `${FIORI.brand} !important` }} />}
-                            label={t(
-                                masterSources.find((s) => s.value === attr.master_source)?.labelKey ?? attr.master_source,
-                            )}
-                            size="small"
-                            sx={{
-                                height: 18,
-                                fontSize: '0.65rem',
-                                bgcolor: FIORI.brandBg,
-                                color: FIORI.brand,
-                                fontWeight: 600,
-                                '& .MuiChip-icon': { ml: '4px' },
-                            }}
-                        />
-                    </Tooltip>
+                    <Tag design="Information" hideStateIcon size="S" title={t('masterSourceChipTooltip')} icon={<Icon name="information" />}>
+                        {t(masterSources.find((s) => s.value === attr.master_source)?.labelKey ?? attr.master_source)}
+                    </Tag>
                 )}
                 {platformContext && attr.platform_field_mapping && (
-                    <Tooltip
+                    <Tag
+                        design="Positive"
+                        hideStateIcon
+                        size="S"
+                        icon={<Icon name="upload-to-cloud" />}
                         title={t('mappedToPlatformPayloadTooltip', {
                             platform: PLATFORM_DISPLAY_NAMES[platformContext],
                             field: attr.platform_field_mapping.is_custom
                                 ? attr.platform_field_mapping.label
                                 : t(PAYLOAD_FIELD_LABEL_KEYS[attr.platform_field_mapping.target_field] ?? attr.platform_field_mapping.target_field),
                         })}
-                        arrow
                     >
-                        <Chip
-                            icon={<PublishIcon sx={{ fontSize: 13, color: `${FIORI.success} !important` }} />}
-                            label={t('mappedToPlatformPayloadChip', { platform: PLATFORM_DISPLAY_NAMES[platformContext] })}
-                            size="small"
-                            sx={{
-                                height: 18,
-                                fontSize: '0.65rem',
-                                bgcolor: FIORI.successBg,
-                                color: FIORI.success,
-                                fontWeight: 700,
-                                '& .MuiChip-icon': { ml: '4px' },
-                            }}
-                        />
-                    </Tooltip>
+                        {t('mappedToPlatformPayloadChip', { platform: PLATFORM_DISPLAY_NAMES[platformContext] })}
+                    </Tag>
                 )}
                 {attr.lazada_mandatory && (
-                    <Tooltip
-                        title={t('lazadaRequiredTooltip')}
-                        arrow
-                    >
-                        <Chip
-                            label={t('lazadaRequiredChip')}
-                            size="small"
-                            sx={{
-                                height: 18,
-                                fontSize: '0.65rem',
-                                bgcolor: FIORI.warningBg,
-                                color: FIORI.warning,
-                                fontWeight: 700,
-                            }}
-                        />
-                    </Tooltip>
+                    <Tag design="Critical" hideStateIcon size="S" title={t('lazadaRequiredTooltip')}>
+                        {t('lazadaRequiredChip')}
+                    </Tag>
                 )}
                 {attr.shopee_mandatory && (
-                    <Tooltip
-                        title={t('shopeeRequiredTooltip')}
-                        arrow
-                    >
-                        <Chip
-                            label={t('shopeeRequiredChip')}
-                            size="small"
-                            sx={{
-                                height: 18,
-                                fontSize: '0.65rem',
-                                bgcolor: FIORI.brandBg,
-                                color: FIORI.brand,
-                                fontWeight: 700,
-                            }}
-                        />
-                    </Tooltip>
+                    <Tag design="Information" hideStateIcon size="S" title={t('shopeeRequiredTooltip')}>
+                        {t('shopeeRequiredChip')}
+                    </Tag>
                 )}
                 {attr.tiktok_mandatory && (
-                    <Tooltip
-                        title={t('tiktokRequiredTooltip')}
-                        arrow
-                    >
-                        <Chip
-                            label={t('tiktokRequiredChip')}
-                            size="small"
-                            sx={{
-                                height: 18,
-                                fontSize: '0.65rem',
-                                bgcolor: FIORI.successBg,
-                                color: FIORI.success,
-                                fontWeight: 700,
-                            }}
-                        />
-                    </Tooltip>
+                    <Tag design="Positive" hideStateIcon size="S" title={t('tiktokRequiredTooltip')}>
+                        {t('tiktokRequiredChip')}
+                    </Tag>
                 )}
             </>
         );
     };
 
+    // หัวฟิลด์ (label + * + chip ขอบเขต) ที่ทุกประเภทฟิลด์ด้านล่างใช้ร่วมกัน
+    const fieldHeader = (
+        <div className={styles.fieldHeader}>
+            <span className={styles.fieldLabelText}>
+                {label} {attr.is_required && <span style={{ color: 'var(--sapNegativeColor)' }}>*</span>}
+            </span>
+            {renderChips()}
+        </div>
+    );
+
     if (attr.type === 'select' || attr.type === 'multiselect') {
         const options = attr.options ?? [];
 
         return (
-            <FormControl fullWidth size="small">
-                <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 0.5 }}>
-                    <Typography variant="caption" fontWeight={600} color="#334155">
-                        {label} {attr.is_required && <Box component="span" sx={{ color: 'error.main' }}>*</Box>}
-                    </Typography>
-                    {renderChips()}
-                </Stack>
-                <Stack direction="row" spacing={1} alignItems="center">
+            <div>
+                {fieldHeader}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                     <SelectControl
                         attributeId={attr.id}
                         groupKey={groupKey}
@@ -4693,16 +4448,14 @@ const RenderAttributeInput = memo(function RenderAttributeInput({
                         onValueChange={onValueChange}
                     />
                     {canAddOptions && !isReadOnly && (
-                        <IconButton
-                            size="small"
-                            title={t('addOptionToFieldTooltip', { label })}
+                        <Button
+                            icon="add"
+                            tooltip={t('addOptionToFieldTooltip', { label })}
+                            accessibleName={t('addOptionToFieldTooltip', { label })}
                             onClick={() => setAddOptionOpen(true)}
-                            sx={{ border: '1px solid #cbd5e1', borderRadius: 1 }}
-                        >
-                            <AddIcon fontSize="small" />
-                        </IconButton>
+                        />
                     )}
-                </Stack>
+                </div>
                 {canAddOptions && (
                     <QuickAddOptionDialog
                         open={addOptionOpen}
@@ -4720,19 +4473,14 @@ const RenderAttributeInput = memo(function RenderAttributeInput({
                         onCreated={(code) => onChange(code)}
                     />
                 )}
-            </FormControl>
+            </div>
         );
     }
 
     if (attr.type === 'textarea') {
         return (
-            <Box>
-                <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 0.5 }}>
-                    <Typography variant="caption" fontWeight={600} color="#334155">
-                        {label} {attr.is_required && <Box component="span" sx={{ color: 'error.main' }}>*</Box>}
-                    </Typography>
-                    {renderChips()}
-                </Stack>
+            <div>
+                {fieldHeader}
                 <RichTextControl
                     attributeId={attr.id}
                     groupKey={groupKey}
@@ -4744,123 +4492,98 @@ const RenderAttributeInput = memo(function RenderAttributeInput({
                     productId={productId}
                     onValueChange={onValueChange}
                 />
-            </Box>
+            </div>
         );
     }
 
     if (attr.type === 'price') {
         return (
-            <Box>
-                <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 0.5 }}>
-                    <Typography variant="caption" fontWeight={600} color="#334155">
-                        {label} {attr.is_required && <Box component="span" sx={{ color: 'error.main' }}>*</Box>}
-                    </Typography>
-                    {renderChips()}
-                </Stack>
-                <TextField
-                    size="small"
-                    fullWidth
+            <div>
+                {fieldHeader}
+                <Input
+                    style={{ width: '100%' }}
                     disabled={isReadOnly}
                     value={stringValue}
-                    onChange={(e) => onChange(e.target.value)}
-                    autoComplete="off"
-                    sx={fioriFieldStateSx('none')}
-                    InputProps={{
-                        startAdornment: <InputAdornment position="start">฿</InputAdornment>,
-                    }}
+                    onInput={(e) => onChange(e.target.value)}
+                    accessibleName={label}
+                    icon={<span className={styles.currencyAdornment}>฿</span>}
                 />
-            </Box>
+            </div>
         );
     }
 
     if (attr.type === 'number') {
         return (
-            <Box>
-                <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 0.5 }}>
-                    <Typography variant="caption" fontWeight={600} color="#334155">
-                        {label} {attr.is_required && <Box component="span" sx={{ color: 'error.main' }}>*</Box>}
-                    </Typography>
-                    {renderChips()}
-                </Stack>
-                <TextField
-                    size="small"
-                    fullWidth
-                    type="number"
+            <div>
+                {fieldHeader}
+                <Input
+                    style={{ width: '100%' }}
+                    type="Number"
                     disabled={isReadOnly}
                     value={stringValue}
-                    onChange={(e) => onChange(e.target.value)}
+                    onInput={(e) => onChange(e.target.value)}
                     placeholder={t('enterFieldPlaceholder', { label: label.toLowerCase() })}
-                    autoComplete="off"
-                    sx={fioriFieldStateSx('none')}
+                    accessibleName={label}
                 />
-            </Box>
+            </div>
         );
     }
 
     if (attr.type === 'boolean') {
         return (
-            <Box>
-                <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 0.5 }}>
-                    <Typography variant="caption" fontWeight={600} color="#334155">
-                        {label} {attr.is_required && <Box component="span" sx={{ color: 'error.main' }}>*</Box>}
-                    </Typography>
-                    {renderChips()}
-                </Stack>
+            <div>
+                {fieldHeader}
                 <Switch
-                    sx={fioriSwitchSx}
                     disabled={isReadOnly}
+                    accessibleName={label}
                     checked={stringValue === '1' || stringValue === 'true'}
                     onChange={(e) => onChange(e.target.checked ? '1' : '0')}
                 />
-            </Box>
+            </div>
         );
     }
 
     if (attr.type === 'checkbox') {
         return (
-            <Box>
-                <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 0.5 }}>
-                    <FormControlLabel
-                        control={
-                            <Checkbox
-                                disabled={isReadOnly}
-                                checked={stringValue === '1' || stringValue === 'true'}
-                                onChange={(e) => onChange(e.target.checked ? '1' : '0')}
-                            />
-                        }
-                        label={
-                            <Typography variant="caption" fontWeight={600} color="#334155">
-                                {label} {attr.is_required && <Box component="span" sx={{ color: 'error.main' }}>*</Box>}
-                            </Typography>
-                        }
+            <div>
+                <div className={styles.fieldHeader}>
+                    <CheckBox
+                        disabled={isReadOnly}
+                        text={attr.is_required ? `${label} *` : label}
+                        checked={stringValue === '1' || stringValue === 'true'}
+                        onChange={(e) => onChange(e.target.checked ? '1' : '0')}
                     />
                     {renderChips()}
-                </Stack>
-            </Box>
+                </div>
+            </div>
         );
     }
 
     if (attr.type === 'date' || attr.type === 'datetime') {
         return (
-            <Box>
-                <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 0.5 }}>
-                    <Typography variant="caption" fontWeight={600} color="#334155">
-                        {label} {attr.is_required && <Box component="span" sx={{ color: 'error.main' }}>*</Box>}
-                    </Typography>
-                    {renderChips()}
-                </Stack>
-                <TextField
-                    type={attr.type === 'date' ? 'date' : 'datetime-local'}
-                    size="small"
-                    fullWidth
-                    disabled={isReadOnly}
-                    value={stringValue}
-                    onChange={(e) => onChange(e.target.value)}
-                    InputLabelProps={{ shrink: true }}
-                    autoComplete="off"
-                    sx={fioriFieldStateSx('none')}
-                />
-            </Box>
+            <div>
+                {fieldHeader}
+                {/* ค่าเก็บเป็นรูปแบบเดียวกับ <input type="date"/"datetime-local"> เดิม */}
+                {attr.type === 'date' ? (
+                    <DatePicker
+                        style={{ width: '100%' }}
+                        disabled={isReadOnly}
+                        valueFormat="yyyy-MM-dd"
+                        value={stringValue}
+                        accessibleName={label}
+                        onChange={(e) => onChange(e.detail.value)}
+                    />
+                ) : (
+                    <DateTimePicker
+                        style={{ width: '100%' }}
+                        disabled={isReadOnly}
+                        valueFormat="yyyy-MM-dd'T'HH:mm"
+                        value={stringValue}
+                        accessibleName={label}
+                        onChange={(e) => onChange(e.detail.value)}
+                    />
+                )}
+            </div>
         );
     }
 
@@ -4951,17 +4674,12 @@ const RenderAttributeInput = memo(function RenderAttributeInput({
         };
 
         return (
-            <Box>
-                <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 0.5 }}>
-                    <Typography variant="caption" fontWeight={600} color="#334155">
-                        {label} {attr.is_required && <Box component="span" sx={{ color: 'error.main' }}>*</Box>}
-                    </Typography>
-                    {renderChips()}
-                </Stack>
-                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>
+            <div>
+                {fieldHeader}
+                <div className={styles.caption} style={{ marginTop: 0, marginBottom: '0.25rem' }}>
                     {t('galleryHelperText', { max: MAX_GALLERY_IMAGES, count: items.length, dim: MIN_GALLERY_DIMENSION })}
-                </Typography>
-                <Stack direction="row" spacing={1} flexWrap="wrap" alignItems="flex-start" sx={{ mb: 1 }}>
+                </div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-start', gap: '0.5rem', marginBottom: '0.5rem' }}>
                     {items.map((item, index) => (
                         <GalleryThumb
                             key={`${index}-${typeof item === 'string' ? item : item.name}`}
@@ -4982,14 +4700,14 @@ const RenderAttributeInput = memo(function RenderAttributeInput({
                             onFilesSelected={addFiles}
                         />
                     )}
-                </Stack>
+                </div>
                 <FileUploadRowsList
                     error={atLimit ? t('galleryMaxReached', { max: MAX_GALLERY_IMAGES }) : (galleryError ?? undefined)}
                     rows={galleryUploadRows}
                     percentLabel={(percent) => t('uploadPercentComplete', { percent })}
                     onRemoveRow={removeGalleryUploadRow}
                 />
-            </Box>
+            </div>
         );
     }
 
@@ -5088,17 +4806,12 @@ const RenderAttributeInput = memo(function RenderAttributeInput({
         };
 
         return (
-            <Box>
-                <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 0.5 }}>
-                    <Typography variant="caption" fontWeight={600} color="#334155">
-                        {label} {attr.is_required && <Box component="span" sx={{ color: 'error.main' }}>*</Box>}
-                    </Typography>
-                    {renderChips()}
-                </Stack>
-                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>
+            <div>
+                {fieldHeader}
+                <div className={styles.caption} style={{ marginTop: 0, marginBottom: '0.25rem' }}>
                     {t('videoHelperText', { max: MAX_VIDEO_COUNT, count: items.length })}
-                </Typography>
-                <Stack direction="row" spacing={1.5} flexWrap="wrap" alignItems="flex-start" sx={{ mb: 1 }}>
+                </div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-start', gap: '0.75rem', marginBottom: '0.5rem' }}>
                     {items.map((item, index) => (
                         <VideoThumb
                             key={`${index}-${typeof item === 'string' ? item : item.name}`}
@@ -5119,14 +4832,14 @@ const RenderAttributeInput = memo(function RenderAttributeInput({
                             onFilesSelected={addFiles}
                         />
                     )}
-                </Stack>
+                </div>
                 <FileUploadRowsList
                     error={atLimit ? t('videoMaxReached', { max: MAX_VIDEO_COUNT }) : (videoError ?? undefined)}
                     rows={videoUploadRows}
                     percentLabel={(percent) => t('uploadPercentComplete', { percent })}
                     onRemoveRow={removeVideoUploadRow}
                 />
-            </Box>
+            </div>
         );
     }
 
@@ -5170,83 +4883,48 @@ const RenderAttributeInput = memo(function RenderAttributeInput({
         const currentLabel = existingLabel ? t('currentFileLabel', { name: existingLabel }) : '';
 
         return (
-            <Box>
-                <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 0.5 }}>
-                    <Typography variant="caption" fontWeight={600} color="#334155">
-                        {label} {attr.is_required && <Box component="span" sx={{ color: 'error.main' }}>*</Box>}
-                    </Typography>
-                    {renderChips()}
-                </Stack>
-                <Stack direction="row" spacing={1.5} flexWrap="wrap" alignItems="flex-start">
+            <div>
+                {fieldHeader}
+                <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-start', gap: '0.75rem' }}>
                     {isImage && previewSrc && (
-                        <Box sx={{ position: 'relative', width: 200, height: 200 }}>
-                            <Box
-                                component="img"
+                        <div style={{ position: 'relative', width: 200, height: 200 }}>
+                            <img
                                 src={previewSrc}
                                 alt={label}
                                 onClick={() => setLightboxOpen(true)}
-                                sx={{
-                                    width: 200,
-                                    height: 200,
-                                    objectFit: 'cover',
-                                    borderRadius: 1,
-                                    border: '1px solid #e2e8f0',
-                                    cursor: 'pointer',
-                                    '&:hover': { opacity: 0.85 },
-                                }}
+                                className={`${styles.thumbMedia} ${styles.thumbClickable}`}
+                                style={{ width: 200, height: 200, objectFit: 'cover' }}
                             />
                             {!isReadOnly && (
-                                <IconButton
-                                    size="small"
-                                    onClick={() => onChange('')}
-                                    aria-label="remove file"
-                                    sx={{
-                                        position: 'absolute',
-                                        top: -8,
-                                        right: -8,
-                                        bgcolor: FIORI.surface,
-                                        border: `1px solid ${FIORI.border}`,
-                                        width: 20,
-                                        height: 20,
-                                        '&:hover': { bgcolor: '#fee2e2' },
-                                    }}
-                                >
-                                    <CloseIcon sx={{ fontSize: 14 }} />
-                                </IconButton>
+                                <button type="button" onClick={() => onChange('')} aria-label="remove file" className={styles.thumbRemove}>
+                                    <Icon name="decline" style={{ width: 10, height: 10 }} />
+                                </button>
                             )}
-                        </Box>
+                        </div>
                     )}
                     {!isImage && pdfPreviewSrc && (
-                        <Box sx={{ width: 400, flexShrink: 0 }}>
+                        <div style={{ width: 400, maxWidth: '100%', flexShrink: 0 }}>
                             <FioriPdfViewer
                                 src={pdfPreviewSrc}
                                 title={selectedName || existingLabel}
                                 height={150}
                                 onClose={!isReadOnly ? () => onChange('') : undefined}
                             />
-                        </Box>
+                        </div>
                     )}
                     {!isImage && !pdfPreviewSrc && currentLabel && (
-                        <Stack
-                            direction="row"
-                            alignItems="center"
-                            spacing={1}
-                            sx={{ border: `1px solid ${FIORI.border}`, borderRadius: '0.375rem', px: 1.25, py: 0.5, minWidth: 200, maxWidth: 260 }}
-                        >
-                            <Typography variant="body2" noWrap sx={{ flex: 1, minWidth: 0, color: FIORI.textPrimary }}>
-                                {currentLabel}
-                            </Typography>
+                        <div className={styles.fileChip}>
+                            <span className={styles.fileChipLabel}>{currentLabel}</span>
                             {!isReadOnly && (
-                                <IconButton
-                                    size="small"
+                                <Button
+                                    design="Transparent"
+                                    icon="decline"
+                                    className={styles.negativeIcon}
                                     onClick={() => onChange('')}
-                                    sx={{ p: 0.25, color: FIORI.error }}
-                                    aria-label="remove file"
-                                >
-                                    <CloseIcon sx={{ fontSize: 16 }} />
-                                </IconButton>
+                                    accessibleName="remove file"
+                                />
                             )}
-                        </Stack>
+                        </div>
                     )}
                     <FioriUploadDropzoneTile
                         width={200}
@@ -5262,41 +4940,32 @@ const RenderAttributeInput = memo(function RenderAttributeInput({
                             });
                         }}
                     />
-                </Stack>
+                </div>
                 <FileUploadRowsList
                     rows={singleFileUploadRows}
                     percentLabel={(percent) => t('uploadPercentComplete', { percent })}
                     onRemoveRow={removeSingleFileUploadRow}
                 />
                 {isImage && previewSrc && (
-                    <Dialog open={lightboxOpen} onClose={() => setLightboxOpen(false)} maxWidth="md">
-                        <DialogContent sx={{ p: 0, lineHeight: 0 }}>
-                            <Box component="img" src={previewSrc} alt={label} sx={{ display: 'block', maxWidth: '90vw', maxHeight: '85vh' }} />
-                        </DialogContent>
+                    <Dialog open={lightboxOpen} onClose={() => setLightboxOpen(false)} style={{ padding: 0 }} className={styles.lightbox}>
+                        <img src={previewSrc} alt={label} style={{ display: 'block', maxWidth: '90vw', maxHeight: '85vh' }} />
                     </Dialog>
                 )}
-            </Box>
+            </div>
         );
     }
 
     return (
-        <Box>
-            <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 0.5 }}>
-                <Typography variant="caption" fontWeight={600} color="#334155">
-                    {label} {attr.is_required && <Box component="span" sx={{ color: 'error.main' }}>*</Box>}
-                </Typography>
-                {renderChips()}
-            </Stack>
-            <TextField
-                size="small"
-                fullWidth
+        <div>
+            {fieldHeader}
+            <Input
+                style={{ width: '100%' }}
                 disabled={isReadOnly}
                 value={stringValue}
-                onChange={(e) => onChange(e.target.value)}
+                onInput={(e) => onChange(e.target.value)}
                 placeholder={attr.code === 'pid' || attr.code === 'pname' ? sku : t('enterFieldPlaceholder', { label: label.toLowerCase() })}
-                autoComplete="off"
-                sx={fioriFieldStateSx('none')}
+                accessibleName={label}
             />
-        </Box>
+        </div>
     );
 });

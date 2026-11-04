@@ -1,7 +1,7 @@
 import { useLocale } from '@/hooks/use-locale';
-import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
-import { Box, ButtonBase, Menu, MenuItem, Typography, type BoxProps } from '@mui/material';
-import { useState } from 'react';
+import '@ui5/webcomponents-icons/dist/slim-arrow-down.js';
+import { Button, List, ListItemStandard, ResponsivePopover, type ListPropTypes } from '@ui5/webcomponents-react';
+import { useState, type CSSProperties } from 'react';
 import { useTranslation } from 'react-i18next';
 
 // Real flag artwork (circle-flags — already-circular SVGs) instead of flag
@@ -12,6 +12,7 @@ import { useTranslation } from 'react-i18next';
 // Statically importing just the ~20 flags this app actually offers (via
 // Vite's `?url`) keeps the bundle to a handful of small SVGs instead of
 // pulling in circle-flags' full 400+ flag set.
+import flagCn from 'circle-flags/flags/cn.svg?url';
 import flagDe from 'circle-flags/flags/de.svg?url';
 import flagDk from 'circle-flags/flags/dk.svg?url';
 import flagEs from 'circle-flags/flags/es.svg?url';
@@ -22,7 +23,6 @@ import flagIn from 'circle-flags/flags/in.svg?url';
 import flagIt from 'circle-flags/flags/it.svg?url';
 import flagJp from 'circle-flags/flags/jp.svg?url';
 import flagKr from 'circle-flags/flags/kr.svg?url';
-import flagCn from 'circle-flags/flags/cn.svg?url';
 import flagNl from 'circle-flags/flags/nl.svg?url';
 import flagNo from 'circle-flags/flags/no.svg?url';
 import flagPt from 'circle-flags/flags/pt.svg?url';
@@ -64,98 +64,105 @@ function flagUrl(localeCode: string): string | undefined {
     return FLAG_BY_LANGUAGE[language];
 }
 
-function FlagIcon({ localeCode, size = 26 }: { localeCode: string; size?: number }) {
+export function FlagIcon({ localeCode, size = 26, slot }: { localeCode: string; size?: number; slot?: string }) {
     const url = flagUrl(localeCode);
 
     return (
-        <Box
-            sx={{
+        <span
+            slot={slot}
+            style={{
                 width: size,
                 height: size,
                 borderRadius: '50%',
                 overflow: 'hidden',
-                display: 'flex',
+                display: 'inline-flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 fontSize: size * 0.7,
                 lineHeight: 1,
                 flexShrink: 0,
-                bgcolor: 'action.hover',
+                background: 'var(--sapNeutralBackgroundColor)',
                 boxShadow: '0 0 0 1px rgba(0,0,0,0.08)',
             }}
         >
             {url ? <img src={url} alt="" width={size} height={size} style={{ display: 'block' }} /> : '🌐'}
-        </Box>
+        </span>
     );
 }
 
-export default function LocaleDropdown(props: BoxProps) {
+interface LocaleMenuProps {
+    open: boolean;
+    opener: HTMLElement | null;
+    onClose: () => void;
+}
+
+/**
+ * The locale picker popover on its own — opened from the standalone
+ * LocaleDropdown button below, or from the ShellBar's globe item
+ * (app-sidebar-header.tsx), which supplies its own opener element.
+ */
+export function LocaleMenu({ open, opener, onClose }: LocaleMenuProps) {
     const { t } = useTranslation('common');
     const { locale, locales, setLocale } = useLocale();
-    const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
 
-    const select = (code: string) => {
-        setLocale(code);
-        setAnchorEl(null);
+    const onItemClick: ListPropTypes['onItemClick'] = (e) => {
+        const code = (e.detail.item as HTMLElement).dataset.code;
+        if (code) setLocale(code);
+        onClose();
     };
+
+    return (
+        <ResponsivePopover
+            open={open && !!opener}
+            opener={opener ?? undefined}
+            onClose={onClose}
+            placement="Bottom"
+            horizontalAlign="End"
+            accessibleName={t('language')}
+        >
+            <List selectionMode="Single" separators="Inner" onItemClick={onItemClick} style={{ minWidth: 220 }}>
+                {locales.map(({ code, display_name }) => (
+                    <ListItemStandard
+                        key={code}
+                        data-code={code}
+                        text={display_name ?? code}
+                        selected={code === locale}
+                        image={<FlagIcon localeCode={code} />}
+                    />
+                ))}
+            </List>
+        </ResponsivePopover>
+    );
+}
+
+/**
+ * Standalone locale switcher button (flag + language name) — used outside
+ * the app shell (login, storefront home, product page). Inside the shell the
+ * same popover hangs off the ShellBar instead.
+ */
+export default function LocaleDropdown({ style, className }: { style?: CSSProperties; className?: string }) {
+    const { t } = useTranslation('common');
+    const { locale, locales } = useLocale();
+    const [opener, setOpener] = useState<HTMLElement | null>(null);
 
     const current = locales.find((l) => l.code === locale);
 
     return (
-        <Box {...props}>
-            <ButtonBase
-                onClick={(e) => setAnchorEl(e.currentTarget)}
-                aria-label={t('language')}
-                sx={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 1,
-                    pl: 0.75,
-                    pr: 1.5,
-                    py: 0.5,
-                    borderRadius: 999,
-                    border: 1,
-                    borderColor: 'divider',
-                    bgcolor: 'background.paper',
-                    '&:hover': { bgcolor: 'action.hover' },
-                }}
+        <span style={{ display: 'inline-flex', ...style }} className={className}>
+            <Button
+                design="Transparent"
+                endIcon="slim-arrow-down"
+                accessibleName={t('language')}
+                tooltip={t('language')}
+                onClick={(e) => setOpener(opener ? null : (e.currentTarget as HTMLElement))}
+                style={{ borderRadius: 999, border: '1px solid var(--sapButton_BorderColor)' }}
             >
-                <FlagIcon localeCode={locale ?? 'en'} size={22} />
-                <Typography variant="body2" fontWeight={700} color="primary.main">
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', fontWeight: 700, color: 'var(--sapBrandColor)' }}>
+                    <FlagIcon localeCode={locale ?? 'en'} size={20} />
                     {current?.display_name ?? t('language')}
-                </Typography>
-                <KeyboardArrowDownIcon fontSize="small" sx={{ color: 'primary.main' }} />
-            </ButtonBase>
-            <Menu
-                anchorEl={anchorEl}
-                open={Boolean(anchorEl)}
-                onClose={() => setAnchorEl(null)}
-                anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
-                slotProps={{
-                    paper: { sx: { mt: 1, minWidth: 220, borderRadius: 2 } },
-                    list: { sx: { py: 0 } },
-                }}
-            >
-                {locales.map(({ code, display_name }, index) => (
-                    <MenuItem
-                        key={code}
-                        selected={code === locale}
-                        onClick={() => select(code)}
-                        sx={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: 1.5,
-                            py: 1.25,
-                            px: 2,
-                            borderBottom: index < locales.length - 1 ? 1 : 0,
-                            borderColor: 'divider',
-                        }}
-                    >
-                        <FlagIcon localeCode={code} />
-                        <Typography variant="body2">{display_name ?? code}</Typography>
-                    </MenuItem>
-                ))}
-            </Menu>
-        </Box>
+                </span>
+            </Button>
+            <LocaleMenu open={!!opener} opener={opener} onClose={() => setOpener(null)} />
+        </span>
     );
 }

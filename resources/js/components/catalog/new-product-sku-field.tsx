@@ -1,6 +1,6 @@
-import { FioriField, fioriFieldStateSx, type FioriValueState } from '@/components/fiori-form';
-import { CircularProgress, InputAdornment, TextField } from '@mui/material';
-import { useEffect, useState } from 'react';
+import { FioriField, ui5ValueState, type FioriValueState } from '@/components/fiori-form';
+import { BusyIndicator, Input, type InputDomRef } from '@ui5/webcomponents-react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 export type SkuAvailability = 'idle' | 'checking' | 'available' | 'taken' | 'invalid';
@@ -60,6 +60,16 @@ interface NewProductSkuFieldProps {
 
 export function NewProductSkuField({ value, onChange, status, serverError, autoFocus = true }: NewProductSkuFieldProps) {
     const { t } = useTranslation('catalog');
+    const inputRef = useRef<InputDomRef>(null);
+
+    // React's autoFocus only works on native form controls — focus the UI5
+    // Input manually. Delayed so it lands after a UI5 Dialog's own initial focus.
+    useEffect(() => {
+        if (!autoFocus) return;
+        const timer = window.setTimeout(() => inputRef.current?.focus(), 150);
+        return () => window.clearTimeout(timer);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     let state: FioriValueState = 'none';
     let message: string | undefined;
@@ -79,26 +89,18 @@ export function NewProductSkuField({ value, onChange, status, serverError, autoF
 
     return (
         <FioriField label={t('newSku')} htmlFor="new-product-sku" required valueState={state} message={message} labelWidth={90}>
-            <TextField
+            {/* message แสดงโดย FioriField ด้านล่างช่องแล้ว — ไม่ส่ง valueStateMessage ให้ Input ซ้ำ */}
+            <Input
                 id="new-product-sku"
-                fullWidth
-                size="small"
-                autoFocus={autoFocus}
+                style={{ width: '100%' }}
+                ref={inputRef}
                 value={value}
-                onChange={(e) => onChange(e.target.value)}
-                onBlur={(e) => onChange(e.target.value.trim())}
+                onInput={(e) => onChange(e.target.value)}
+                // UI5 change = blur/Enter (เหมือน onBlur เดิม) → ตัดช่องว่างหัวท้าย
+                onChange={(e) => onChange(e.target.value.trim())}
                 placeholder={t('skuPlaceholder')}
-                sx={fioriFieldStateSx(state)}
-                slotProps={{
-                    input: {
-                        endAdornment:
-                            status === 'checking' ? (
-                                <InputAdornment position="end">
-                                    <CircularProgress size={14} />
-                                </InputAdornment>
-                            ) : undefined,
-                    },
-                }}
+                valueState={ui5ValueState(state)}
+                icon={status === 'checking' ? <BusyIndicator active size="S" delay={0} /> : undefined}
             />
         </FioriField>
     );

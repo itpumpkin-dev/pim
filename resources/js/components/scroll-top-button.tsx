@@ -1,8 +1,9 @@
-import { Fab, Tooltip, Zoom } from '@mui/material';
-import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
+import '@ui5/webcomponents-icons/dist/navigation-up-arrow.js';
+import { Button } from '@ui5/webcomponents-react';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FIORI } from '@/lib/fiori-style';
+
+import styles from './scroll-top-button.module.css';
 
 /** Nearest ancestor that actually scrolls — the layout's <main> (AppContent), not window. */
 function findScrollParent(node: HTMLElement | null): HTMLElement | null {
@@ -45,26 +46,16 @@ export function ScrollTopButton({ threshold = 400 }: { threshold?: number }) {
     return (
         <>
             <span ref={anchorRef} hidden />
-            <Zoom in={visible}>
-                <Tooltip title={t('scrollToTop')} placement="left">
-                    <Fab
-                        size="medium"
-                        aria-label={t('scrollToTop')}
-                        onClick={scrollToTop}
-                        sx={{
-                            position: 'fixed',
-                            right: { xs: 16, md: 32 },
-                            bottom: { xs: 16, md: 32 },
-                            zIndex: (theme) => theme.zIndex.speedDial,
-                            bgcolor: FIORI.brand,
-                            color: '#fff',
-                            '&:hover': { bgcolor: FIORI.brandDark },
-                        }}
-                    >
-                        <KeyboardArrowUpIcon />
-                    </Fab>
-                </Tooltip>
-            </Zoom>
+            <Button
+                design="Emphasized"
+                icon="navigation-up-arrow"
+                tooltip={t('scrollToTop')}
+                accessibleName={t('scrollToTop')}
+                onClick={scrollToTop}
+                aria-hidden={!visible}
+                tabIndex={visible ? 0 : -1}
+                className={`${styles.button} ${visible ? styles.visible : ''}`}
+            />
         </>
     );
 }

@@ -1,14 +1,16 @@
+import {
+    MappingLoading,
+    MappingPager,
+    MappingPickerCell,
+    MappingSearchInput,
+    MappingSectionHeader,
+    mappingStyles,
+    MappingSyncButton,
+    MappingToolbar,
+} from '@/components/catalog/marketplace-mapping-ui';
 import { PimBrandPicker, type PimBrandOption } from '@/components/catalog/pim-brand-picker';
 import { FioriResponsiveTable, type FioriResponsiveColumn } from '@/components/fiori-responsive-table';
 import { xsrfToken } from '@/lib/csrf';
-import { FIORI, fioriDefaultSx, fioriSearchFieldSx } from '@/lib/fiori-style';
-import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
-import ChevronRightIcon from '@mui/icons-material/ChevronRight';
-import FirstPageIcon from '@mui/icons-material/FirstPage';
-import LastPageIcon from '@mui/icons-material/LastPage';
-import SearchIcon from '@mui/icons-material/Search';
-import SyncIcon from '@mui/icons-material/Sync';
-import { Box, Button, CircularProgress, IconButton, InputAdornment, MenuItem, Paper, Select, Stack, TextField, Typography } from '@mui/material';
 import { router } from '@inertiajs/react';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -41,7 +43,6 @@ export interface ShopeeBrandMappingPanelProps {
  */
 export function ShopeeBrandMappingPanel({ shopeeCategoryId, shopeeCategoryName }: ShopeeBrandMappingPanelProps) {
     const { t } = useTranslation('catalog');
-    const { t: tGrid } = useTranslation('grid');
 
     const [brands, setBrands] = useState<ShopeeBrandRow[] | null>(null);
     const [brandsMeta, setBrandsMeta] = useState<{ currentPage: number; lastPage: number; total: number } | null>(null);
@@ -211,18 +212,14 @@ export function ShopeeBrandMappingPanel({ shopeeCategoryId, shopeeCategoryName }
             priority: 'high',
             align: 'right',
             width: 120,
-            render: (brand) => (
-                <Typography variant="body2" sx={{ fontFamily: 'monospace', color: FIORI.textSecondary }}>
-                    {brand.id}
-                </Typography>
-            ),
+            render: (brand) => <span className={mappingStyles.mono}>{brand.id}</span>,
         },
         {
             key: 'name',
             header: t('nameColumn'),
             priority: 'always',
             minWidth: 200,
-            render: (brand) => <Typography fontWeight={600}>{brand.name}</Typography>,
+            render: (brand) => <span className={mappingStyles.primary}>{brand.name}</span>,
         },
         {
             key: 'mapping',
@@ -230,120 +227,55 @@ export function ShopeeBrandMappingPanel({ shopeeCategoryId, shopeeCategoryName }
             priority: 'high',
             minWidth: 260,
             render: (brand) => (
-                <Stack direction="row" alignItems="center" spacing={1}>
-                    <Box sx={{ flex: 1, minWidth: 200 }}>
-                        <PimBrandPicker
-                            value={brand.mapped}
-                            disabled={savingBrandId === brand.id}
-                            onChange={(val) => {
-                                if (val) {
-                                    assignBrand(brand.id, val);
-                                } else if (brand.mapped) {
-                                    clearBrand(brand.id, brand.mapped.id);
-                                }
-                            }}
-                            placeholder={t('searchPimBrandPlaceholder')}
-                        />
-                    </Box>
-                    {savingBrandId === brand.id && <CircularProgress size={14} />}
-                </Stack>
+                <MappingPickerCell saving={savingBrandId === brand.id}>
+                    <PimBrandPicker
+                        value={brand.mapped}
+                        disabled={savingBrandId === brand.id}
+                        onChange={(val) => {
+                            if (val) {
+                                assignBrand(brand.id, val);
+                            } else if (brand.mapped) {
+                                clearBrand(brand.id, brand.mapped.id);
+                            }
+                        }}
+                        placeholder={t('searchPimBrandPlaceholder')}
+                    />
+                </MappingPickerCell>
             ),
         },
     ];
 
     return (
-        <Stack spacing={2}>
-            <Stack direction="row" justifyContent="space-between" alignItems="center">
-                <Typography variant="subtitle2" fontWeight={700} sx={{ color: FIORI.textPrimary }}>
-                    {t('brandsForCategory', { name: shopeeCategoryName })}
-                </Typography>
-
-                <Stack direction="row" spacing={1.5} alignItems="center">
-                    {brandSyncMessage && (
-                        <Typography variant="caption" color="text.secondary">
-                            {brandSyncMessage}
-                        </Typography>
-                    )}
-                    <Button
-                        size="small"
-                        variant="outlined"
-                        disabled={brandSyncing}
-                        startIcon={brandSyncing ? <CircularProgress size={14} /> : <SyncIcon fontSize="small" />}
-                        onClick={triggerBrandSync}
-                        sx={fioriDefaultSx}
-                    >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <MappingSectionHeader
+                small
+                title={t('brandsForCategory', { name: shopeeCategoryName })}
+                message={brandSyncMessage}
+                actions={
+                    <MappingSyncButton busy={brandSyncing} onClick={triggerBrandSync}>
                         {brandSyncing ? t('syncingBrands') : t('syncBrandsForCategory')}
-                    </Button>
-                </Stack>
-            </Stack>
+                    </MappingSyncButton>
+                }
+            />
 
-            <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" alignItems="center" spacing={2}>
-                <TextField
-                    value={brandSearch}
-                    onChange={(event) => setBrandSearch(event.target.value)}
-                    placeholder={t('searchBrands')}
-                    size="small"
-                    sx={{ ...fioriSearchFieldSx, minWidth: 280 }}
-                    InputProps={{
-                        startAdornment: (
-                            <InputAdornment position="start">
-                                <SearchIcon sx={{ color: FIORI.textSecondary, fontSize: 20 }} />
-                            </InputAdornment>
-                        ),
-                    }}
+            <MappingToolbar compact>
+                <MappingSearchInput value={brandSearch} onChange={setBrandSearch} placeholder={t('searchBrands')} />
+                <MappingPager
+                    loading={loadingBrands}
+                    perPage={brandPerPage}
+                    onPerPageChange={handlePerPageChange}
+                    currentPage={brandsMeta?.currentPage ?? 1}
+                    lastPage={brandsMeta?.lastPage ?? 1}
+                    onGoToPage={goToPage}
                 />
-
-                <Stack direction="row" alignItems="center" spacing={1.5}>
-                    {loadingBrands && <CircularProgress size={18} />}
-
-                    <Select value={brandPerPage} onChange={(e) => handlePerPageChange(Number(e.target.value))} size="small" sx={{ minWidth: 60, height: 36 }}>
-                        <MenuItem value={10}>10</MenuItem>
-                        <MenuItem value={25}>25</MenuItem>
-                        <MenuItem value={50}>50</MenuItem>
-                        <MenuItem value={100}>100</MenuItem>
-                    </Select>
-                    <Typography variant="body2" color="text.secondary">
-                        {tGrid('perPage')}
-                    </Typography>
-
-                    <Paper variant="outlined" sx={{ px: 1.5, py: 0.5, display: 'flex', alignItems: 'center' }}>
-                        <Typography variant="body2">{brandsMeta?.currentPage ?? 1}</Typography>
-                    </Paper>
-                    <Typography variant="body2" color="text.secondary">
-                        {tGrid('pageOf', { lastPage: brandsMeta?.lastPage ?? 1 })}
-                    </Typography>
-
-                    <Stack direction="row" spacing={0.2}>
-                        <IconButton size="small" disabled={(brandsMeta?.currentPage ?? 1) <= 1} onClick={() => goToPage(1)}>
-                            <FirstPageIcon fontSize="small" />
-                        </IconButton>
-                        <IconButton size="small" disabled={(brandsMeta?.currentPage ?? 1) <= 1} onClick={() => goToPage((brandsMeta?.currentPage ?? 1) - 1)}>
-                            <ChevronLeftIcon fontSize="small" />
-                        </IconButton>
-                        <IconButton
-                            size="small"
-                            disabled={(brandsMeta?.currentPage ?? 1) >= (brandsMeta?.lastPage ?? 1)}
-                            onClick={() => goToPage((brandsMeta?.currentPage ?? 1) + 1)}
-                        >
-                            <ChevronRightIcon fontSize="small" />
-                        </IconButton>
-                        <IconButton
-                            size="small"
-                            disabled={(brandsMeta?.currentPage ?? 1) >= (brandsMeta?.lastPage ?? 1)}
-                            onClick={() => goToPage(brandsMeta?.lastPage ?? 1)}
-                        >
-                            <LastPageIcon fontSize="small" />
-                        </IconButton>
-                    </Stack>
-                </Stack>
-            </Stack>
+            </MappingToolbar>
 
             <FioriResponsiveTable
                 columns={brandColumns}
                 rows={brands ?? []}
-                getRowKey={(brand) => brand.id}
-                emptyMessage={loadingBrands ? <CircularProgress size={20} /> : t('noBrandsInCategory')}
+                getRowKey={(brand: ShopeeBrandRow) => brand.id}
+                emptyMessage={loadingBrands ? <MappingLoading /> : t('noBrandsInCategory')}
             />
-        </Stack>
+        </div>
     );
 }

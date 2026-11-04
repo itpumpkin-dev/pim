@@ -1,31 +1,25 @@
 import { HistoryPanel } from '@/components/history-panel';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
-import { Head, Link, router, useForm } from '@inertiajs/react';
-import ArrowBackIcon from '@mui/icons-material/ArrowBack';
-import UploadIcon from '@mui/icons-material/CloudUpload';
-import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
-import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
-import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
-import SaveIcon from '@mui/icons-material/Save';
+import { Head, router, useForm } from '@inertiajs/react';
+import '@ui5/webcomponents-icons/dist/delete.js';
+import '@ui5/webcomponents-icons/dist/navigation-down-arrow.js';
+import '@ui5/webcomponents-icons/dist/navigation-up-arrow.js';
+import '@ui5/webcomponents-icons/dist/upload.js';
 import {
-    Autocomplete,
-    Box,
     Button,
-    Checkbox,
-    CircularProgress,
-    FormControl,
-    FormControlLabel,
-    IconButton,
-    MenuItem,
-    Paper,
+    CheckBox,
+    ComboBox,
+    ComboBoxItem,
+    FileUploader,
+    Input,
+    Option,
     Select,
-    Stack,
     Tab,
-    Tabs,
-    TextField,
-    Typography,
-} from '@mui/material';
+    TabContainer,
+    Tag,
+    TextArea,
+} from '@ui5/webcomponents-react';
 import { FormEvent, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -34,10 +28,11 @@ import LocaleLabelFields from '@/components/catalog/locale-label-fields';
 import { ShopeeCategoryPicker, type ShopeeCategoryOption } from '@/components/catalog/shopee-category-picker';
 import { TikTokCategoryPicker, type TikTokCategoryOption } from '@/components/catalog/tiktok-category-picker';
 import { WooCommerceCategoryPicker, type WooCommerceCategoryOption } from '@/components/catalog/woocommerce-category-picker';
-import { FioriField, FioriFormErrorSummary, FioriFormGroup, fioriFieldStateSx, valueStateOf } from '@/components/fiori-form';
+import { FioriField, FioriFormGroup, ui5ValueState, valueStateOf } from '@/components/fiori-form';
 import { useUnsavedChangesGuard } from '@/hooks/use-unsaved-changes-guard';
-import { FIORI, fioriDefaultSx, fioriEmphasizedSx, fioriTabsSx } from '@/lib/fiori-style';
-import { type CodeEditState, codeHintKey, normalizeCodeInput } from '@/lib/code-field';
+import { codeHintKey, normalizeCodeInput, type CodeEditState } from '@/lib/code-field';
+
+import { MasterFormPage, masterStyles } from '../master-crud';
 
 interface GroupData {
     id: number;
@@ -85,6 +80,8 @@ export default function ProductGroupEdit({
     const { t } = useTranslation('catalog');
     const { t: tNav } = useTranslation('nav');
     const [tabIndex, setTabIndex] = useState(0);
+    // bumps after each "add family" pick so the ComboBox remounts empty (it was a value={null} Autocomplete)
+    const [familyPickerKey, setFamilyPickerKey] = useState(0);
 
     const [lazadaCategory, setLazadaCategory] = useState<LazadaCategoryOption | null>(group.lazada_category);
     const [shopeeCategory, setShopeeCategory] = useState<ShopeeCategoryOption | null>(group.shopee_category);
@@ -127,10 +124,7 @@ export default function ProductGroupEdit({
         () => data.family_ids.map((id) => availableFamilies.find((f) => f.id === id)).filter((f): f is (typeof availableFamilies)[number] => !!f),
         [data.family_ids, availableFamilies],
     );
-    const unboundFamilies = useMemo(
-        () => availableFamilies.filter((f) => !data.family_ids.includes(f.id)),
-        [availableFamilies, data.family_ids],
-    );
+    const unboundFamilies = useMemo(() => availableFamilies.filter((f) => !data.family_ids.includes(f.id)), [availableFamilies, data.family_ids]);
 
     const addFamily = (familyId: number) => {
         setData('family_ids', [...data.family_ids, familyId]);
@@ -163,354 +157,294 @@ export default function ProductGroupEdit({
         });
     };
 
+    const tabs = canViewHistory ? (
+        <TabContainer collapsed style={{ marginBottom: '1.5rem' }} onTabSelect={(e) => setTabIndex(e.detail.tabIndex)}>
+            <Tab text="General" selected={tabIndex === 0} />
+            <Tab text="History" selected={tabIndex === 1} />
+        </TabContainer>
+    ) : null;
+
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={`${t('editProductGroup')}: ${group.code}`} />
-            <Box component="form" onSubmit={submit} sx={{ p: { xs: 2, md: 4 }, width: '100%', maxWidth: 760, bgcolor: FIORI.pageBg }}>
-                {canViewHistory && (
-                    <Tabs value={tabIndex} onChange={(_, v) => setTabIndex(v)} sx={{ ...fioriTabsSx, mb: 3 }}>
-                        <Tab label="General" />
-                        <Tab label="History" />
-                    </Tabs>
-                )}
+            {tabIndex === 1 && canViewHistory && (
+                <div className={masterStyles.formPage}>
+                    {tabs}
+                    <HistoryPanel historyUrl={`/catalog/product-groups/${group.id}/history`} />
+                </div>
+            )}
 
-                {tabIndex === 1 && canViewHistory && <HistoryPanel historyUrl={`/catalog/product-groups/${group.id}/history`} />}
+            {tabIndex === 0 && (
+                <MasterFormPage
+                    before={tabs}
+                    title={t('editProductGroup')}
+                    backHref="/catalog/product-groups"
+                    processing={processing}
+                    onSubmit={submit}
+                    errors={errors}
+                >
+                    <LocaleLabelFields
+                        title={t('productGroupName')}
+                        description={t('nameHelperText')}
+                        values={data.translations}
+                        onChange={(localeId, value) => setData('translations', { ...data.translations, [localeId]: value })}
+                    />
 
-                {tabIndex === 0 && (
-                    <>
-                        <Stack
-                            direction={{ xs: 'column', sm: 'row' }}
-                            justifyContent="space-between"
-                            alignItems={{ sm: 'center' }}
-                            spacing={2}
-                            sx={{ mb: 3 }}
+                    <FioriFormGroup title={t('generalTitle')}>
+                        <FioriField
+                            label={t('code')}
+                            htmlFor="pg-code"
+                            hint={t(codeHintKey({ canEditCode, codeLocked }))}
+                            valueState={valueStateOf(errors.code)}
+                            message={errors.code}
                         >
-                            <Typography variant="h5" fontWeight={600} sx={{ color: FIORI.textPrimary }}>
-                                {t('editProductGroup')}
-                            </Typography>
-                            <Stack direction="row" spacing={1}>
-                                <Button
-                                    component={Link}
-                                    href="/catalog/product-groups"
-                                    variant="outlined"
-                                    startIcon={<ArrowBackIcon />}
-                                    sx={fioriDefaultSx}
-                                >
-                                    {t('back')}
-                                </Button>
-                                <Button
-                                    type="submit"
-                                    variant="contained"
-                                    disabled={processing}
-                                    startIcon={processing ? <CircularProgress size={16} color="inherit" /> : <SaveIcon />}
-                                    sx={fioriEmphasizedSx}
-                                >
-                                    {processing ? t('saving') : t('save')}
-                                </Button>
-                            </Stack>
-                        </Stack>
-
-                        <Stack spacing={2}>
-                            <LocaleLabelFields
-                                title={t('productGroupName')}
-                                description={t('nameHelperText')}
-                                values={data.translations}
-                                onChange={(localeId, value) => setData('translations', { ...data.translations, [localeId]: value })}
+                            <Input
+                                id="pg-code"
+                                value={data.code}
+                                disabled={!canEditCode}
+                                maxlength={100}
+                                valueState={ui5ValueState(valueStateOf(errors.code))}
+                                onInput={(e) => setData('code', normalizeCodeInput(e.target.value))}
                             />
+                        </FioriField>
 
-                            <FioriFormGroup title={t('generalTitle')}>
-                                <FioriField label={t('code')} htmlFor="pg-code" hint={t(codeHintKey({ canEditCode, codeLocked }))} valueState={valueStateOf(errors.code)} message={errors.code}>
-                                    <TextField
-                                        id="pg-code"
-                                        fullWidth
-                                        size="small"
-                                        value={data.code}
-                                        disabled={!canEditCode}
-                                        onChange={(e) => setData('code', normalizeCodeInput(e.target.value))}
-                                        inputProps={{ maxLength: 100 }}
-                                        sx={fioriFieldStateSx(valueStateOf(errors.code))}
-                                    />
-                                </FioriField>
+                        <FioriField label={t('category')} valueState={valueStateOf(errors.category_id)} message={errors.category_id}>
+                            <Select
+                                id="pg-category"
+                                value={data.category_id === '' ? '' : String(data.category_id)}
+                                valueState={ui5ValueState(valueStateOf(errors.category_id))}
+                                onChange={(e) => {
+                                    const value = e.detail.selectedOption.value ?? '';
+                                    const next = value === '' ? '' : Number(value);
+                                    setData((prev) => ({ ...prev, category_id: next, subcategory_id: '' }));
+                                }}
+                            >
+                                <Option value="">{t('selectCategory')}</Option>
+                                {categories.map((c) => (
+                                    <Option key={c.id} value={String(c.id)}>
+                                        {c.name}
+                                    </Option>
+                                ))}
+                            </Select>
+                        </FioriField>
 
-                                <FioriField label={t('category')} valueState={valueStateOf(errors.category_id)} message={errors.category_id}>
-                                    <FormControl fullWidth size="small" sx={fioriFieldStateSx(valueStateOf(errors.category_id))}>
-                                        <Select
-                                            id="pg-category"
-                                            displayEmpty
-                                            value={data.category_id === '' ? '' : String(data.category_id)}
-                                            onChange={(e) => {
-                                                const next = e.target.value === '' ? '' : Number(e.target.value);
-                                                setData((prev) => ({ ...prev, category_id: next, subcategory_id: '' }));
-                                            }}
-                                        >
-                                            <MenuItem value="">{t('selectCategory')}</MenuItem>
-                                            {categories.map((c) => (
-                                                <MenuItem key={c.id} value={String(c.id)}>
-                                                    {c.name}
-                                                </MenuItem>
-                                            ))}
-                                        </Select>
-                                    </FormControl>
-                                </FioriField>
+                        <FioriField label={t('subcategory')} valueState={valueStateOf(errors.subcategory_id)} message={errors.subcategory_id}>
+                            <Select
+                                id="pg-subcategory"
+                                disabled={data.category_id === ''}
+                                value={data.subcategory_id === '' ? '' : String(data.subcategory_id)}
+                                valueState={ui5ValueState(valueStateOf(errors.subcategory_id))}
+                                onChange={(e) => {
+                                    const value = e.detail.selectedOption.value ?? '';
+                                    setData('subcategory_id', value === '' ? '' : Number(value));
+                                }}
+                            >
+                                <Option value="">{data.category_id === '' ? t('selectCategoryFirst') : t('selectSubcategory')}</Option>
+                                {subcategoryOptions.map((s) => (
+                                    <Option key={s.id} value={String(s.id)}>
+                                        {s.name}
+                                    </Option>
+                                ))}
+                            </Select>
+                        </FioriField>
 
-                                <FioriField label={t('subcategory')} valueState={valueStateOf(errors.subcategory_id)} message={errors.subcategory_id}>
-                                    <FormControl fullWidth size="small" sx={fioriFieldStateSx(valueStateOf(errors.subcategory_id))}>
-                                        <Select
-                                            id="pg-subcategory"
-                                            displayEmpty
-                                            disabled={data.category_id === ''}
-                                            value={data.subcategory_id === '' ? '' : String(data.subcategory_id)}
-                                            onChange={(e) => setData('subcategory_id', e.target.value === '' ? '' : Number(e.target.value))}
-                                        >
-                                            <MenuItem value="">
-                                                {data.category_id === '' ? t('selectCategoryFirst') : t('selectSubcategory')}
-                                            </MenuItem>
-                                            {subcategoryOptions.map((s) => (
-                                                <MenuItem key={s.id} value={String(s.id)}>
-                                                    {s.name}
-                                                </MenuItem>
-                                            ))}
-                                        </Select>
-                                    </FormControl>
-                                </FioriField>
+                        <FioriField
+                            label={t('businessTypeName')}
+                            valueState={valueStateOf(errors.business_type_id)}
+                            message={errors.business_type_id}
+                        >
+                            <Select
+                                id="pg-business-type"
+                                value={data.business_type_id === '' ? '' : String(data.business_type_id)}
+                                valueState={ui5ValueState(valueStateOf(errors.business_type_id))}
+                                onChange={(e) => {
+                                    const value = e.detail.selectedOption.value ?? '';
+                                    setData('business_type_id', value === '' ? '' : Number(value));
+                                }}
+                            >
+                                <Option value="">{t('selectBusinessType')}</Option>
+                                {businessTypes.map((b) => (
+                                    <Option key={b.id} value={String(b.id)}>
+                                        {b.name}
+                                    </Option>
+                                ))}
+                            </Select>
+                        </FioriField>
 
-                                <FioriField
-                                    label={t('businessTypeName')}
-                                    valueState={valueStateOf(errors.business_type_id)}
-                                    message={errors.business_type_id}
+                        <FioriField
+                            label={t('description')}
+                            htmlFor="pg-description"
+                            valueState={valueStateOf(errors.description)}
+                            message={errors.description}
+                            fullWidth
+                        >
+                            <TextArea
+                                id="pg-description"
+                                rows={4}
+                                value={data.description}
+                                valueState={ui5ValueState(valueStateOf(errors.description))}
+                                onInput={(e) => setData('description', e.target.value)}
+                            />
+                        </FioriField>
+
+                        <FioriField label={t('thumbnail')} valueState={valueStateOf(errors.thumbnail)} message={errors.thumbnail}>
+                            <div className={masterStyles.inlineRow}>
+                                <FileUploader hideInput accept="image/*" onChange={(e) => setData('thumbnail', e.detail.files?.[0] ?? null)}>
+                                    <Button icon="upload">{t('chooseFile')}</Button>
+                                </FileUploader>
+                                {data.thumbnail ? (
+                                    <span className={masterStyles.muted}>{data.thumbnail.name}</span>
+                                ) : thumbnailUrl ? (
+                                    <img src={thumbnailUrl} alt="" className={masterStyles.thumb} />
+                                ) : null}
+                            </div>
+                        </FioriField>
+
+                        <FioriField label="">
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                                <CheckBox
+                                    text={t('aiTranslate')}
+                                    checked={data.is_ai_translate}
+                                    onChange={(e) => setData('is_ai_translate', e.target.checked)}
+                                />
+                                <CheckBox text={t('active')} checked={data.is_active} onChange={(e) => setData('is_active', e.target.checked)} />
+                            </div>
+                        </FioriField>
+                    </FioriFormGroup>
+
+                    <FioriFormGroup title={t('attributeFamily')} description={t('boundAttributeFamiliesHelperText')}>
+                        <FioriField label="" valueState={valueStateOf(errors.family_ids)} message={errors.family_ids} fullWidth>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                                <ComboBox
+                                    key={familyPickerKey}
+                                    style={{ width: '100%' }}
+                                    placeholder={t('addAttributeFamilyPlaceholder')}
+                                    onSelectionChange={(e) => {
+                                        const id = e.detail.item?.value;
+                                        if (!id) return;
+                                        addFamily(Number(id));
+                                        setFamilyPickerKey((k) => k + 1);
+                                    }}
                                 >
-                                    <FormControl fullWidth size="small" sx={fioriFieldStateSx(valueStateOf(errors.business_type_id))}>
-                                        <Select
-                                            id="pg-business-type"
-                                            displayEmpty
-                                            value={data.business_type_id === '' ? '' : String(data.business_type_id)}
-                                            onChange={(e) => setData('business_type_id', e.target.value === '' ? '' : Number(e.target.value))}
-                                        >
-                                            <MenuItem value="">{t('selectBusinessType')}</MenuItem>
-                                            {businessTypes.map((b) => (
-                                                <MenuItem key={b.id} value={String(b.id)}>
-                                                    {b.name}
-                                                </MenuItem>
-                                            ))}
-                                        </Select>
-                                    </FormControl>
-                                </FioriField>
+                                    {unboundFamilies.map((f) => (
+                                        <ComboBoxItem key={f.id} value={String(f.id)} text={f.name} />
+                                    ))}
+                                </ComboBox>
 
-                                <FioriField
-                                    label={t('description')}
-                                    htmlFor="pg-description"
-                                    valueState={valueStateOf(errors.description)}
-                                    message={errors.description}
-                                    fullWidth
-                                >
-                                    <TextField
-                                        id="pg-description"
-                                        fullWidth
-                                        size="small"
-                                        multiline
-                                        rows={4}
-                                        value={data.description}
-                                        onChange={(e) => setData('description', e.target.value)}
-                                        sx={fioriFieldStateSx(valueStateOf(errors.description))}
-                                    />
-                                </FioriField>
-
-                                <FioriField label={t('thumbnail')} valueState={valueStateOf(errors.thumbnail)} message={errors.thumbnail}>
-                                    <Stack direction="row" spacing={1.5} alignItems="center">
-                                        <Button component="label" variant="outlined" startIcon={<UploadIcon />} sx={fioriDefaultSx}>
-                                            {t('chooseFile')}
-                                            <input
-                                                type="file"
-                                                hidden
-                                                accept="image/*"
-                                                onChange={(e) => setData('thumbnail', e.target.files?.[0] ?? null)}
-                                            />
-                                        </Button>
-                                        {data.thumbnail ? (
-                                            <Typography variant="body2" color="text.secondary">
-                                                {data.thumbnail.name}
-                                            </Typography>
-                                        ) : thumbnailUrl ? (
-                                            <Box
-                                                component="img"
-                                                src={thumbnailUrl}
-                                                alt=""
-                                                sx={{ height: 40, width: 40, objectFit: 'cover', borderRadius: 1 }}
-                                            />
-                                        ) : null}
-                                    </Stack>
-                                </FioriField>
-
-                                <FioriField label="">
-                                    <Stack>
-                                        <FormControlLabel
-                                            control={
-                                                <Checkbox
-                                                    checked={data.is_ai_translate}
-                                                    onChange={(e) => setData('is_ai_translate', e.target.checked)}
+                                {boundFamilies.length === 0 ? (
+                                    <span style={{ color: 'var(--sapContent_LabelColor)', fontStyle: 'italic' }}>
+                                        {t('noAttributeFamiliesBound')}
+                                    </span>
+                                ) : (
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                                        {boundFamilies.map((family, index) => (
+                                            <div
+                                                key={family.id}
+                                                style={{
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    gap: '0.5rem',
+                                                    padding: '0.25rem 0.5rem 0.25rem 0.75rem',
+                                                    border: '1px solid var(--sapGroup_ContentBorderColor)',
+                                                    borderRadius: 'var(--sapElement_BorderCornerRadius)',
+                                                }}
+                                            >
+                                                <span style={{ flex: 1, fontWeight: 600 }}>{family.name}</span>
+                                                {index === 0 && <Tag design="Information">{t('defaultFamilyBadge')}</Tag>}
+                                                <Button
+                                                    design="Transparent"
+                                                    icon="navigation-up-arrow"
+                                                    disabled={index === 0}
+                                                    tooltip={t('moveFamilyUp')}
+                                                    accessibleName={t('moveFamilyUp')}
+                                                    onClick={() => moveFamily(index, -1)}
                                                 />
-                                            }
-                                            label={t('aiTranslate')}
-                                        />
-                                        <FormControlLabel
-                                            control={<Checkbox checked={data.is_active} onChange={(e) => setData('is_active', e.target.checked)} />}
-                                            label={t('active')}
-                                        />
-                                    </Stack>
-                                </FioriField>
-                            </FioriFormGroup>
+                                                <Button
+                                                    design="Transparent"
+                                                    icon="navigation-down-arrow"
+                                                    disabled={index === boundFamilies.length - 1}
+                                                    tooltip={t('moveFamilyDown')}
+                                                    accessibleName={t('moveFamilyDown')}
+                                                    onClick={() => moveFamily(index, 1)}
+                                                />
+                                                <Button
+                                                    design="Transparent"
+                                                    icon="delete"
+                                                    tooltip={t('removeFamily')}
+                                                    accessibleName={t('removeFamily')}
+                                                    onClick={() => removeFamily(family.id)}
+                                                />
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        </FioriField>
+                    </FioriFormGroup>
 
-                            <FioriFormGroup title={t('attributeFamily')} description={t('boundAttributeFamiliesHelperText')}>
-                                <FioriField label="" valueState={valueStateOf(errors.family_ids)} message={errors.family_ids} fullWidth>
-                                    <Stack spacing={1.5}>
-                                        <Autocomplete
-                                            size="small"
-                                            options={unboundFamilies}
-                                            getOptionLabel={(f) => f.name}
-                                            value={null}
-                                            onChange={(_, next) => next && addFamily(next.id)}
-                                            renderInput={(params) => <TextField {...params} placeholder={t('addAttributeFamilyPlaceholder')} />}
-                                        />
+                    <FioriFormGroup title={t('marketplaceCategoryTitle')} description={t('marketplaceCategoryHelperText')}>
+                        <FioriField
+                            label={t('lazadaCategoryLabel')}
+                            valueState={valueStateOf(errors.lazada_category_id)}
+                            message={errors.lazada_category_id}
+                        >
+                            <LazadaCategoryPicker
+                                value={lazadaCategory}
+                                onChange={(next) => {
+                                    setLazadaCategory(next);
+                                    setData('lazada_category_id', next?.id ?? null);
+                                }}
+                                placeholder={t('lazadaCategoryPlaceholder')}
+                            />
+                        </FioriField>
 
-                                        {boundFamilies.length === 0 ? (
-                                            <Typography variant="body2" sx={{ color: FIORI.textSecondary, fontStyle: 'italic' }}>
-                                                {t('noAttributeFamiliesBound')}
-                                            </Typography>
-                                        ) : (
-                                            <Stack spacing={1}>
-                                                {boundFamilies.map((family, index) => (
-                                                    <Paper
-                                                        key={family.id}
-                                                        variant="outlined"
-                                                        sx={{
-                                                            display: 'flex',
-                                                            alignItems: 'center',
-                                                            px: 1.5,
-                                                            py: 1,
-                                                            gap: 1,
-                                                            borderColor: FIORI.border,
-                                                        }}
-                                                    >
-                                                        <Typography variant="body2" fontWeight={600} sx={{ flex: 1 }}>
-                                                            {family.name}
-                                                        </Typography>
-                                                        {index === 0 && (
-                                                            <Typography
-                                                                variant="caption"
-                                                                sx={{
-                                                                    color: FIORI.brand,
-                                                                    fontWeight: 600,
-                                                                    border: `1px solid ${FIORI.brand}`,
-                                                                    borderRadius: '4px',
-                                                                    px: 0.75,
-                                                                    py: 0.125,
-                                                                }}
-                                                            >
-                                                                {t('defaultFamilyBadge')}
-                                                            </Typography>
-                                                        )}
-                                                        <IconButton
-                                                            size="small"
-                                                            disabled={index === 0}
-                                                            title={t('moveFamilyUp')}
-                                                            onClick={() => moveFamily(index, -1)}
-                                                        >
-                                                            <KeyboardArrowUpIcon fontSize="small" />
-                                                        </IconButton>
-                                                        <IconButton
-                                                            size="small"
-                                                            disabled={index === boundFamilies.length - 1}
-                                                            title={t('moveFamilyDown')}
-                                                            onClick={() => moveFamily(index, 1)}
-                                                        >
-                                                            <KeyboardArrowDownIcon fontSize="small" />
-                                                        </IconButton>
-                                                        <IconButton
-                                                            size="small"
-                                                            title={t('removeFamily')}
-                                                            onClick={() => removeFamily(family.id)}
-                                                        >
-                                                            <DeleteOutlineIcon fontSize="small" />
-                                                        </IconButton>
-                                                    </Paper>
-                                                ))}
-                                            </Stack>
-                                        )}
-                                    </Stack>
-                                </FioriField>
-                            </FioriFormGroup>
+                        <FioriField
+                            label={t('shopeeCategoryLabel')}
+                            valueState={valueStateOf(errors.shopee_category_id)}
+                            message={errors.shopee_category_id}
+                        >
+                            <ShopeeCategoryPicker
+                                value={shopeeCategory}
+                                onChange={(next) => {
+                                    setShopeeCategory(next);
+                                    setData('shopee_category_id', next?.id ?? null);
+                                }}
+                                placeholder={t('shopeeCategoryPlaceholder')}
+                            />
+                        </FioriField>
 
-                            <FioriFormGroup title={t('marketplaceCategoryTitle')} description={t('marketplaceCategoryHelperText')}>
-                                <FioriField
-                                    label={t('lazadaCategoryLabel')}
-                                    valueState={valueStateOf(errors.lazada_category_id)}
-                                    message={errors.lazada_category_id}
-                                >
-                                    <LazadaCategoryPicker
-                                        value={lazadaCategory}
-                                        onChange={(next) => {
-                                            setLazadaCategory(next);
-                                            setData('lazada_category_id', next?.id ?? null);
-                                        }}
-                                        placeholder={t('lazadaCategoryPlaceholder')}
-                                        sx={fioriFieldStateSx('none')}
-                                    />
-                                </FioriField>
+                        <FioriField
+                            label={t('tiktokCategoryLabel')}
+                            valueState={valueStateOf(errors.tiktok_category_id)}
+                            message={errors.tiktok_category_id}
+                        >
+                            <TikTokCategoryPicker
+                                value={tiktokCategory}
+                                onChange={(next) => {
+                                    setTiktokCategory(next);
+                                    setData('tiktok_category_id', next?.id ?? null);
+                                }}
+                                placeholder={t('tiktokCategoryPlaceholder')}
+                            />
+                        </FioriField>
 
-                                <FioriField
-                                    label={t('shopeeCategoryLabel')}
-                                    valueState={valueStateOf(errors.shopee_category_id)}
-                                    message={errors.shopee_category_id}
-                                >
-                                    <ShopeeCategoryPicker
-                                        value={shopeeCategory}
-                                        onChange={(next) => {
-                                            setShopeeCategory(next);
-                                            setData('shopee_category_id', next?.id ?? null);
-                                        }}
-                                        placeholder={t('shopeeCategoryPlaceholder')}
-                                        sx={fioriFieldStateSx('none')}
-                                    />
-                                </FioriField>
-
-                                <FioriField
-                                    label={t('tiktokCategoryLabel')}
-                                    valueState={valueStateOf(errors.tiktok_category_id)}
-                                    message={errors.tiktok_category_id}
-                                >
-                                    <TikTokCategoryPicker
-                                        value={tiktokCategory}
-                                        onChange={(next) => {
-                                            setTiktokCategory(next);
-                                            setData('tiktok_category_id', next?.id ?? null);
-                                        }}
-                                        placeholder={t('tiktokCategoryPlaceholder')}
-                                        sx={fioriFieldStateSx('none')}
-                                    />
-                                </FioriField>
-
-                                <FioriField
-                                    label={t('woocommerceCategoryLabel')}
-                                    valueState={valueStateOf(errors.woocommerce_category_id)}
-                                    message={errors.woocommerce_category_id}
-                                >
-                                    <WooCommerceCategoryPicker
-                                        value={woocommerceCategory}
-                                        onChange={(next) => {
-                                            setWoocommerceCategory(next);
-                                            setData('woocommerce_category_id', next?.id ?? null);
-                                        }}
-                                        placeholder={t('woocommerceCategoryPlaceholder')}
-                                        sx={fioriFieldStateSx('none')}
-                                    />
-                                </FioriField>
-                            </FioriFormGroup>
-                        </Stack>
-
-                        <FioriFormErrorSummary errors={errors} message={t('correctHighlightedFields')} sx={{ mt: 2, maxWidth: 760 }} />
-                    </>
-                )}
-            </Box>
+                        <FioriField
+                            label={t('woocommerceCategoryLabel')}
+                            valueState={valueStateOf(errors.woocommerce_category_id)}
+                            message={errors.woocommerce_category_id}
+                        >
+                            <WooCommerceCategoryPicker
+                                value={woocommerceCategory}
+                                onChange={(next) => {
+                                    setWoocommerceCategory(next);
+                                    setData('woocommerce_category_id', next?.id ?? null);
+                                }}
+                                placeholder={t('woocommerceCategoryPlaceholder')}
+                            />
+                        </FioriField>
+                    </FioriFormGroup>
+                </MasterFormPage>
+            )}
         </AppLayout>
     );
 }

@@ -1,29 +1,18 @@
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
-import { Head, Link, router, useForm } from '@inertiajs/react';
-import ArrowBackIcon from '@mui/icons-material/ArrowBack';
-import UploadIcon from '@mui/icons-material/CloudUpload';
-import SaveIcon from '@mui/icons-material/Save';
-import {
-    Box,
-    Button,
-    Checkbox,
-    CircularProgress,
-    FormControl,
-    FormControlLabel,
-    MenuItem,
-    Select,
-    Stack,
-    TextField,
-    Typography,
-} from '@mui/material';
+import { Head, router, useForm } from '@inertiajs/react';
+import '@ui5/webcomponents-icons/dist/nav-back.js';
+import '@ui5/webcomponents-icons/dist/save.js';
+import { Button, CheckBox, Input, Option, Select, TextArea, Title } from '@ui5/webcomponents-react';
 import { FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import LocaleLabelFields from '@/components/catalog/locale-label-fields';
-import { FioriField, FioriFormErrorSummary, FioriFormGroup, fioriFieldStateSx, valueStateOf } from '@/components/fiori-form';
+import { FioriFileUploader } from '@/components/fiori-file-uploader';
+import { FioriField, FioriFormErrorSummary, FioriFormGroup, ui5ValueState, valueStateOf } from '@/components/fiori-form';
 import { useUnsavedChangesGuard } from '@/hooks/use-unsaved-changes-guard';
-import { FIORI, fioriDefaultSx, fioriEmphasizedSx } from '@/lib/fiori-style';
+
+import styles from '../categories/category-pages.module.css';
 
 interface Props {
     categories: { id: number; name: string }[];
@@ -51,8 +40,8 @@ export default function SubcategoryCreate({ categories = [], defaultCategoryId =
     });
     const skipNavigationGuardRef = useUnsavedChangesGuard(isDirty);
 
-    const submit = (event: FormEvent) => {
-        event.preventDefault();
+    const submit = (event?: FormEvent) => {
+        event?.preventDefault();
         skipNavigationGuardRef.current = true;
         post('/catalog/subcategories', {
             onSuccess: () => router.visit('/catalog/subcategories', { replace: true }),
@@ -65,28 +54,22 @@ export default function SubcategoryCreate({ categories = [], defaultCategoryId =
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={t('createSubcategory')} />
-            <Box component="form" onSubmit={submit} sx={{ p: { xs: 2, md: 4 }, width: '100%', maxWidth: 760, bgcolor: FIORI.pageBg }}>
-                <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ sm: 'center' }} spacing={2} sx={{ mb: 3 }}>
-                    <Typography variant="h5" fontWeight={600} sx={{ color: FIORI.textPrimary }}>
+            <form onSubmit={submit} className={styles.formPage}>
+                <div className={styles.formHeader}>
+                    <Title level="H3" wrappingType="Normal">
                         {t('createSubcategory')}
-                    </Typography>
-                    <Stack direction="row" spacing={1}>
-                        <Button component={Link} href="/catalog/subcategories" variant="outlined" startIcon={<ArrowBackIcon />} sx={fioriDefaultSx}>
+                    </Title>
+                    <div className={styles.actions}>
+                        <Button icon="nav-back" onClick={() => router.visit('/catalog/subcategories')}>
                             {t('back')}
                         </Button>
-                        <Button
-                            type="submit"
-                            variant="contained"
-                            disabled={processing}
-                            startIcon={processing ? <CircularProgress size={16} color="inherit" /> : <SaveIcon />}
-                            sx={fioriEmphasizedSx}
-                        >
+                        <Button design="Emphasized" icon="save" disabled={processing} loading={processing} onClick={() => submit()}>
                             {processing ? t('saving') : t('save')}
                         </Button>
-                    </Stack>
-                </Stack>
+                    </div>
+                </div>
 
-                <Stack spacing={2}>
+                <div className={styles.formStack}>
                     <LocaleLabelFields
                         title={t('subcategoryName')}
                         description={t('nameHelperText')}
@@ -102,32 +85,38 @@ export default function SubcategoryCreate({ categories = [], defaultCategoryId =
                             message={errors.code}
                             hint={t('categoryCodeHelperText')}
                         >
-                            <TextField
+                            <Input
                                 id="sub-code"
-                                fullWidth
-                                size="small"
+                                className={styles.fullWidth}
                                 value={data.code}
-                                onChange={(e) => setData('code', e.target.value)}
-                                sx={fioriFieldStateSx(valueStateOf(errors.code))}
+                                valueState={ui5ValueState(valueStateOf(errors.code))}
+                                onInput={(e) => setData('code', e.target.value)}
                             />
                         </FioriField>
 
-                        <FioriField label={t('category')} valueState={valueStateOf(errors.category_id)} message={errors.category_id}>
-                            <FormControl fullWidth size="small" sx={fioriFieldStateSx(valueStateOf(errors.category_id))}>
-                                <Select
-                                    id="sub-category"
-                                    displayEmpty
-                                    value={data.category_id === '' ? '' : String(data.category_id)}
-                                    onChange={(e) => setData('category_id', e.target.value === '' ? '' : Number(e.target.value))}
-                                >
-                                    <MenuItem value="">{t('selectCategory')}</MenuItem>
-                                    {categories.map((c) => (
-                                        <MenuItem key={c.id} value={String(c.id)}>
-                                            {c.name}
-                                        </MenuItem>
-                                    ))}
-                                </Select>
-                            </FormControl>
+                        <FioriField
+                            label={t('category')}
+                            htmlFor="sub-category"
+                            valueState={valueStateOf(errors.category_id)}
+                            message={errors.category_id}
+                        >
+                            <Select
+                                id="sub-category"
+                                className={styles.fullWidth}
+                                value={data.category_id === '' ? '' : String(data.category_id)}
+                                valueState={ui5ValueState(valueStateOf(errors.category_id))}
+                                onChange={(e) => {
+                                    const v = e.detail.selectedOption.value ?? '';
+                                    setData('category_id', v === '' ? '' : Number(v));
+                                }}
+                            >
+                                <Option value="">{t('selectCategory')}</Option>
+                                {categories.map((c) => (
+                                    <Option key={c.id} value={String(c.id)}>
+                                        {c.name}
+                                    </Option>
+                                ))}
+                            </Select>
                         </FioriField>
 
                         <FioriField
@@ -137,49 +126,40 @@ export default function SubcategoryCreate({ categories = [], defaultCategoryId =
                             message={errors.description}
                             fullWidth
                         >
-                            <TextField
+                            <TextArea
                                 id="sub-description"
-                                fullWidth
-                                size="small"
-                                multiline
+                                className={styles.fullWidth}
                                 rows={4}
                                 value={data.description}
-                                onChange={(e) => setData('description', e.target.value)}
-                                sx={fioriFieldStateSx(valueStateOf(errors.description))}
+                                valueState={ui5ValueState(valueStateOf(errors.description))}
+                                onInput={(e) => setData('description', e.target.value)}
                             />
                         </FioriField>
 
                         <FioriField label={t('thumbnail')} valueState={valueStateOf(errors.thumbnail)} message={errors.thumbnail}>
-                            <Stack direction="row" spacing={1.5} alignItems="center">
-                                <Button component="label" variant="outlined" startIcon={<UploadIcon />} sx={fioriDefaultSx}>
-                                    {t('chooseFile')}
-                                    <input type="file" hidden accept="image/*" onChange={(e) => setData('thumbnail', e.target.files?.[0] ?? null)} />
-                                </Button>
-                                {data.thumbnail && (
-                                    <Typography variant="body2" color="text.secondary">
-                                        {data.thumbnail.name}
-                                    </Typography>
-                                )}
-                            </Stack>
+                            <FioriFileUploader
+                                placeholder={t('chooseFile')}
+                                accept="image/*"
+                                valueLabel={data.thumbnail?.name ?? null}
+                                onSelect={(files) => setData('thumbnail', files[0] ?? null)}
+                            />
                         </FioriField>
 
                         <FioriField label="">
-                            <Stack>
-                                <FormControlLabel
-                                    control={<Checkbox checked={data.is_ai_translate} onChange={(e) => setData('is_ai_translate', e.target.checked)} />}
-                                    label={t('aiTranslate')}
+                            <div className={styles.checkStack}>
+                                <CheckBox
+                                    text={t('aiTranslate')}
+                                    checked={data.is_ai_translate}
+                                    onChange={(e) => setData('is_ai_translate', e.target.checked)}
                                 />
-                                <FormControlLabel
-                                    control={<Checkbox checked={data.is_active} onChange={(e) => setData('is_active', e.target.checked)} />}
-                                    label={t('active')}
-                                />
-                            </Stack>
+                                <CheckBox text={t('active')} checked={data.is_active} onChange={(e) => setData('is_active', e.target.checked)} />
+                            </div>
                         </FioriField>
                     </FioriFormGroup>
-                </Stack>
+                </div>
 
-                <FioriFormErrorSummary errors={errors} message={t('correctHighlightedFields')} sx={{ mt: 2, maxWidth: 760 }} />
-            </Box>
+                <FioriFormErrorSummary errors={errors} message={t('correctHighlightedFields')} className={styles.errorSummary} />
+            </form>
         </AppLayout>
     );
 }

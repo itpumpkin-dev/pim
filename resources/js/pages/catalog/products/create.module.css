@@ -1,0 +1,21 @@
+.page {
+    padding: 1rem;
+    background: var(--sapBackgroundColor);
+    min-height: 100%;
+    width: 100%;
+    max-width: 760px;
+    box-sizing: border-box;
+}
+
+@media (min-width: 900px) {
+    .page {
+        padding: 2rem;
+    }
+}
+
+.variantsCard {
+    padding: 1.5rem;
+    border: 1px solid var(--sapGroup_ContentBorderColor);
+    border-radius: var(--sapElement_BorderCornerRadius);
+    background: var(--sapGroup_ContentBackground);
+}

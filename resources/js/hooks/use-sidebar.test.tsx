@@ -1,11 +1,8 @@
 // @vitest-environment jsdom
-import { createTheme, ThemeProvider } from '@mui/material';
 import { act, renderHook } from '@testing-library/react';
+import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { SidebarProvider, useSidebar } from './use-sidebar';
-import type { ReactNode } from 'react';
-
-const theme = createTheme();
 
 function mockMatchMedia(matchesMobile: boolean) {
     window.matchMedia = vi.fn((query: string) => ({
@@ -18,11 +15,7 @@ function mockMatchMedia(matchesMobile: boolean) {
 }
 
 function wrapper({ children }: { children: ReactNode }) {
-    return (
-        <ThemeProvider theme={theme}>
-            <SidebarProvider>{children}</SidebarProvider>
-        </ThemeProvider>
-    );
+    return <SidebarProvider>{children}</SidebarProvider>;
 }
 
 describe('useSidebar', () => {
@@ -88,11 +81,9 @@ describe('useSidebar', () => {
 
         function controlledWrapper({ children }: { children: ReactNode }) {
             return (
-                <ThemeProvider theme={theme}>
-                    <SidebarProvider open={false} onOpenChange={onOpenChange}>
-                        {children}
-                    </SidebarProvider>
-                </ThemeProvider>
+                <SidebarProvider open={false} onOpenChange={onOpenChange}>
+                    {children}
+                </SidebarProvider>
             );
         }
 
@@ -105,5 +96,23 @@ describe('useSidebar', () => {
         expect(onOpenChange).toHaveBeenCalledWith(true);
         // still false: the controlled prop itself never changed, only the callback fired
         expect(result.current.open).toBe(false);
+    });
+
+    it('with `persist`, a remounted provider remembers the last desktop open state', () => {
+        mockMatchMedia(false);
+
+        function persistWrapper({ children }: { children: ReactNode }) {
+            return <SidebarProvider persist>{children}</SidebarProvider>;
+        }
+
+        const first = renderHook(() => useSidebar(), { wrapper: persistWrapper });
+        act(() => first.result.current.setOpen(false));
+        first.unmount();
+
+        // simulates the next Inertia navigation remounting the whole shell
+        const second = renderHook(() => useSidebar(), { wrapper: persistWrapper });
+        expect(second.result.current.open).toBe(false);
+
+        act(() => second.result.current.setOpen(true));
     });
 });

@@ -1,0 +1,58 @@
+.columns {
+    display: flex;
+    min-height: 420px;
+    margin: -1rem;
+}
+
+.pane {
+    flex: 1;
+    min-width: 0;
+    padding: 1rem;
+}
+
+.paneAvailable {
+    border-right: 1px solid var(--sapGroup_ContentBorderColor);
+}
+
+.paneTitle {
+    display: block;
+    margin-bottom: 0.75rem;
+}
+
+.list {
+    overflow-y: auto;
+}
+
+.item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.375rem 0.5rem;
+    border-radius: var(--sapElement_BorderCornerRadius, 0.25rem);
+    color: var(--sapTextColor);
+    font-size: var(--sapFontSize);
+    cursor: pointer;
+}
+
+.item:hover {
+    background: var(--sapList_Hover_Background);
+}
+
+.item:focus-visible {
+    outline: var(--sapContent_FocusWidth) var(--sapContent_FocusStyle) var(--sapContent_FocusColor);
+    outline-offset: -1px;
+}
+
+.grip {
+    width: 1rem;
+    height: 1rem;
+    flex-shrink: 0;
+    color: var(--sapContent_NonInteractiveIconColor);
+    cursor: grab;
+}
+
+.empty {
+    display: block;
+    padding: 0.5rem 1rem;
+    color: var(--sapContent_LabelColor);
+}

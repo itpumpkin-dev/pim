@@ -1,0 +1,73 @@
+.viewer {
+    border: 1px solid var(--sapGroup_ContentBorderColor);
+    border-radius: var(--sapElement_BorderCornerRadius, 0.5rem);
+    background: var(--sapGroup_ContentBackground);
+    overflow: hidden;
+}
+
+.toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    padding: 0.25rem 0.5rem 0.25rem 1rem;
+    border-bottom: 1px solid var(--sapGroup_ContentBorderColor);
+    background: var(--sapList_HeaderBackground);
+}
+
+.title {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-width: 0;
+}
+
+.titleText {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--sapTextColor);
+    font-weight: 600;
+    font-size: var(--sapFontSize);
+}
+
+.icon {
+    flex-shrink: 0;
+    color: var(--sapContent_IconColor);
+}
+
+.actions {
+    display: flex;
+    gap: 0.25rem;
+    flex-shrink: 0;
+}
+
+/* Desktop/tablet: embed the PDF. Mobile (< 600px): download prompt instead. */
+.frame {
+    display: block;
+    width: 100%;
+    border: 0;
+    background: var(--sapGroup_ContentBackground);
+}
+
+.mobile {
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 2rem 1rem;
+    text-align: center;
+    color: var(--sapContent_LabelColor);
+    font-size: var(--sapFontSize);
+}
+
+@media (max-width: 599.98px) {
+    .frame {
+        display: none;
+    }
+
+    .mobile {
+        display: flex;
+    }
+}

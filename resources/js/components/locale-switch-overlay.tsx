@@ -1,7 +1,5 @@
 import { PulseDots } from '@/components/route-loading-skeleton';
 import { useLocale } from '@/hooks/use-locale';
-import { FIORI } from '@/lib/fiori-style';
-import { alpha, Box, Typography } from '@mui/material';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -76,41 +74,42 @@ export function LocaleSwitchOverlay() {
 
     return (
         <>
-            <Box component="span" ref={anchorRef} sx={{ display: 'none' }} />
+            <span ref={anchorRef} style={{ display: 'none' }} />
             {visible && rect && (
-                <Box
+                <div
                     role="status"
                     aria-live="polite"
-                    sx={{
+                    style={{
                         position: 'fixed',
                         ...rect,
-                        zIndex: (theme) => theme.zIndex.appBar - 1,
-                        bgcolor: (theme) => alpha(theme.palette.background.default, 0.6),
+                        zIndex: 10,
+                        background: 'color-mix(in srgb, var(--sapBackgroundColor) 60%, transparent)',
                         display: 'flex',
                         justifyContent: 'center',
                         alignItems: 'flex-start',
-                        pt: 6,
+                        paddingTop: '3rem',
+                        boxSizing: 'border-box',
                     }}
                 >
-                    <Box
-                        sx={{
+                    <div
+                        style={{
                             display: 'flex',
                             alignItems: 'center',
-                            gap: 1.5,
-                            px: 2,
-                            py: 1,
-                            bgcolor: FIORI.surface,
-                            border: `1px solid ${FIORI.border}`,
-                            borderRadius: '999px',
-                            boxShadow: '0 4px 16px rgba(0,0,0,0.12)',
+                            gap: '0.75rem',
+                            padding: '0.5rem 1rem',
+                            background: 'var(--sapGroup_ContentBackground)',
+                            border: '1px solid var(--sapGroup_ContentBorderColor)',
+                            borderRadius: 999,
+                            boxShadow: 'var(--sapContent_Shadow1)',
+                            color: 'var(--sapTextColor)',
+                            fontFamily: 'var(--sapFontFamily)',
+                            fontSize: 'var(--sapFontSize)',
                         }}
                     >
                         <PulseDots size={8} />
-                        <Typography variant="body2" sx={{ color: FIORI.textPrimary }}>
-                            {t('switchingLanguage')}
-                        </Typography>
-                    </Box>
-                </Box>
+                        <span>{t('switchingLanguage')}</span>
+                    </div>
+                </div>
             )}
         </>
     );

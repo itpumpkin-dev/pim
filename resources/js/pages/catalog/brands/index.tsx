@@ -1,39 +1,16 @@
+import { ClickableThumbnail, ImagePreviewProvider } from '@/components/image-preview';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem, type SharedData } from '@/types';
 import { Head, router, usePage } from '@inertiajs/react';
-import AddIcon from '@mui/icons-material/Add';
-import SearchIcon from '@mui/icons-material/Search';
-import EditIcon from '@mui/icons-material/Edit';
-import DeleteIcon from '@mui/icons-material/Delete';
-import FirstPageIcon from '@mui/icons-material/FirstPage';
-import LastPageIcon from '@mui/icons-material/LastPage';
-import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
-import ChevronRightIcon from '@mui/icons-material/ChevronRight';
-import ImageOutlinedIcon from '@mui/icons-material/ImageOutlined';
-import {
-    Box,
-    Button,
-    Chip,
-    IconButton,
-    InputAdornment,
-    Paper,
-    Stack,
-    TableSortLabel,
-    TextField,
-    Tooltip,
-    Typography,
-} from '@mui/material';
+import '@ui5/webcomponents-icons/dist/picture.js';
+import { Icon } from '@ui5/webcomponents-react';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FioriResponsiveColumn, FioriResponsiveTable } from '@/components/fiori-responsive-table';
+
 import { FioriMessageBox } from '@/components/fiori-message-box';
-import { ClickableThumbnail, ImagePreviewProvider } from '@/components/image-preview';
-import {
-    FIORI,
-    fioriEmphasizedSx,
-    fioriIconButtonSx,
-    fioriSearchFieldSx,
-} from '@/lib/fiori-style';
+import { FioriResponsiveTable, type FioriResponsiveColumn } from '@/components/fiori-responsive-table';
+
+import { CountTag, MasterListPage, MasterListToolbar, MasterPagination, RowActions, SecondaryText, SortableHeader, StrongText } from '../master-crud';
 
 interface BrandItem {
     id: number;
@@ -133,6 +110,10 @@ export default function BrandIndex({ brands, parentOptions, attributeId, filters
     // ตามด้วยแพลตฟอร์มที่ map ไว้กับคำอธิบาย ส่วน slug ที่มีประโยชน์น้อยสุดจะโดนซ่อนก่อน —
     // ส่วน thumbnail ที่เป็นแค่รูปประกอบไม่มีข้อมูลอะไรที่คุ้มจะเอาไปโชว์แบบ label/value เลย
     // ตัดออกจาก pop-in ไปเลย
+    const sortHeader = (field: string, label: string) => (
+        <SortableHeader label={label} active={sortField === field} direction={sortDir} onSort={() => handleSort(field)} />
+    );
+
     const columns: FioriResponsiveColumn<BrandItem>[] = [
         {
             key: 'thumbnail',
@@ -145,76 +126,38 @@ export default function BrandIndex({ brands, parentOptions, attributeId, filters
                     alt={row.admin_label || row.code}
                     size={38}
                     radius={1.5}
-                    fallback={<ImageOutlinedIcon fontSize="small" sx={{ color: 'grey.500' }} />}
+                    fallback={<Icon name="picture" style={{ color: 'var(--sapContent_IconColor)' }} />}
                 />
             ),
         },
         {
             key: 'name',
-            header: (
-                <TableSortLabel active={sortField === 'admin_label'} direction={sortField === 'admin_label' ? sortDir : 'asc'} onClick={() => handleSort('admin_label')}>
-                    {t('name')}
-                </TableSortLabel>
-            ),
+            header: sortHeader('admin_label', t('name')),
+            popinText: t('name'),
             priority: 'always',
-            render: (row) => <Typography sx={{ fontWeight: 600 }}>{row.admin_label || row.code}</Typography>,
+            render: (row) => <StrongText>{row.admin_label || row.code}</StrongText>,
         },
         {
             key: 'description',
-            header: (
-                <TableSortLabel active={sortField === 'description'} direction={sortField === 'description' ? sortDir : 'asc'} onClick={() => handleSort('description')}>
-                    {t('description')}
-                </TableSortLabel>
-            ),
+            header: sortHeader('description', t('description')),
+            popinText: t('description'),
             priority: 'medium',
-            render: (row) => (
-                <Typography sx={{ color: FIORI.textSecondary, maxWidth: 250, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {row.description || <Typography component="span" color="text.disabled">—</Typography>}
-                </Typography>
-            ),
+            render: (row) => <SecondaryText value={row.description} maxWidth={250} />,
         },
         {
             key: 'slug',
-            header: (
-                <TableSortLabel active={sortField === 'slug'} direction={sortField === 'slug' ? sortDir : 'asc'} onClick={() => handleSort('slug')}>
-                    {t('slug')}
-                </TableSortLabel>
-            ),
+            header: sortHeader('slug', t('slug')),
+            popinText: t('slug'),
             priority: 'low',
-            render: (row) => (
-                <Typography sx={{ color: FIORI.textSecondary }}>
-                    {row.slug || <Typography component="span" color="text.disabled">—</Typography>}
-                </Typography>
-            ),
+            render: (row) => <SecondaryText value={row.slug} />,
         },
         {
             key: 'products_count',
-            header: (
-                <TableSortLabel active={sortField === 'products_count'} direction={sortField === 'products_count' ? sortDir : 'asc'} onClick={() => handleSort('products_count')}>
-                    {t('productsCount')}
-                </TableSortLabel>
-            ),
+            header: sortHeader('products_count', t('productsCount')),
+            popinText: t('productsCount'),
             priority: 'high',
             align: 'right',
-            render: (row) =>
-                row.products_count ? (
-                    <Tooltip title={t('viewBrandProducts')}>
-                        <Chip
-                            label={row.products_count}
-                            size="small"
-                            onClick={() => goToProducts(row)}
-                            sx={{
-                                bgcolor: 'rgba(0,112,242,0.08)',
-                                color: FIORI.brand,
-                                fontWeight: 700,
-                                cursor: 'pointer',
-                                '&:hover': { bgcolor: 'rgba(0,112,242,0.16)' },
-                            }}
-                        />
-                    </Tooltip>
-                ) : (
-                    <Typography color="text.disabled">0</Typography>
-                ),
+            render: (row) => <CountTag count={row.products_count} tooltip={t('viewBrandProducts')} onClick={() => goToProducts(row)} />,
         },
         ...(canEdit
             ? [
@@ -224,14 +167,8 @@ export default function BrandIndex({ brands, parentOptions, attributeId, filters
                       priority: 'always' as const,
                       align: 'right' as const,
                       render: (row: BrandItem) => (
-                          <Stack direction="row" spacing={0.5} justifyContent="flex-end">
-                              <IconButton size="small" sx={fioriIconButtonSx} onClick={() => router.visit(`/catalog/brands/${row.id}/edit`)}>
-                                  <EditIcon fontSize="small" />
-                              </IconButton>
-                              {/* <IconButton size="small" sx={fioriIconButtonSx} onClick={() => setDeleteBrandId(row.id)}>
-                                  <DeleteIcon fontSize="small" />
-                              </IconButton> */}
-                          </Stack>
+                          // ปุ่มลบปิดไว้ (เดิม comment out ไว้) — เหลือแค่แก้ไข
+                          <RowActions onEdit={() => router.visit(`/catalog/brands/${row.id}/edit`)} />
                       ),
                   },
               ]
@@ -240,118 +177,58 @@ export default function BrandIndex({ brands, parentOptions, attributeId, filters
 
     return (
         <ImagePreviewProvider>
-        <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title={t('brandsTitle')} />
-            <Box sx={{ p: { xs: 2, md: 4 }, bgcolor: FIORI.pageBg, minHeight: '100%' }}>
-                <Box
-                    sx={{
-                        display: 'flex',
-                        flexDirection: { xs: 'column', sm: 'row' },
-                        justifyContent: 'space-between',
-                        alignItems: { xs: 'stretch', sm: 'flex-start' },
-                        gap: 2,
-                        mb: 3,
-                    }}
+            <AppLayout breadcrumbs={breadcrumbs}>
+                <Head title={t('brandsTitle')} />
+                <MasterListPage
+                    title={t('brandsTitle')}
+                    intro={t('brandsIntro')}
+                    addLabel={t('addNewBrand')}
+                    onAdd={canEdit ? () => router.visit('/catalog/brands/create') : undefined}
                 >
-                    <Box>
-                        <Typography variant="h5" fontWeight={600} sx={{ color: FIORI.textPrimary }}>{t('brandsTitle')}</Typography>
-                        <Typography variant="body2" sx={{ color: FIORI.textSecondary, mt: 0.25, maxWidth: 720 }}>{t('brandsIntro')}</Typography>
-                    </Box>
-                    {canEdit && (
-                        <Button
-                            variant="contained"
-                            startIcon={<AddIcon />}
-                            onClick={() => router.visit('/catalog/brands/create')}
-                            sx={fioriEmphasizedSx}
-                        >
-                            {t('addNewBrand')}
-                        </Button>
-                    )}
-                </Box>
+                    <MasterListToolbar
+                        resultsLabel={tGrid('results', { count: brands.total })}
+                        search={search}
+                        onSearchChange={setSearch}
+                        searchPlaceholder={t('searchBrands')}
+                    />
 
-                <Box>
-                        <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" alignItems={{ md: 'center' }} spacing={1.5} sx={{ mb: 2 }}>
-                            <Typography variant="body2" sx={{ color: FIORI.textSecondary }}>
-                                {tGrid('results', { count: brands.total })}
-                            </Typography>
-                            <TextField
-                                value={search}
-                                onChange={(e) => setSearch(e.target.value)}
-                                placeholder={t('searchBrands')}
-                                size="small"
-                                sx={{ ...fioriSearchFieldSx, minWidth: 260 }}
-                                InputProps={{
-                                    startAdornment: (
-                                        <InputAdornment position="start">
-                                            <SearchIcon fontSize="small" sx={{ color: FIORI.textSecondary }} />
-                                        </InputAdornment>
-                                    ),
-                                }}
-                            />
-                        </Stack>
+                    <FioriResponsiveTable columns={columns} rows={brands.data} getRowKey={(row) => row.id} emptyMessage={t('noBrandsFound')} />
 
-                        <FioriResponsiveTable
-                            columns={columns}
-                            rows={brands.data}
-                            getRowKey={(row) => row.id}
-                            emptyMessage={t('noBrandsFound')}
-                        />
+                    <MasterPagination currentPage={currentPage} lastPage={lastPage} label={tGrid('pageOf', { lastPage })} onPageChange={goToPage} />
+                </MasterListPage>
 
-                        <Stack direction="row" justifyContent="flex-end" alignItems="center" spacing={1.5} sx={{ mt: 2 }}>
-                            <Typography variant="body2" sx={{ color: FIORI.textSecondary }}>{tGrid('pageOf', { lastPage })}</Typography>
-                            <Stack direction="row" spacing={0.2}>
-                                <IconButton size="small" sx={fioriIconButtonSx} disabled={currentPage <= 1} onClick={() => goToPage(1)}>
-                                    <FirstPageIcon fontSize="small" />
-                                </IconButton>
-                                <IconButton size="small" sx={fioriIconButtonSx} disabled={currentPage <= 1} onClick={() => goToPage(currentPage - 1)}>
-                                    <ChevronLeftIcon fontSize="small" />
-                                </IconButton>
-                                <Paper variant="outlined" sx={{ px: 1.5, py: 0.5, bgcolor: FIORI.surface, borderRadius: '8px', borderColor: FIORI.border, display: 'flex', alignItems: 'center' }}>
-                                    <Typography variant="body2" sx={{ color: FIORI.textPrimary }}>{currentPage}</Typography>
-                                </Paper>
-                                <IconButton size="small" sx={fioriIconButtonSx} disabled={currentPage >= lastPage} onClick={() => goToPage(currentPage + 1)}>
-                                    <ChevronRightIcon fontSize="small" />
-                                </IconButton>
-                                <IconButton size="small" sx={fioriIconButtonSx} disabled={currentPage >= lastPage} onClick={() => goToPage(lastPage)}>
-                                    <LastPageIcon fontSize="small" />
-                                </IconButton>
-                            </Stack>
-                        </Stack>
-                </Box>
-            </Box>
-
-            <FioriMessageBox
-                open={deleteBrandId !== null}
-                onCancel={() => setDeleteBrandId(null)}
-                onConfirm={() => {
-                    if (deleteBrandId !== null) {
-                        setDeleting(true);
-                        router.delete(`/catalog/brands/${deleteBrandId}`, {
-                            onSuccess: () => setDeleteBrandId(null),
-                            onFinish: () => setDeleting(false),
-                        });
-                    }
-                }}
-                title={tGrid('confirmDeletion')}
-                severity="warning"
-                destructive
-                confirmLabel={tGrid('delete')}
-                cancelLabel={tGrid('cancel')}
-                confirmLoading={deleting}
-            >
-                {t('confirmDeleteBrand')}
-                {(() => {
-                    const target = brands.data.find((b) => b.id === deleteBrandId);
-                    const count = target?.products_count ?? 0;
-                    if (count === 0) return null;
-                    return (
-                        <Typography color="error" variant="body2" sx={{ mt: 1.5, fontWeight: 600 }}>
-                            {t('deleteBrandProductWarning', { count })}
-                        </Typography>
-                    );
-                })()}
-            </FioriMessageBox>
-        </AppLayout>
+                <FioriMessageBox
+                    open={deleteBrandId !== null}
+                    onCancel={() => setDeleteBrandId(null)}
+                    onConfirm={() => {
+                        if (deleteBrandId !== null) {
+                            setDeleting(true);
+                            router.delete(`/catalog/brands/${deleteBrandId}`, {
+                                onSuccess: () => setDeleteBrandId(null),
+                                onFinish: () => setDeleting(false),
+                            });
+                        }
+                    }}
+                    title={tGrid('confirmDeletion')}
+                    severity="warning"
+                    destructive
+                    confirmLabel={tGrid('delete')}
+                    cancelLabel={tGrid('cancel')}
+                    confirmLoading={deleting}
+                >
+                    {t('confirmDeleteBrand')}
+                    {(() => {
+                        const target = brands.data.find((b) => b.id === deleteBrandId);
+                        const count = target?.products_count ?? 0;
+                        if (count === 0) return null;
+                        return (
+                            <div style={{ marginTop: '0.75rem', fontWeight: 600, color: 'var(--sapNegativeTextColor)' }}>
+                                {t('deleteBrandProductWarning', { count })}
+                            </div>
+                        );
+                    })()}
+                </FioriMessageBox>
+            </AppLayout>
         </ImagePreviewProvider>
     );
 }

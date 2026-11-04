@@ -1,23 +1,19 @@
-import AppLayout from '@/layouts/app-layout';
-import { type BreadcrumbItem, type SharedData } from '@/types';
-import { Head, Link, router, usePage } from '@inertiajs/react';
-import { Box, Button, InputAdornment, TextField, Typography, IconButton } from '@mui/material';
-import SearchIcon from '@mui/icons-material/Search';
-import EditIcon from '@mui/icons-material/Edit';
-import ContentCopyIcon from '@mui/icons-material/ContentCopy';
-import DeleteIcon from '@mui/icons-material/Delete';
-import { useState, useEffect, useRef } from 'react';
-import { useTranslation } from 'react-i18next';
-import CreateUserDialog from '@/components/system/create-user-dialog';
-import { FioriResponsiveColumn, FioriResponsiveTable } from '@/components/fiori-responsive-table';
 import { FioriMessageBox } from '@/components/fiori-message-box';
-import {
-    FIORI,
-    FioriStatus,
-    fioriEmphasizedSx,
-    fioriIconButtonSx,
-    fioriSearchFieldSx,
-} from '@/lib/fiori-style';
+import { FioriResponsiveColumn, FioriResponsiveTable } from '@/components/fiori-responsive-table';
+import CreateUserDialog from '@/components/system/create-user-dialog';
+import AppLayout from '@/layouts/app-layout';
+import { FioriStatus } from '@/lib/fiori-style';
+import { type BreadcrumbItem, type SharedData } from '@/types';
+import { Head, router, usePage } from '@inertiajs/react';
+import '@ui5/webcomponents-icons/dist/copy.js';
+import '@ui5/webcomponents-icons/dist/delete.js';
+import '@ui5/webcomponents-icons/dist/edit.js';
+import '@ui5/webcomponents-icons/dist/search.js';
+import { Button, FlexBox, Icon, Input, Title } from '@ui5/webcomponents-react';
+import { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+
+import styles from './index.module.css';
 
 interface PaginationData<T> {
     data: T[];
@@ -28,21 +24,26 @@ interface PaginationData<T> {
 }
 
 interface GridConfig {
-    columns: Record<string, {
-        label: string;
-        type: string;
-        sortable?: boolean;
-    }>;
-    actions?: Record<string, {
-        icon: string;
-        label: string;
-    }>;
+    columns: Record<
+        string,
+        {
+            label: string;
+            type: string;
+            sortable?: boolean;
+        }
+    >;
+    actions?: Record<
+        string,
+        {
+            icon: string;
+            label: string;
+        }
+    >;
 }
-
-
 
 interface UserIndexProps {
     gridConfig: GridConfig;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     gridData: PaginationData<any>;
     filters: {
         search?: string;
@@ -102,11 +103,11 @@ export default function UserIndex({ gridConfig, gridData, filters, managerOption
         key,
         header: t(column.label),
         priority: index === 0 ? 'always' : index === 1 ? 'high' : index === 2 ? 'medium' : 'low',
-        render: (row) =>
+        render: (row: UserRow) =>
             column.type === 'boolean' ? (
                 <FioriStatus label={row[key] ? t('active') : t('inactive')} tone={row[key] ? 'success' : 'neutral'} />
             ) : key === 'employee_id' || key === 'username' ? (
-                <Typography component="span" fontWeight={600}>{row[key] || '-'}</Typography>
+                <span style={{ fontWeight: 600 }}>{row[key] || '-'}</span>
             ) : (
                 row[key] || '-'
             ),
@@ -116,18 +117,19 @@ export default function UserIndex({ gridConfig, gridData, filters, managerOption
         columns.push({
             key: 'actions',
             header: '',
+            popinText: '',
             priority: 'always',
             align: 'right',
-            render: (row) => (
-                <Box sx={{ display: 'flex', gap: 0.5, justifyContent: 'flex-end' }}>
+            render: (row: UserRow) => (
+                <FlexBox justifyContent="End" style={{ gap: '0.25rem' }}>
                     {visibleActions.map(([actionKey, action]) => {
                         if (actionKey === 'delete' && row.id === auth.user?.id) {
                             return null;
                         }
 
-                        let Icon = EditIcon;
-                        if (action.icon === 'copy') Icon = ContentCopyIcon;
-                        if (action.icon === 'delete') Icon = DeleteIcon;
+                        let iconName = 'edit';
+                        if (action.icon === 'copy') iconName = 'copy';
+                        if (action.icon === 'delete') iconName = 'delete';
 
                         const handleClick = () => {
                             if (actionKey === 'update') {
@@ -137,14 +139,15 @@ export default function UserIndex({ gridConfig, gridData, filters, managerOption
                             }
                         };
 
+                        // ปุ่มไอคอน + ป้ายเล็กใต้ไอคอน (แบบเดิม) — UI5 Button วางข้อความใต้ไอคอนไม่ได้ เลยใช้ <button> ธรรมดา
                         return (
-                            <IconButton key={actionKey} size="small" sx={{ ...fioriIconButtonSx, display: 'flex', flexDirection: 'column' }} onClick={handleClick}>
-                                <Icon fontSize="small" />
-                                <Typography variant="caption" sx={{ fontSize: '0.6rem' }}>{t(action.label)}</Typography>
-                            </IconButton>
+                            <button key={actionKey} type="button" className={styles.actionButton} onClick={handleClick}>
+                                <Icon name={iconName} className={styles.actionIcon} />
+                                <span className={styles.actionLabel}>{t(action.label)}</span>
+                            </button>
                         );
                     })}
-                </Box>
+                </FlexBox>
             ),
         });
     }
@@ -152,72 +155,56 @@ export default function UserIndex({ gridConfig, gridData, filters, managerOption
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={tSystem('usersCount', { count: gridData.total })} />
-            <Box sx={{ p: 4, bgcolor: FIORI.pageBg, minHeight: '100%' }}>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 3 }}>
-                    <Box>
-                        <Typography variant="h5" fontWeight={600} sx={{ color: FIORI.textPrimary }}>
+            <div className={styles.page}>
+                <FlexBox justifyContent="SpaceBetween" alignItems="Start" wrap="Wrap" style={{ gap: '1rem', marginBottom: '1.5rem' }}>
+                    <div>
+                        <Title level="H4" size="H4">
                             {tSystem('usersCount', { count: gridData.total })}
-                        </Typography>
-                        <Box sx={{ mt: 2 }}>
-                            <TextField
+                        </Title>
+                        <div style={{ marginTop: '1rem' }}>
+                            <Input
                                 placeholder={tSystem('searchByUsername')}
-                                size="small"
                                 value={search}
-                                onChange={(e) => setSearch(e.target.value)}
-                                sx={{ ...fioriSearchFieldSx, minWidth: 280 }}
-                                InputProps={{
-                                    startAdornment: (
-                                        <InputAdornment position="start">
-                                            <SearchIcon sx={{ color: FIORI.textSecondary, fontSize: 20 }} />
-                                        </InputAdornment>
-                                    ),
-                                }}
+                                icon={<Icon name="search" />}
+                                onInput={(e) => setSearch(e.target.value)}
+                                style={{ minWidth: 280 }}
                             />
-                        </Box>
-                    </Box>
+                        </div>
+                    </div>
                     {canCreate && (
-                        <Box>
-                            <Button variant="contained" sx={{ ...fioriEmphasizedSx, px: 2.5, py: 1 }} onClick={() => setCreateOpen(true)}>
+                        <div>
+                            <Button design="Emphasized" onClick={() => setCreateOpen(true)}>
                                 {tSystem('createUser')}
                             </Button>
-                        </Box>
+                        </div>
                     )}
-                </Box>
+                </FlexBox>
 
-                <CreateUserDialog
-                    open={createOpen}
-                    onClose={() => setCreateOpen(false)}
-                    managerOptions={managerOptions}
-                />
+                <CreateUserDialog open={createOpen} onClose={() => setCreateOpen(false)} managerOptions={managerOptions} />
 
-                <FioriResponsiveTable
-                    columns={columns}
-                    rows={gridData.data}
-                    getRowKey={(row) => row.id}
-                    emptyMessage={t('noDataFound')}
-                />
-            </Box>
-        <FioriMessageBox
-            open={deleteUserId !== null}
-            onCancel={() => setDeleteUserId(null)}
-            onConfirm={() => {
-                if (deleteUserId !== null) {
-                    setDeleting(true);
-                    router.delete(`/system/user/${deleteUserId}`, {
-                        onSuccess: () => setDeleteUserId(null),
-                        onFinish: () => setDeleting(false),
-                    });
-                }
-            }}
-            title={tSystem('confirmDeletionTitle')}
-            severity="warning"
-            destructive
-            confirmLabel={t('delete')}
-            cancelLabel={t('cancel')}
-            confirmLoading={deleting}
-        >
-            {tSystem('confirmDeleteUserMessage')}
-        </FioriMessageBox>
+                <FioriResponsiveTable columns={columns} rows={gridData.data} getRowKey={(row: UserRow) => row.id} emptyMessage={t('noDataFound')} />
+            </div>
+            <FioriMessageBox
+                open={deleteUserId !== null}
+                onCancel={() => setDeleteUserId(null)}
+                onConfirm={() => {
+                    if (deleteUserId !== null) {
+                        setDeleting(true);
+                        router.delete(`/system/user/${deleteUserId}`, {
+                            onSuccess: () => setDeleteUserId(null),
+                            onFinish: () => setDeleting(false),
+                        });
+                    }
+                }}
+                title={tSystem('confirmDeletionTitle')}
+                severity="warning"
+                destructive
+                confirmLabel={t('delete')}
+                cancelLabel={t('cancel')}
+                confirmLoading={deleting}
+            >
+                {tSystem('confirmDeleteUserMessage')}
+            </FioriMessageBox>
         </AppLayout>
     );
 }

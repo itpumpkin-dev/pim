@@ -1,7 +1,9 @@
 import Heading from '@/components/heading';
 import { type NavItem } from '@/types';
-import { Link } from '@inertiajs/react';
-import { Box, Divider, List, ListItemButton, ListItemText, Stack } from '@mui/material';
+import { router } from '@inertiajs/react';
+import { List, ListItemStandard } from '@ui5/webcomponents-react';
+import { type ReactNode } from 'react';
+import styles from './layout.module.css';
 
 const sidebarNavItems: NavItem[] = [
     {
@@ -21,39 +23,34 @@ const sidebarNavItems: NavItem[] = [
     },
 ];
 
-export default function SettingsLayout({ children }: { children: React.ReactNode }) {
+export default function SettingsLayout({ children }: { children: ReactNode }) {
     const currentPath = window.location.pathname;
 
     return (
-        <Box sx={{ px: 2, py: 3 }}>
+        <div style={{ padding: '1.5rem 1rem' }}>
             <Heading title="Settings" description="Manage your profile and account settings" />
 
-            <Stack direction={{ xs: 'column', lg: 'row' }} spacing={{ xs: 4, lg: 6 }}>
-                <Box component="aside" sx={{ width: '100%', maxWidth: { xs: 'none', lg: 192 } }}>
-                    <List disablePadding sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+            <div className={styles.columns}>
+                <aside className={styles.aside}>
+                    <List
+                        selectionMode="Single"
+                        onItemClick={(e) => {
+                            const url = (e.detail.item as HTMLElement).dataset.url;
+                            if (url) router.visit(url);
+                        }}
+                    >
                         {sidebarNavItems.map((item) => (
-                            <ListItemButton
-                                key={item.url}
-                                component={item.url ? Link : 'div'}
-                                href={item.url as any}
-                                prefetch={item.url ? true : undefined}
-                                selected={currentPath === item.url}
-                                sx={{ borderRadius: 1 }}
-                            >
-                                <ListItemText primary={item.title} />
-                            </ListItemButton>
+                            <ListItemStandard key={item.url} data-url={item.url} text={item.title} selected={currentPath === item.url} />
                         ))}
                     </List>
-                </Box>
+                </aside>
 
-                <Divider sx={{ display: { xs: 'block', lg: 'none' } }} />
+                <div className={styles.divider} />
 
-                <Box sx={{ flex: 1, maxWidth: { lg: 672 } }}>
-                    <Stack spacing={6} sx={{ maxWidth: 576 }}>
-                        {children}
-                    </Stack>
-                </Box>
-            </Stack>
-        </Box>
+                <div className={styles.content}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '3rem', maxWidth: 576 }}>{children}</div>
+                </div>
+            </div>
+        </div>
     );
 }

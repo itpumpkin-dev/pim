@@ -1,32 +1,15 @@
 import LocaleLabelFields from '@/components/catalog/locale-label-fields';
+import { FioriField, FioriFormGroup, ui5ValueState, valueStateOf } from '@/components/fiori-form';
 import { HistoryPanel } from '@/components/history-panel';
 import { useUnsavedChangesGuard } from '@/hooks/use-unsaved-changes-guard';
 import AppLayout from '@/layouts/app-layout';
+import { type CodeEditState, codeHintKey, normalizeCodeInput } from '@/lib/code-field';
 import { type BreadcrumbItem } from '@/types';
-import { Head, Link, router, useForm } from '@inertiajs/react';
-import ArrowBackIcon from '@mui/icons-material/ArrowBack';
-import SaveIcon from '@mui/icons-material/Save';
-import {
-    Box,
-    Button,
-    Checkbox,
-    Chip,
-    CircularProgress,
-    FormControl,
-    ListItemText,
-    MenuItem,
-    Select,
-    Stack,
-    Tab,
-    Tabs,
-    TextField,
-    Typography,
-} from '@mui/material';
+import { Head, router, useForm } from '@inertiajs/react';
+import { Input, MultiComboBox, MultiComboBoxItem, Option, Select, Tab, TabContainer } from '@ui5/webcomponents-react';
 import { FormEvent, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FioriField, FioriFormErrorSummary, FioriFormGroup, fioriFieldStateSx, valueStateOf } from '@/components/fiori-form';
-import { FIORI, fioriDefaultSx, fioriEmphasizedSx, fioriTabsSx } from '@/lib/fiori-style';
-import { type CodeEditState, codeHintKey, normalizeCodeInput } from '@/lib/code-field';
+import { MasterFormPage, masterStyles } from '../master-crud';
 
 interface ChannelItem {
     id: number;
@@ -64,7 +47,18 @@ interface Props extends CodeEditState {
     canViewHistory?: boolean;
 }
 
-export default function ChannelEdit({ channel, translations, localeIds, currencyIds, rootCategories, locales, currencies, canViewHistory = false, canEditCode = false, codeLocked = false }: Props) {
+export default function ChannelEdit({
+    channel,
+    translations,
+    localeIds,
+    currencyIds,
+    rootCategories,
+    locales,
+    currencies,
+    canViewHistory = false,
+    canEditCode = false,
+    codeLocked = false,
+}: Props) {
     const { t } = useTranslation('catalog');
     const { t: tNav } = useTranslation('nav');
     const [tabIndex, setTabIndex] = useState(0);
@@ -99,69 +93,66 @@ export default function ChannelEdit({ channel, translations, localeIds, currency
         });
     };
 
+    const tabs = canViewHistory ? (
+        <TabContainer collapsed style={{ marginBottom: '1.5rem' }} onTabSelect={(e) => setTabIndex(e.detail.tabIndex)}>
+            <Tab text="General" selected={tabIndex === 0} />
+            <Tab text="History" selected={tabIndex === 1} />
+        </TabContainer>
+    ) : null;
+
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={`${t('editChannel')}: ${channel.code}`} />
-            <Box component="form" onSubmit={submit} sx={{ p: { xs: 2, md: 4 }, width: '100%', maxWidth: 760, bgcolor: FIORI.pageBg, minHeight: '100%' }}>
-                {canViewHistory && (
-                    <Tabs
-                        value={tabIndex}
-                        onChange={(_, v) => setTabIndex(v)}
-                        sx={{ ...fioriTabsSx, mb: 3 }}
-                    >
-                        <Tab label="General" />
-                        <Tab label="History" />
-                    </Tabs>
-                )}
+            {tabIndex === 1 && canViewHistory && (
+                <div className={masterStyles.formPage}>
+                    {tabs}
+                    <HistoryPanel historyUrl={`/catalog/channels/${channel.id}/history`} />
+                </div>
+            )}
 
-                {tabIndex === 1 && canViewHistory && <HistoryPanel historyUrl={`/catalog/channels/${channel.id}/history`} />}
-
-                {tabIndex === 0 && (
-                <>
-                <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ sm: 'center' }} spacing={2} sx={{ mb: 3 }}>
-                    <Typography variant="h5" fontWeight={600} sx={{ color: FIORI.textPrimary }}>{t('editChannel')}</Typography>
-                    <Stack direction="row" spacing={1}>
-                        <Button component={Link} href="/catalog/channels" variant="outlined" startIcon={<ArrowBackIcon />} sx={fioriDefaultSx}>
-                            {t('back')}
-                        </Button>
-                        <Button type="submit" variant="contained" disabled={processing} startIcon={processing ? <CircularProgress size={16} color="inherit" /> : <SaveIcon />} sx={fioriEmphasizedSx}>
-                            {processing ? t('saving') : t('save')}
-                        </Button>
-                    </Stack>
-                </Stack>
-
-                <Stack spacing={2}>
+            {tabIndex === 0 && (
+                <MasterFormPage
+                    before={tabs}
+                    title={t('editChannel')}
+                    backHref="/catalog/channels"
+                    processing={processing}
+                    onSubmit={submit}
+                    errors={errors}
+                >
                     <FioriFormGroup title={t('generalTitle')}>
-                        <FioriField label={t('code')} htmlFor="channel-code" hint={t(codeHintKey({ canEditCode, codeLocked }))} valueState={valueStateOf(errors.code)} message={errors.code}>
-                            <TextField
+                        <FioriField
+                            label={t('code')}
+                            htmlFor="channel-code"
+                            hint={t(codeHintKey({ canEditCode, codeLocked }))}
+                            valueState={valueStateOf(errors.code)}
+                            message={errors.code}
+                        >
+                            <Input
                                 id="channel-code"
-                                fullWidth
-                                size="small"
                                 value={data.code}
                                 disabled={!canEditCode}
-                                onChange={(e) => setData('code', normalizeCodeInput(e.target.value))}
-                                inputProps={{ maxLength: 50 }}
-                                sx={fioriFieldStateSx(valueStateOf(errors.code))}
+                                maxlength={50}
+                                valueState={ui5ValueState(valueStateOf(errors.code))}
+                                onInput={(e) => setData('code', normalizeCodeInput(e.target.value))}
                             />
                         </FioriField>
 
                         <FioriField label={t('rootCategoryOptional')} htmlFor="root-category">
-                            <FormControl fullWidth size="small" sx={fioriFieldStateSx('none')}>
-                                <Select
-                                    id="root-category"
-                                    value={data.root_category_id}
-                                    onChange={(e) => setData('root_category_id', e.target.value)}
-                                >
-                                    <MenuItem value="none">
-                                        <em>{t('noRootCategory')}</em>
-                                    </MenuItem>
-                                    {rootCategories.map((cat) => (
-                                        <MenuItem key={cat.id} value={cat.id}>
-                                            {cat.display_name}
-                                        </MenuItem>
-                                    ))}
-                                </Select>
-                            </FormControl>
+                            <Select
+                                id="root-category"
+                                value={String(data.root_category_id)}
+                                onChange={(e) => {
+                                    const value = e.detail.selectedOption.value ?? 'none';
+                                    setData('root_category_id', value === 'none' ? 'none' : Number(value));
+                                }}
+                            >
+                                <Option value="none">{t('noRootCategory')}</Option>
+                                {rootCategories.map((cat) => (
+                                    <Option key={cat.id} value={String(cat.id)}>
+                                        {cat.display_name}
+                                    </Option>
+                                ))}
+                            </Select>
                         </FioriField>
                     </FioriFormGroup>
 
@@ -180,29 +171,22 @@ export default function ChannelEdit({ channel, translations, localeIds, currency
                             message={errors.locale_ids}
                             fullWidth
                         >
-                            <FormControl fullWidth size="small" sx={fioriFieldStateSx(valueStateOf(errors.locale_ids))}>
-                                <Select
-                                    id="channel-locales"
-                                    multiple
-                                    value={data.locale_ids}
-                                    onChange={(e) => setData('locale_ids', e.target.value as number[])}
-                                    renderValue={(selected) => (
-                                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                                            {(selected as number[]).map((id) => {
-                                                const locale = locales.find((l) => l.id === id);
-                                                return <Chip key={id} label={locale?.display_name ?? locale?.code ?? id} size="small" />;
-                                            })}
-                                        </Box>
-                                    )}
-                                >
-                                    {locales.map((locale) => (
-                                        <MenuItem key={locale.id} value={locale.id}>
-                                            <Checkbox checked={data.locale_ids.includes(locale.id)} />
-                                            <ListItemText primary={locale.display_name ?? locale.code} />
-                                        </MenuItem>
-                                    ))}
-                                </Select>
-                            </FormControl>
+                            <MultiComboBox
+                                id="channel-locales"
+                                style={{ width: '100%' }}
+                                selectedValues={data.locale_ids.map(String)}
+                                valueState={ui5ValueState(valueStateOf(errors.locale_ids))}
+                                onSelectionChange={(e) =>
+                                    setData(
+                                        'locale_ids',
+                                        e.detail.items.map((item) => Number(item.value)),
+                                    )
+                                }
+                            >
+                                {locales.map((locale) => (
+                                    <MultiComboBoxItem key={locale.id} value={String(locale.id)} text={locale.display_name ?? locale.code} />
+                                ))}
+                            </MultiComboBox>
                         </FioriField>
 
                         <FioriField
@@ -213,37 +197,31 @@ export default function ChannelEdit({ channel, translations, localeIds, currency
                             message={errors.currency_ids}
                             fullWidth
                         >
-                            <FormControl fullWidth size="small" sx={fioriFieldStateSx(valueStateOf(errors.currency_ids))}>
-                                <Select
-                                    id="channel-currencies"
-                                    multiple
-                                    value={data.currency_ids}
-                                    onChange={(e) => setData('currency_ids', e.target.value as number[])}
-                                    renderValue={(selected) => (
-                                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                                            {(selected as number[]).map((id) => {
-                                                const currency = currencies.find((c) => c.id === id);
-                                                return <Chip key={id} label={currency?.code ?? id} size="small" />;
-                                            })}
-                                        </Box>
-                                    )}
-                                >
-                                    {currencies.map((currency) => (
-                                        <MenuItem key={currency.id} value={currency.id}>
-                                            <Checkbox checked={data.currency_ids.includes(currency.id)} />
-                                            <ListItemText primary={currency.name ? `${currency.code} — ${currency.name}` : currency.code} />
-                                        </MenuItem>
-                                    ))}
-                                </Select>
-                            </FormControl>
+                            <MultiComboBox
+                                id="channel-currencies"
+                                style={{ width: '100%' }}
+                                selectedValues={data.currency_ids.map(String)}
+                                valueState={ui5ValueState(valueStateOf(errors.currency_ids))}
+                                onSelectionChange={(e) =>
+                                    setData(
+                                        'currency_ids',
+                                        e.detail.items.map((item) => Number(item.value)),
+                                    )
+                                }
+                            >
+                                {currencies.map((currency) => (
+                                    <MultiComboBoxItem
+                                        key={currency.id}
+                                        value={String(currency.id)}
+                                        text={currency.code}
+                                        additionalText={currency.name ?? undefined}
+                                    />
+                                ))}
+                            </MultiComboBox>
                         </FioriField>
                     </FioriFormGroup>
-                </Stack>
-
-                <FioriFormErrorSummary errors={errors} message={t('correctHighlightedFields')} sx={{ mt: 2, maxWidth: 760 }} />
-                </>
-                )}
-            </Box>
+                </MasterFormPage>
+            )}
         </AppLayout>
     );
 }

@@ -1,13 +1,14 @@
 import { useForm } from '@inertiajs/react';
+import { Bar, Button, Dialog, FlexBox, Input, Label, Text, type InputDomRef } from '@ui5/webcomponents-react';
 import { FormEventHandler, useRef, useState } from 'react';
 
 import InputError from '@/components/input-error';
-import { Box, Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, TextField, Typography } from '@mui/material';
 
 import HeadingSmall from '@/components/heading-small';
 
 export default function DeleteUser() {
-    const passwordInput = useRef<HTMLInputElement>(null);
+    const passwordInput = useRef<InputDomRef>(null);
+    const formRef = useRef<HTMLFormElement>(null);
     const [open, setOpen] = useState(false);
     const { data, setData, delete: destroy, processing, reset, errors, clearErrors } = useForm({ password: '' });
 
@@ -29,62 +30,78 @@ export default function DeleteUser() {
     };
 
     return (
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+        <FlexBox direction="Column" style={{ gap: '1.5rem' }}>
             <HeadingSmall title="Delete account" description="Delete your account and all of its resources" />
-            <Box
-                sx={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: 2,
-                    borderRadius: 2,
-                    border: 1,
-                    borderColor: 'error.light',
-                    bgcolor: (theme) => (theme.palette.mode === 'dark' ? 'rgba(211, 47, 47, 0.12)' : 'rgba(211, 47, 47, 0.06)'),
-                    p: 2,
+            <FlexBox
+                direction="Column"
+                style={{
+                    gap: '1rem',
+                    borderRadius: 'var(--sapElement_BorderCornerRadius)',
+                    border: '1px solid var(--sapErrorBorderColor)',
+                    background: 'var(--sapErrorBackground)',
+                    padding: '1rem',
                 }}
             >
-                <Box sx={{ color: 'error.main' }}>
-                    <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                        Warning
-                    </Typography>
-                    <Typography variant="body2">Please proceed with caution, this cannot be undone.</Typography>
-                </Box>
+                <div style={{ color: 'var(--sapNegativeTextColor)' }}>
+                    <Text style={{ display: 'block', fontWeight: 500, color: 'inherit' }}>Warning</Text>
+                    <Text style={{ display: 'block', color: 'inherit' }}>Please proceed with caution, this cannot be undone.</Text>
+                </div>
 
-                <Button variant="contained" color="error" onClick={() => setOpen(true)} sx={{ alignSelf: 'flex-start' }}>
+                <Button design="Negative" onClick={() => setOpen(true)} style={{ alignSelf: 'flex-start' }}>
                     Delete account
                 </Button>
 
-                <Dialog open={open} onClose={closeModal} maxWidth="xs" fullWidth component="form" onSubmit={deleteUser}>
-                    <DialogTitle>Are you sure you want to delete your account?</DialogTitle>
-                    <DialogContent>
-                        <DialogContentText sx={{ mb: 2 }}>
+                <Dialog
+                    open={open}
+                    onClose={closeModal}
+                    headerText="Are you sure you want to delete your account?"
+                    style={{ width: 'min(28rem, calc(100vw - 2rem))' }}
+                    footer={
+                        <Bar
+                            design="Footer"
+                            endContent={
+                                <>
+                                    <Button onClick={closeModal} disabled={processing}>
+                                        Cancel
+                                    </Button>
+                                    <Button
+                                        design="Negative"
+                                        onClick={() => formRef.current?.requestSubmit()}
+                                        disabled={processing}
+                                        loading={processing}
+                                        loadingDelay={0}
+                                    >
+                                        {processing ? 'Deleting…' : 'Delete account'}
+                                    </Button>
+                                </>
+                            }
+                        />
+                    }
+                >
+                    <form ref={formRef} id="delete-user-form" onSubmit={deleteUser}>
+                        <Text style={{ display: 'block', marginBottom: '1rem', color: 'var(--sapContent_LabelColor)' }}>
                             Once your account is deleted, all of its resources and data will also be permanently deleted. Please enter your password
                             to confirm you would like to permanently delete your account.
-                        </DialogContentText>
+                        </Text>
 
-                        <TextField
-                            id="password"
-                            label="Password"
-                            type="password"
-                            fullWidth
-                            inputRef={passwordInput}
-                            value={data.password}
-                            onChange={(e) => setData('password', e.target.value)}
-                            autoComplete="current-password"
-                            error={Boolean(errors.password)}
-                        />
-                        <InputError message={errors.password} sx={{ mt: 1 }} />
-                    </DialogContent>
-                    <DialogActions>
-                        <Button variant="outlined" color="inherit" onClick={closeModal} disabled={processing}>
-                            Cancel
-                        </Button>
-                        <Button type="submit" variant="contained" color="error" disabled={processing} startIcon={processing ? <CircularProgress size={16} color="inherit" /> : undefined}>
-                            {processing ? 'Deleting…' : 'Delete account'}
-                        </Button>
-                    </DialogActions>
+                        <FlexBox direction="Column" style={{ gap: '0.25rem' }}>
+                            <Label for="delete-user-password" showColon={false}>
+                                Password
+                            </Label>
+                            <Input
+                                id="delete-user-password"
+                                type="Password"
+                                style={{ width: '100%' }}
+                                ref={passwordInput}
+                                value={data.password}
+                                onInput={(e) => setData('password', e.target.value)}
+                                valueState={errors.password ? 'Negative' : 'None'}
+                            />
+                            <InputError message={errors.password} style={{ marginTop: '0.5rem' }} />
+                        </FlexBox>
+                    </form>
                 </Dialog>
-            </Box>
-        </Box>
+            </FlexBox>
+        </FlexBox>
     );
 }

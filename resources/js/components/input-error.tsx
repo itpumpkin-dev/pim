@@ -1,9 +1,11 @@
-import { Typography, type TypographyProps } from '@mui/material';
+import type { CSSProperties, HTMLAttributes } from 'react';
 
-export default function InputError({ message, ...props }: TypographyProps & { message?: string }) {
+type InputErrorProps = Omit<HTMLAttributes<HTMLDivElement>, 'children'> & { message?: string; style?: CSSProperties; className?: string };
+
+export default function InputError({ message, style, ...props }: InputErrorProps) {
     return message ? (
-        <Typography variant="body2" color="error" {...props}>
+        <div role="alert" style={{ color: 'var(--sapNegativeTextColor)', fontSize: 'var(--sapFontSize)', ...style }} {...props}>
             {message}
-        </Typography>
+        </div>
     ) : null;
 }

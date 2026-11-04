@@ -1,30 +1,40 @@
-import { Box, Typography } from '@mui/material';
 import AppLogoIcon from './app-logo-icon';
 
 export default function AppLogo({ collapsed = false }: { collapsed?: boolean }) {
     return (
         <>
-            <Box
-                sx={{
+            <span
+                style={{
                     display: 'flex',
                     aspectRatio: '1 / 1',
                     width: 46,
                     height: 46,
                     alignItems: 'center',
                     justifyContent: 'center',
-                    borderRadius: 1,
-                    color: 'primary.main',
+                    borderRadius: 'var(--sapElement_BorderCornerRadius)',
+                    color: 'var(--sapBrandColor)',
                     flexShrink: 0,
                 }}
             >
                 <AppLogoIcon style={{ width: 46, height: 46, fill: 'currentColor' }} />
-            </Box>
+            </span>
             {!collapsed && (
-                <Box sx={{ ml: 1, display: 'grid', flex: 1, textAlign: 'left' }}>
-                    <Typography variant="body2" noWrap sx={{ fontWeight: 1000, lineHeight: 1, fontSize: 24, color: 'text.primary' }}>
-                        PIM<Box component="span" sx={{ color: 'primary.main' }}>Pumpkin</Box>
-                    </Typography>
-                </Box>
+                <span style={{ marginLeft: '0.5rem', display: 'grid', flex: 1, textAlign: 'left' }}>
+                    <span
+                        style={{
+                            fontFamily: 'var(--sapFontFamily)',
+                            fontWeight: 900,
+                            lineHeight: 1,
+                            fontSize: 24,
+                            color: 'var(--sapTextColor)',
+                            whiteSpace: 'nowrap',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                        }}
+                    >
+                        PIM<span style={{ color: 'var(--sapBrandColor)' }}>Pumpkin</span>
+                    </span>
+                </span>
             )}
         </>
     );

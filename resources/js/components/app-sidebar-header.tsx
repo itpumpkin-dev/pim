@@ -1,126 +1,99 @@
-import AppearanceToggleDropdown from '@/components/appearance-dropdown';
-import { Breadcrumbs } from '@/components/breadcrumbs';
-import LocaleDropdown from '@/components/locale-dropdown';
-import { NavUser } from '@/components/nav-user';
-import { NotificationBell } from '@/components/notification-bell';
+import { AppearanceMenu, appearanceIcon } from '@/components/appearance-dropdown';
+import { LocaleMenu } from '@/components/locale-dropdown';
+import { NavUserMenu, UserAvatar } from '@/components/nav-user';
+import { NotificationPopover, useNotifications } from '@/components/notification-bell';
 import { ShellSearch } from '@/components/shell-search';
+import { useAppearance } from '@/hooks/use-appearance';
+import { useLocale } from '@/hooks/use-locale';
 import { useSidebar } from '@/hooks/use-sidebar';
-import { getFioriShell } from '@/theme';
-import { type BreadcrumbItem as BreadcrumbItemType } from '@/types';
-import MenuIcon from '@mui/icons-material/Menu';
-import { Box, Divider, IconButton, Tooltip, useMediaQuery, useTheme } from '@mui/material';
-import { type ReactNode } from 'react';
+import { type SharedData } from '@/types';
+import { router, usePage } from '@inertiajs/react';
+import '@ui5/webcomponents-icons/dist/globe.js';
+import '@ui5/webcomponents-icons/dist/menu2.js';
+import { Button, ShellBar, ShellBarItem } from '@ui5/webcomponents-react';
+import { useCallback, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
+import AppLogoIcon from './app-logo-icon';
 
-interface AppSidebarHeaderProps {
-    breadcrumbs?: BreadcrumbItemType[];
-    actions?: ReactNode;
-}
+type OpenPopup = { kind: 'notifications' | 'locale' | 'appearance' | 'user'; opener: HTMLElement } | null;
 
-export function AppSidebarHeader({ breadcrumbs = [], actions }: AppSidebarHeaderProps) {
-    const { toggleSidebar } = useSidebar();
+/**
+ * SAP Fiori Shell Bar — the top bar of every app-shell page, on the official
+ * UI5 `ShellBar` (placed in NavigationLayout's `header` slot by AppShell):
+ * menu button (toggles the side navigation), logo + product title (→
+ * dashboard), Shell Search, notifications bell (realtime count), language
+ * and appearance switches, and the profile avatar opening the User Menu.
+ *
+ * Every popover hangs off the opener element the ShellBar hands back in its
+ * click event (`detail.targetRef`), which is also the overflow button when
+ * the bar is too narrow to show the item itself. They're portalled to
+ * <body> so nothing but ShellBar ends up in the layout's header slot.
+ */
+export function AppSidebarHeader({ slot }: { slot?: string }) {
     const { t } = useTranslation('common');
-    const theme = useTheme();
-    const shell = getFioriShell(theme.palette.mode);
+    const { auth } = usePage<SharedData>().props;
+    const { toggleSidebar, isMobile } = useSidebar();
+    const { appearance } = useAppearance();
+    const { locale, locales } = useLocale();
+    const feed = useNotifications();
 
-    // md+ shows the search as an always-open pill; below that it collapses
-    // to a magnifier button that expands on tap (Horizon shell-bar behaviour)
-    // — ShellSearch owns the collapse/expand state itself, this just tells
-    // it which mode to render.
-    const isCompact = useMediaQuery(theme.breakpoints.down('md'));
+    const [popup, setPopup] = useState<OpenPopup>(null);
+    const close = useCallback(() => setPopup(null), []);
+    const toggle = (kind: NonNullable<OpenPopup>['kind'], opener: HTMLElement) =>
+        setPopup((prev) => (prev?.kind === kind && prev.opener === opener ? null : { kind, opener }));
 
-    const shellIconSx = {
-        width: 36,
-        height: 36,
-        borderRadius: `${shell.borderRadius}px`,
-        color: shell.textColor,
-        '&:hover': { bgcolor: shell.hoverBg },
-        '&:active': { bgcolor: shell.activeBg },
-    } as const;
+    // The ShellBar collapses the search field to a magnifier button on its
+    // own when the bar is narrow; this mirrors its state so Ctrl+K can expand
+    // it again (ShellSearch → onExpandRequest).
+    const [searchVisible, setSearchVisible] = useState(!isMobile);
+    const expandSearch = useCallback(() => setSearchVisible(true), []);
+
+    const currentLocale = locales.find((l) => l.code === locale);
+    const unread = feed.unreadCount;
 
     return (
-        <Box
-            component="header"
-            sx={{
-                position: 'sticky',
-                top: 0,
-                zIndex: theme.zIndex.appBar,
-                display: 'flex',
-                alignItems: 'center',
-                gap: 0.5,
-                height: shell.height,
-                minHeight: shell.height,
-                px: { xs: 1, sm: 1.5 },
-                bgcolor: shell.color,
-                color: shell.textColor,
-                boxShadow: shell.shadow,
-            }}
-        >
-            <Tooltip title={t('toggleSidebar')}>
-                <IconButton onClick={toggleSidebar} edge="start" aria-label={t('toggleSidebar')} sx={{ ...shellIconSx, ml: -0.5 }}>
-                    <MenuIcon sx={{ fontSize: 20 }} />
-                </IconButton>
-            </Tooltip>
-
-            <Divider
-                orientation="vertical"
-                flexItem
-                sx={{ my: 1, mx: 0.5, borderColor: shell.searchBorder, display: { xs: 'none', sm: 'block' } }}
-            />
-
-            <Box
-                sx={{
-                    minWidth: 0,
-                    flex: 1,
-                    display: 'flex',
-                    alignItems: 'center',
-                    overflow: 'hidden',
-                    // Fiori title area: first crumb reads as the product title.
-                    '& .MuiBreadcrumbs-root': { minWidth: 0, overflow: 'hidden' },
-                    '& .MuiBreadcrumbs-li:first-of-type': { fontWeight: 600 },
-                    // never wrap a crumb by character (Thai has no spaces) — keep
-                    // it on one line and ellipsis the overflow instead
-                    '& .MuiBreadcrumbs-ol': { flexWrap: 'nowrap', whiteSpace: 'nowrap' },
-                    '& .MuiBreadcrumbs-li': { minWidth: 0, overflow: 'hidden' },
-                    '& .MuiBreadcrumbs-li a, & .MuiBreadcrumbs-li p': {
-                        display: 'block',
-                        whiteSpace: 'nowrap',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                    },
-                    '& .MuiBreadcrumbs-separator': { color: shell.secondaryTextColor, mx: 0.5, flexShrink: 0 },
-                    // เส้นทางลิงก์จริงใช้สี interactive ของ shell (คลิกได้ต่างจาก
-                    // ข้อความปกติชัดเจน) หน้าปัจจุบัน (ตัวสุดท้าย) ใช้สีเข้มสุด
-                    // ส่วน placeholder ("#" — segment ที่ยังไม่มีหน้าให้ไปจริงๆ)
-                    // ใช้สีรองแบบเดียวกับ separator เพราะไม่ใช่ทั้งลิงก์และไม่ใช่
-                    // หน้าปัจจุบัน (ดู Breadcrumbs component ที่ตัดสินใจว่าอันไหน
-                    // render เป็น <a> vs <p>)
-                    '& .MuiBreadcrumbs-li a': { color: shell.interactiveColor },
-                    '& .MuiBreadcrumbs-li p': { color: shell.secondaryTextColor },
-                    '& .MuiBreadcrumbs-li:last-of-type p': { color: shell.textColor },
-                    // ปุ่ม "…" ตอน collapse (ดู maxItems ใน Breadcrumbs component)
-                    '& .MuiBreadcrumbs-li button': { color: shell.secondaryTextColor, minWidth: 'auto' },
-                }}
+        <>
+            <ShellBar
+                slot={slot}
+                primaryTitle="PIM Pumpkin"
+                logo={<AppLogoIcon style={{ height: '2rem', width: 'auto' }} />}
+                onLogoClick={() => router.visit('/dashboard')}
+                startButton={
+                    <Button
+                        icon="menu2"
+                        design="Transparent"
+                        tooltip={t('toggleSidebar')}
+                        accessibleName={t('toggleSidebar')}
+                        onClick={toggleSidebar}
+                    />
+                }
+                searchField={<ShellSearch onExpandRequest={expandSearch} />}
+                showSearchField={searchVisible}
+                onSearchFieldToggle={(e) => setSearchVisible(e.detail.expanded)}
+                showNotifications
+                notificationsCount={unread > 0 ? (unread > 99 ? '99+' : String(unread)) : undefined}
+                onNotificationsClick={(e) => toggle('notifications', e.detail.targetRef)}
+                profile={auth.user ? <UserAvatar user={auth.user} /> : undefined}
+                onProfileClick={(e) => toggle('user', e.detail.targetRef)}
             >
-                <Breadcrumbs breadcrumbs={breadcrumbs} compact={isCompact} />
-            </Box>
-
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, flexShrink: 0 }}>
-                <ShellSearch shell={shell} isCompact={isCompact} />
-
-                {actions}
-
-                <Divider
-                    orientation="vertical"
-                    flexItem
-                    sx={{ my: 1, mx: 0.5, borderColor: shell.searchBorder, display: { xs: 'none', sm: 'block' } }}
+                <ShellBarItem
+                    icon="globe"
+                    text={currentLocale?.display_name ?? t('language')}
+                    onClick={(e) => toggle('locale', e.detail.targetRef)}
                 />
+                <ShellBarItem icon={appearanceIcon(appearance)} text="Theme" onClick={(e) => toggle('appearance', e.detail.targetRef)} />
+            </ShellBar>
 
-                <NotificationBell />
-                <LocaleDropdown />
-                <AppearanceToggleDropdown />
-                <NavUser />
-            </Box>
-        </Box>
+            {createPortal(
+                <>
+                    <NotificationPopover feed={feed} open={popup?.kind === 'notifications'} opener={popup?.opener ?? null} onClose={close} />
+                    <LocaleMenu open={popup?.kind === 'locale'} opener={popup?.opener ?? null} onClose={close} />
+                    <AppearanceMenu open={popup?.kind === 'appearance'} opener={popup?.opener ?? null} onClose={close} />
+                    <NavUserMenu open={popup?.kind === 'user'} opener={popup?.opener ?? null} onClose={close} />
+                </>,
+                document.body,
+            )}
+        </>
     );
 }

@@ -1,30 +1,18 @@
+import { useFioriConfirm } from '@/components/fiori-message-box';
+import { FioriResponsiveColumn, FioriResponsiveTable } from '@/components/fiori-responsive-table';
+import { ContentTranslationCoverage, type ContentGroup } from '@/components/system/content-translation-coverage';
 import AppLayout from '@/layouts/app-layout';
+import { xsrfToken } from '@/lib/csrf';
+import { FioriBusyIndicator } from '@/lib/fiori-style';
 import { type BreadcrumbItem } from '@/types';
-import { Head, Link, router } from '@inertiajs/react';
-import SearchIcon from '@mui/icons-material/Search';
-import TranslateIcon from '@mui/icons-material/Translate';
-import {
-    Box,
-    Button,
-    CircularProgress,
-    IconButton,
-    InputAdornment,
-    Paper,
-    Snackbar,
-    Stack,
-    Tab,
-    Tabs,
-    TextField,
-    Tooltip,
-    Typography,
-} from '@mui/material';
+import { Head, router } from '@inertiajs/react';
+import '@ui5/webcomponents-icons/dist/search.js';
+import '@ui5/webcomponents-icons/dist/translate.js';
+import { Button, Icon, Input, Tab, TabContainer, Text, TextArea, Title, Toast } from '@ui5/webcomponents-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ContentTranslationCoverage, type ContentGroup } from '@/components/system/content-translation-coverage';
-import { FioriResponsiveColumn, FioriResponsiveTable } from '@/components/fiori-responsive-table';
-import { useFioriConfirm } from '@/components/fiori-message-box';
-import { xsrfToken } from '@/lib/csrf';
-import { FIORI, fioriCardSx, fioriDefaultSx, fioriEmphasizedSx, fioriGhostSx, fioriSearchFieldSx, fioriTabsSx } from '@/lib/fiori-style';
+
+import styles from './locale-pages.module.css';
 
 const CONTENT_NAMESPACE = 'content';
 
@@ -98,15 +86,16 @@ export default function LocaleTranslations({ localeModel, namespaces, activeName
     // nothing until the new page finished loading. Tracks that gap so the
     // Tabs can show a spinner and the content area can dim instead.
     const [switchingTab, setSwitchingTab] = useState(false);
+    // UI5 TabContainer selects the clicked tab itself; when the "discard
+    // unsaved changes?" confirm is cancelled, bumping this key remounts the
+    // strip so the selection snaps back to activeNamespace.
+    const [tabStripKey, setTabStripKey] = useState(0);
 
     useEffect(() => {
         setValues(original);
     }, [original]);
 
-    const dirty = useMemo(
-        () => Object.fromEntries(Object.entries(values).filter(([path, value]) => value !== original[path])),
-        [values, original],
-    );
+    const dirty = useMemo(() => Object.fromEntries(Object.entries(values).filter(([path, value]) => value !== original[path])), [values, original]);
     const dirtyCount = Object.keys(dirty).length;
 
     const filteredEntries = useMemo(() => {
@@ -137,7 +126,10 @@ export default function LocaleTranslations({ localeModel, namespaces, activeName
                 confirmLabel: 'Discard',
                 destructive: true,
             });
-            if (!confirmed) return;
+            if (!confirmed) {
+                setTabStripKey((key) => key + 1);
+                return;
+            }
         }
 
         setSwitchingTab(true);
@@ -214,21 +206,13 @@ export default function LocaleTranslations({ localeModel, namespaces, activeName
             header: tSystem('translationKey'),
             priority: 'always',
             minWidth: 200,
-            render: (entry) => (
-                <Typography variant="body2" sx={{ fontFamily: 'monospace', color: FIORI.textSecondary }}>
-                    {entry.path}
-                </Typography>
-            ),
+            render: (entry) => <span className={styles.monoText}>{entry.path}</span>,
         },
         {
             key: 'source',
             header: tSystem('translationSource'),
             priority: 'medium',
-            render: (entry) => (
-                <Typography variant="body2" sx={{ color: FIORI.textSecondary }}>
-                    {entry.source}
-                </Typography>
-            ),
+            render: (entry) => <Text style={{ color: 'var(--sapContent_LabelColor)' }}>{entry.source}</Text>,
         },
         {
             key: 'value',
@@ -236,39 +220,29 @@ export default function LocaleTranslations({ localeModel, namespaces, activeName
             priority: 'high',
             minWidth: 260,
             render: (entry) => (
-                <TextField
-                    fullWidth
-                    multiline
-                    size="small"
-                    value={values[entry.path] ?? ''}
-                    onChange={(e) => setValues((prev) => ({ ...prev, [entry.path]: e.target.value }))}
-                    disabled={translatingPaths.has(entry.path)}
-                    InputProps={{
-                        endAdornment: (
-                            <InputAdornment position="end" sx={{ alignSelf: 'flex-start', mt: 1.25 }}>
-                                <Tooltip title={tSystem('translateEntry')}>
-                                    <span>
-                                        <IconButton
-                                            size="small"
-                                            aria-label={tSystem('translateEntry')}
-                                            disabled={translatingPaths.has(entry.path)}
-                                            onClick={() => translateEntry(entry.path)}
-                                            sx={{ color: FIORI.brand }}
-                                        >
-                                            {translatingPaths.has(entry.path) ? <CircularProgress size={16} /> : <TranslateIcon fontSize="small" />}
-                                        </IconButton>
-                                    </span>
-                                </Tooltip>
-                            </InputAdornment>
-                        ),
-                    }}
-                    sx={{
-                        bgcolor: FIORI.surface,
-                        ...(dirty[entry.path] !== undefined && {
-                            '& .MuiOutlinedInput-root': { borderColor: FIORI.warning },
-                        }),
-                    }}
-                />
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.25rem', width: '100%' }}>
+                    <TextArea
+                        rows={1}
+                        growing
+                        value={values[entry.path] ?? ''}
+                        onInput={(e) => {
+                            const value = e.target.value;
+                            setValues((prev) => ({ ...prev, [entry.path]: value }));
+                        }}
+                        disabled={translatingPaths.has(entry.path)}
+                        className={dirty[entry.path] !== undefined ? styles.dirtyField : undefined}
+                        style={{ flex: 1, minWidth: 0 }}
+                    />
+                    <Button
+                        design="Transparent"
+                        icon="translate"
+                        tooltip={tSystem('translateEntry')}
+                        accessibleName={tSystem('translateEntry')}
+                        disabled={translatingPaths.has(entry.path)}
+                        loading={translatingPaths.has(entry.path)}
+                        onClick={() => translateEntry(entry.path)}
+                    />
+                </div>
             ),
         },
     ];
@@ -276,127 +250,88 @@ export default function LocaleTranslations({ localeModel, namespaces, activeName
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={`${tSystem('translationsTitle')}: ${localeModel.code}`} />
-            <Box sx={{ p: { xs: 2, md: 4 }, bgcolor: FIORI.pageBg, minHeight: '100%' }}>
-                <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 3 }}>
-                    <Typography variant="h5" sx={{ fontWeight: 600, color: FIORI.textPrimary }}>
+            <div className={styles.page}>
+                <div className={styles.header}>
+                    <Title level="H2" size="H4" wrappingType="Normal">
                         {tSystem('translationsTitle')}: {localeModel.display_name || localeModel.code}
-                    </Typography>
-                    <Stack direction="row" spacing={1.5} alignItems="center">
+                    </Title>
+                    <div className={styles.headerActions}>
                         {!isContentTab && dirtyCount > 0 && (
-                            <Typography variant="body2" sx={{ color: FIORI.textSecondary }}>
-                                {tSystem('unsavedTranslationsCount', { count: dirtyCount })}
-                            </Typography>
+                            <span className={styles.mutedText}>{tSystem('unsavedTranslationsCount', { count: dirtyCount })}</span>
                         )}
-                        <Button
-                            component={Link}
-                            href="/system/locales"
-                            variant="outlined"
-                            sx={fioriDefaultSx}
-                        >
-                            {t('cancel')}
-                        </Button>
+                        <Button onClick={() => router.visit('/system/locales')}>{t('cancel')}</Button>
                         {!isContentTab && (
-                            <Button
-                                variant="contained"
-                                disabled={dirtyCount === 0 || saving}
-                                onClick={save}
-                                startIcon={saving ? <CircularProgress size={16} color="inherit" /> : undefined}
-                                sx={fioriEmphasizedSx}
-                            >
+                            <Button design="Emphasized" disabled={dirtyCount === 0 || saving} loading={saving} onClick={save}>
                                 {saving ? 'Saving…' : tSystem('saveTranslations')}
                             </Button>
                         )}
-                    </Stack>
-                </Stack>
+                    </div>
+                </div>
 
-                <Paper elevation={0} sx={{ ...fioriCardSx, mb: 2, display: 'flex', alignItems: 'center' }}>
-                    <Tabs
-                        value={activeNamespace ?? false}
-                        onChange={(_, value: string) => switchNamespace(value)}
-                        variant="scrollable"
-                        scrollButtons="auto"
-                        sx={{ ...fioriTabsSx, px: 1, flex: 1, opacity: switchingTab ? 0.6 : 1, pointerEvents: switchingTab ? 'none' : 'auto' }}
+                <div className={`${styles.tabStrip} ${switchingTab ? styles.tabStripBusy : ''}`}>
+                    <TabContainer
+                        key={tabStripKey}
+                        collapsed
+                        tabLayout="Inline"
+                        onTabSelect={(e) => {
+                            const namespace = e.detail.tab.dataset.ns;
+                            if (namespace) {
+                                void switchNamespace(namespace);
+                            }
+                        }}
+                        style={{ flex: 1, minWidth: 0 }}
                     >
                         {namespaces.map((namespace) => (
-                            <Tab key={namespace} value={namespace} label={namespaceLabel(namespace)} sx={{ textTransform: 'none' }} />
+                            <Tab key={namespace} data-ns={namespace} text={namespaceLabel(namespace)} selected={activeNamespace === namespace} />
                         ))}
                         <Tab
                             key={CONTENT_NAMESPACE}
-                            value={CONTENT_NAMESPACE}
-                            label={tSystem('contentTranslationsTab')}
-                            sx={{ textTransform: 'none', fontWeight: 700 }}
+                            data-ns={CONTENT_NAMESPACE}
+                            text={tSystem('contentTranslationsTab')}
+                            selected={activeNamespace === CONTENT_NAMESPACE}
                         />
-                    </Tabs>
-                    {switchingTab && <CircularProgress size={18} thickness={5} sx={{ mr: 2 }} />}
-                </Paper>
+                    </TabContainer>
+                    {switchingTab && <FioriBusyIndicator size="S" style={{ marginRight: '1rem' }} />}
+                </div>
 
-                <Box sx={{ position: 'relative' }}>
+                <div style={{ position: 'relative' }}>
                     {switchingTab && (
-                        <Box
-                            sx={{
-                                position: 'absolute',
-                                inset: 0,
-                                zIndex: 1,
-                                display: 'flex',
-                                flexDirection: 'column',
-                                alignItems: 'center',
-                                gap: 1.5,
-                                pt: 8,
-                                bgcolor: 'rgba(247,247,247,0.7)',
-                            }}
-                        >
-                            <CircularProgress size={32} />
-                            <Typography variant="body2" sx={{ color: FIORI.textSecondary }}>
-                                {tSystem('translationsTabLoading')}
-                            </Typography>
-                        </Box>
+                        <div className={styles.loadingOverlay}>
+                            <FioriBusyIndicator size="M" />
+                            <span className={styles.mutedText}>{tSystem('translationsTabLoading')}</span>
+                        </div>
                     )}
 
-                {isContentTab ? (
-                    contentGroups && <ContentTranslationCoverage localeId={localeModel.id} groups={contentGroups} />
-                ) : (
-                    <>
-                        <TextField
-                            value={search}
-                            onChange={(e) => setSearch(e.target.value)}
-                            placeholder={tSystem('searchTranslations')}
-                            size="small"
-                            sx={{ ...fioriSearchFieldSx, mb: 2, minWidth: 320 }}
-                            InputProps={{
-                                endAdornment: (
-                                    <InputAdornment position="end">
-                                        <SearchIcon sx={{ color: FIORI.textSecondary }} />
-                                    </InputAdornment>
-                                ),
-                            }}
-                        />
+                    {isContentTab ? (
+                        contentGroups && <ContentTranslationCoverage localeId={localeModel.id} groups={contentGroups} />
+                    ) : (
+                        <>
+                            <Input
+                                value={search}
+                                onInput={(e) => setSearch(e.target.value ?? '')}
+                                placeholder={tSystem('searchTranslations')}
+                                icon={<Icon name="search" />}
+                                style={{ marginBottom: '1rem', minWidth: 320, maxWidth: '100%' }}
+                            />
 
-                        <FioriResponsiveTable
-                            columns={columns}
-                            rows={filteredEntries}
-                            getRowKey={(entry) => entry.path}
-                            size="small"
-                            emptyMessage={tSystem('noTranslationEntriesFound')}
-                        />
-                    </>
-                )}
-                </Box>
-            </Box>
+                            <FioriResponsiveTable
+                                columns={columns}
+                                rows={filteredEntries}
+                                getRowKey={(entry) => entry.path}
+                                size="small"
+                                emptyMessage={tSystem('noTranslationEntriesFound')}
+                            />
+                        </>
+                    )}
+                </div>
+            </div>
 
-            <Snackbar
-                open={saved}
-                autoHideDuration={5000}
-                onClose={() => setSaved(false)}
-                message={tSystem('saveTranslations')}
-                anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
-            />
-            <Snackbar
-                open={translateError !== null}
-                autoHideDuration={8000}
-                onClose={() => setTranslateError(null)}
-                message={translateError}
-                anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
-            />
+            <Toast open={saved} duration={5000} placement="TopEnd" onClose={() => setSaved(false)}>
+                {tSystem('saveTranslations')}
+            </Toast>
+            <Toast open={translateError !== null} duration={8000} placement="TopEnd" onClose={() => setTranslateError(null)}>
+                {translateError}
+            </Toast>
             {confirmElement}
         </AppLayout>
     );

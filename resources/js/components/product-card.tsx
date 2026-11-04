@@ -1,23 +1,42 @@
 import { currency, productCsvHeaders, productImageUrl, productToCsvRow, type Product } from '@/data/products';
-import { getCategoryIcon } from '@/lib/category-icon';
+import { getCategoryIconName } from '@/lib/category-icon';
 import { downloadCsv } from '@/lib/csv';
+import { isProductStatus, PRODUCT_STATUS_CHIP_COLORS, PRODUCT_STATUS_LABEL_KEYS } from '@/lib/product-status';
+import { useProductTagLabel } from '@/lib/product-tag';
+import { sapIcon } from '@/lib/sap-icon';
 import { trackEvent } from '@/lib/track-event';
 import { Link } from '@inertiajs/react';
-import FileDownloadOutlinedIcon from '@mui/icons-material/FileDownloadOutlined';
-import Inventory2OutlinedIcon from '@mui/icons-material/Inventory2Outlined';
-import LocalFireDepartmentIcon from '@mui/icons-material/LocalFireDepartment';
-import { Box, Chip, IconButton, Paper, Stack, Typography } from '@mui/material';
+import '@ui5/webcomponents-icons/dist/download.js';
+import '@ui5/webcomponents-icons/dist/heating-cooling.js';
+import '@ui5/webcomponents-icons/dist/product.js';
+import { Tag, Icon as Ui5Icon } from '@ui5/webcomponents-react';
 import { memo, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useProductTagLabel } from '@/lib/product-tag';
-import { isProductStatus, PRODUCT_STATUS_CHIP_COLORS, PRODUCT_STATUS_LABEL_KEYS } from '@/lib/product-status';
+import styles from './product-card.module.css';
+
+type TagDesign = 'Positive' | 'Negative' | 'Critical' | 'Information';
+
+/** `Product.tagColor` (old MUI Chip colour) → UI5 Tag design. */
+export const PRODUCT_TAG_DESIGN: Record<NonNullable<Product['tagColor']>, TagDesign> = {
+    error: 'Negative',
+    success: 'Positive',
+    warning: 'Critical',
+};
+
+/** `PRODUCT_STATUS_CHIP_COLORS` value → UI5 Tag design. */
+export const PRODUCT_STATUS_TAG_DESIGN: Record<(typeof PRODUCT_STATUS_CHIP_COLORS)[keyof typeof PRODUCT_STATUS_CHIP_COLORS], TagDesign> = {
+    success: 'Positive',
+    warning: 'Critical',
+    error: 'Negative',
+    info: 'Information',
+};
 
 // Memoised: the storefront home grid mounts 150+ of these and grows the
 // visible slice on scroll — without this, every card re-renders on each batch.
 export const ProductCard = memo(function ProductCard({ product, popular = false }: { product: Product; popular?: boolean }) {
     const { t } = useTranslation();
     const tagLabel = useProductTagLabel();
-    const Icon = product.icon ?? getCategoryIcon(product.category);
+    const Icon = product.icon ?? sapIcon(getCategoryIconName(product.category));
     const [imageFailed, setImageFailed] = useState(false);
     const [hovering, setHovering] = useState(false);
     const videoRef = useRef<HTMLVideoElement>(null);
@@ -43,162 +62,95 @@ export const ProductCard = memo(function ProductCard({ product, popular = false 
     };
 
     return (
-        <Box
-            onMouseEnter={() => setHovering(true)}
-            onMouseLeave={() => setHovering(false)}
-            sx={{ mb: 2, breakInside: 'avoid', WebkitColumnBreakInside: 'avoid', width: '100%' }}
-        >
-            <Paper
-                component={Link}
-                href={`/products/${product.id}`}
-                prefetch
-                onClick={handleCardClick}
-                elevation={0}
-                sx={{
-                    position: 'relative',
-                    display: 'block',
-                    width: '100%',
-                    borderRadius: 3,
-                    border: 1,
-                    borderColor: 'divider',
-                    overflow: 'hidden',
-                    textDecoration: 'none',
-                    color: 'inherit',
-                    transition: 'transform 0.2s ease, box-shadow 0.2s ease',
-                    '&:hover': { transform: 'translateY(-4px)', boxShadow: 4 },
-                    // Instant press feedback the moment you click — bridges the gap
-                    // before the page navigation/fade-in even starts, so the click
-                    // itself feels acknowledged right away instead of sitting dead.
-                    '&:active': { transform: 'translateY(-1px) scale(0.98)', transition: 'transform 0.08s ease' },
-                }}
-            >
+        <div onMouseEnter={() => setHovering(true)} onMouseLeave={() => setHovering(false)} className={styles.wrapper}>
+            <Link href={`/products/${product.id}`} prefetch onClick={handleCardClick} className={styles.card}>
                 {product.tag && (
-                    <Chip
-                        label={tagLabel(product)}
-                        color={product.tagColor}
-                        size="small"
-                        sx={{ position: 'absolute', top: 10, left: 10, zIndex: 1, fontWeight: 600 }}
-                    />
+                    <Tag className={styles.tag} design={product.tagColor ? PRODUCT_TAG_DESIGN[product.tagColor] : 'Neutral'} hideStateIcon>
+                        {tagLabel(product)}
+                    </Tag>
                 )}
 
                 {popular && (
-                    <Chip
-                        icon={<LocalFireDepartmentIcon fontSize="small" sx={{ color: '#fff !important' }} />}
-                        label={t('popularBadge')}
-                        size="small"
-                        sx={{ position: 'absolute', top: 10, right: 10, zIndex: 1, fontWeight: 600, bgcolor: '#EA580C', color: '#fff' }}
-                    />
+                    <span className={styles.popular}>
+                        <Ui5Icon name="heating-cooling" className={styles.popularIcon} />
+                        {t('popularBadge')}
+                    </span>
                 )}
 
-                <Box
-                    sx={{
-                        position: 'relative',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        bgcolor: 'action.hover',
-                        minHeight: imageFailed ? 160 : undefined,
-                    }}
-                >
+                <div className={styles.media} style={imageFailed ? { minHeight: 160 } : undefined}>
                     {!imageFailed ? (
-                        <Box
-                            component="img"
+                        <img
                             src={productImageUrl(product)}
                             alt={product.name}
                             loading="lazy"
                             onError={() => setImageFailed(true)}
-                            sx={{ width: '100%', height: 'auto', display: 'block', objectFit: 'contain', p: 1.5 }}
+                            className={styles.image}
                         />
                     ) : (
-                        <Icon sx={{ fontSize: 56, color: 'text.disabled', my: 4 }} />
+                        <Icon className={styles.fallbackIcon} style={{ width: 56, height: 56 }} />
                     )}
 
                     {product.videoUrl && (
-                        <Box
-                            component="video"
+                        <video
                             ref={videoRef}
                             src={product.videoUrl}
                             muted
                             loop
                             playsInline
-                            sx={{
-                                position: 'absolute',
-                                inset: 0,
-                                width: '100%',
-                                height: '100%',
-                                objectFit: 'cover',
-                                opacity: hovering ? 1 : 0,
-                                transition: 'opacity 0.25s ease',
-                                pointerEvents: 'none',
-                            }}
+                            className={styles.video}
+                            style={{ opacity: hovering ? 1 : 0 }}
                         />
                     )}
-                </Box>
+                </div>
 
-                <Box sx={{ p: 2 }}>
-                    <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={1}>
-                        <Typography variant="caption" color="text.secondary" sx={{ minWidth: 0 }}>
+                <div className={styles.body}>
+                    <div className={styles.metaRow}>
+                        <span className={styles.caption}>
                             {product.brand} · {product.category}
-                        </Typography>
+                        </span>
                         {isProductStatus(product.status) && (
-                            <Chip
-                                label={t(`catalog:${PRODUCT_STATUS_LABEL_KEYS[product.status]}`)}
-                                color={PRODUCT_STATUS_CHIP_COLORS[product.status]}
-                                variant="outlined"
-                                size="small"
-                                sx={{ height: 20, fontSize: '0.7rem', fontWeight: 600, flexShrink: 0 }}
-                            />
+                            <Tag
+                                className={styles.status}
+                                design={PRODUCT_STATUS_TAG_DESIGN[PRODUCT_STATUS_CHIP_COLORS[product.status]]}
+                                hideStateIcon
+                            >
+                                {t(`catalog:${PRODUCT_STATUS_LABEL_KEYS[product.status]}`)}
+                            </Tag>
                         )}
-                    </Stack>
-                    <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 0.5, minHeight: 40 }}>
-                        {product.name}
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
+                    </div>
+                    <div className={styles.name}>{product.name}</div>
+                    <span className={`${styles.caption} ${styles.variant}`}>
                         {product.color ? `${product.color} · ` : ''}
                         {product.size}
-                    </Typography>
+                    </span>
 
                     {(product.canViewPricing !== false || product.canViewPackaging !== false) && (
-                        <Stack direction="row" alignItems="center" justifyContent="space-between">
-                            {product.canViewPricing !== false && (
-                                <Typography variant="subtitle1" sx={{ fontWeight: 700, color: 'primary.main' }}>
-                                    {currency(product.price)}
-                                </Typography>
-                            )}
+                        <div className={styles.footerRow}>
+                            {product.canViewPricing !== false && <span className={styles.price}>{currency(product.price)}</span>}
                             {product.canViewPackaging !== false && (
-                                <Stack direction="row" spacing={0.5} alignItems="center" sx={{ color: 'text.secondary' }}>
-                                    <Inventory2OutlinedIcon sx={{ fontSize: 16 }} />
-                                    <Typography variant="caption">{t('packLabel', { qty: product.packQty, unit: product.packUnit || t('defaultPackUnit') })}</Typography>
-                                </Stack>
+                                <span className={styles.pack}>
+                                    <Ui5Icon name="product" className={styles.packIcon} />
+                                    <span>{t('packLabel', { qty: product.packQty, unit: product.packUnit || t('defaultPackUnit') })}</span>
+                                </span>
                             )}
-                        </Stack>
+                        </div>
                     )}
 
-                    {/* Native title rather than MUI <Tooltip>: this card renders
-                        150+ times on the storefront home grid and each Tooltip
-                        carries its own Popper/listener setup. */}
-                    <IconButton
-                        size="small"
+                    {/* Native <button> + title rather than a UI5 Button/tooltip:
+                        this card renders 150+ times on the storefront home grid,
+                        so keep each one as light as possible. */}
+                    <button
+                        type="button"
                         onClick={handleExport}
                         title={t('exportThisProduct')}
                         aria-label={t('exportThisProduct')}
-                        sx={{
-                            position: 'absolute',
-                            top: popular ? 44 : 8,
-                            right: 8,
-                            bgcolor: 'background.paper',
-                            border: 1,
-                            borderColor: 'divider',
-                            opacity: 0,
-                            transition: 'opacity 0.15s ease',
-                            '.MuiPaper-root:hover &': { opacity: 1 },
-                            '&:hover, &:focus-visible': { opacity: 1, bgcolor: 'action.hover' },
-                        }}
+                        className={styles.exportButton}
+                        style={{ top: popular ? 44 : 8 }}
                     >
-                        <FileDownloadOutlinedIcon fontSize="small" />
-                    </IconButton>
-                </Box>
-            </Paper>
-        </Box>
+                        <Ui5Icon name="download" className={styles.exportIcon} />
+                    </button>
+                </div>
+            </Link>
+        </div>
     );
 });

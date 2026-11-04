@@ -1,32 +1,22 @@
+import { FioriMessageStrip } from '@/components/fiori-form';
+import { FioriMessageBox } from '@/components/fiori-message-box';
+import { FioriResponsiveTable, type FioriResponsiveColumn } from '@/components/fiori-responsive-table';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem, type SharedData } from '@/types';
 import { Head, router, usePage } from '@inertiajs/react';
-import AddIcon from '@mui/icons-material/Add';
-import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
-import ChevronRightIcon from '@mui/icons-material/ChevronRight';
-import DeleteIcon from '@mui/icons-material/Delete';
-import EditIcon from '@mui/icons-material/Edit';
-import FirstPageIcon from '@mui/icons-material/FirstPage';
-import LastPageIcon from '@mui/icons-material/LastPage';
-import SearchIcon from '@mui/icons-material/Search';
-import {
-    Alert,
-    Box,
-    Button,
-    IconButton,
-    InputAdornment,
-    Paper,
-    Stack,
-    TableSortLabel,
-    TextField,
-    Typography,
-} from '@mui/material';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { FioriMessageBox } from '@/components/fiori-message-box';
-import { FioriResponsiveColumn, FioriResponsiveTable } from '@/components/fiori-responsive-table';
-import { FIORI, fioriEmphasizedSx, fioriIconButtonSx, fioriSearchFieldSx } from '@/lib/fiori-style';
+import {
+    MasterListPage,
+    MasterListToolbar,
+    MasterPagination,
+    RowActions,
+    SecondaryText,
+    SortableHeader,
+    StrongText,
+    masterStyles,
+} from '../master-crud';
 
 interface CurrencyItem {
     id: number;
@@ -94,55 +84,46 @@ export default function CurrencyIndex({ currencies, filters }: Props) {
         router.get('/catalog/currencies', { search, sort: field, dir: nextDir }, { preserveState: true });
     };
 
+    const sortHeader = (field: string, label: string) => (
+        <SortableHeader label={label} active={sortField === field} direction={sortDir} onSort={() => handleSort(field)} />
+    );
+
     const columns: FioriResponsiveColumn<CurrencyItem>[] = [
         {
             key: 'code',
-            header: (
-                <TableSortLabel active={sortField === 'code'} direction={sortField === 'code' ? sortDir : 'asc'} onClick={() => handleSort('code')}>
-                    {t('currencyCode')}
-                </TableSortLabel>
-            ),
+            header: sortHeader('code', t('currencyCode')),
+            popinText: t('currencyCode'),
             priority: 'always',
-            render: (row) => <Typography sx={{ fontWeight: 600 }}>{row.code}</Typography>,
+            render: (row) => <StrongText>{row.code}</StrongText>,
         },
         {
             key: 'name',
-            header: (
-                <TableSortLabel active={sortField === 'name'} direction={sortField === 'name' ? sortDir : 'asc'} onClick={() => handleSort('name')}>
-                    {t('currencyName')}
-                </TableSortLabel>
-            ),
+            header: sortHeader('name', t('currencyName')),
+            popinText: t('currencyName'),
             priority: 'always',
-            render: (row) => <Typography sx={{ color: FIORI.textSecondary }}>{row.name}</Typography>,
+            render: (row) => <SecondaryText value={row.name} />,
         },
         {
             key: 'exchange_rate',
-            header: (
-                <TableSortLabel
-                    active={sortField === 'exchange_rate'}
-                    direction={sortField === 'exchange_rate' ? sortDir : 'asc'}
-                    onClick={() => handleSort('exchange_rate')}
-                >
-                    {t('currencyExchangeRate')}
-                </TableSortLabel>
-            ),
+            header: sortHeader('exchange_rate', t('currencyExchangeRate')),
+            popinText: t('currencyExchangeRate'),
             priority: 'medium',
             align: 'right',
-            render: (row) => <Typography sx={{ color: FIORI.textSecondary }}>{row.exchange_rate}</Typography>,
+            render: (row) => <SecondaryText value={row.exchange_rate} />,
         },
         {
             key: 'channels_count',
             header: tNav('channels'),
             priority: 'medium',
             align: 'right',
-            render: (row) => (row.channels_count ? <Typography>{row.channels_count}</Typography> : <Typography color="text.disabled">0</Typography>),
+            render: (row) => (row.channels_count ? <span>{row.channels_count}</span> : <span className={masterStyles.dash}>0</span>),
         },
         {
             key: 'vendors_count',
             header: tNav('vendors'),
             priority: 'medium',
             align: 'right',
-            render: (row) => (row.vendors_count ? <Typography>{row.vendors_count}</Typography> : <Typography color="text.disabled">0</Typography>),
+            render: (row) => (row.vendors_count ? <span>{row.vendors_count}</span> : <span className={masterStyles.dash}>0</span>),
         },
         ...(canEdit
             ? [
@@ -152,14 +133,7 @@ export default function CurrencyIndex({ currencies, filters }: Props) {
                       priority: 'always' as const,
                       align: 'right' as const,
                       render: (row: CurrencyItem) => (
-                          <Stack direction="row" spacing={0.5} justifyContent="flex-end">
-                              <IconButton size="small" sx={fioriIconButtonSx} onClick={() => router.visit(`/catalog/currencies/${row.id}/edit`)}>
-                                  <EditIcon fontSize="small" />
-                              </IconButton>
-                              <IconButton size="small" sx={fioriIconButtonSx} onClick={() => setDeleteId(row.id)}>
-                                  <DeleteIcon fontSize="small" />
-                              </IconButton>
-                          </Stack>
+                          <RowActions onEdit={() => router.visit(`/catalog/currencies/${row.id}/edit`)} onDelete={() => setDeleteId(row.id)} />
                       ),
                   },
               ]
@@ -169,73 +143,22 @@ export default function CurrencyIndex({ currencies, filters }: Props) {
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={tNav('currencies')} />
-            <Box sx={{ p: { xs: 2, md: 4 }, bgcolor: FIORI.pageBg, minHeight: '100%' }}>
-                <Box
-                    sx={{
-                        display: 'flex',
-                        flexDirection: { xs: 'column', sm: 'row' },
-                        justifyContent: 'space-between',
-                        alignItems: { xs: 'stretch', sm: 'flex-start' },
-                        gap: 2,
-                        mb: 3,
-                    }}
-                >
-                    <Box>
-                        <Typography variant="h5" fontWeight={600} sx={{ color: FIORI.textPrimary }}>{tNav('currencies')}</Typography>
-                        <Typography variant="body2" sx={{ color: FIORI.textSecondary, mt: 0.25 }}>{tGrid('results', { count: currencies.total })}</Typography>
-                    </Box>
-                    {canEdit && (
-                        <Button
-                            variant="contained"
-                            startIcon={<AddIcon />}
-                            onClick={() => router.visit('/catalog/currencies/create')}
-                            sx={fioriEmphasizedSx}
-                        >
-                            {t('createCurrency')}
-                        </Button>
-                    )}
-                </Box>
-
-                <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="flex-end" sx={{ mb: 2 }}>
-                    <TextField
-                        value={search}
-                        onChange={(e) => setSearch(e.target.value)}
-                        placeholder={t('searchCurrencies')}
-                        size="small"
-                        sx={{ ...fioriSearchFieldSx, width: { xs: '100%', md: 'auto' }, minWidth: { xs: 0, md: 260 } }}
-                        InputProps={{
-                            startAdornment: (
-                                <InputAdornment position="start">
-                                    <SearchIcon fontSize="small" sx={{ color: FIORI.textSecondary }} />
-                                </InputAdornment>
-                            ),
-                        }}
-                    />
-                </Stack>
+            <MasterListPage
+                title={tNav('currencies')}
+                addLabel={t('createCurrency')}
+                onAdd={canEdit ? () => router.visit('/catalog/currencies/create') : undefined}
+            >
+                <MasterListToolbar
+                    resultsLabel={tGrid('results', { count: currencies.total })}
+                    search={search}
+                    onSearchChange={setSearch}
+                    searchPlaceholder={t('searchCurrencies')}
+                />
 
                 <FioriResponsiveTable columns={columns} rows={currencies.data} getRowKey={(row) => row.id} emptyMessage={t('noCurrenciesFound')} />
 
-                <Stack direction="row" justifyContent="flex-end" alignItems="center" spacing={1.5} sx={{ mt: 2 }}>
-                    <Typography variant="body2" sx={{ color: FIORI.textSecondary }}>{tGrid('pageOf', { lastPage })}</Typography>
-                    <Stack direction="row" spacing={0.2}>
-                        <IconButton size="small" sx={fioriIconButtonSx} disabled={currentPage <= 1} onClick={() => goToPage(1)}>
-                            <FirstPageIcon fontSize="small" />
-                        </IconButton>
-                        <IconButton size="small" sx={fioriIconButtonSx} disabled={currentPage <= 1} onClick={() => goToPage(currentPage - 1)}>
-                            <ChevronLeftIcon fontSize="small" />
-                        </IconButton>
-                        <Paper variant="outlined" sx={{ px: 1.5, py: 0.5, bgcolor: FIORI.surface, borderRadius: '8px', borderColor: FIORI.border, display: 'flex', alignItems: 'center' }}>
-                            <Typography variant="body2" sx={{ color: FIORI.textPrimary }}>{currentPage}</Typography>
-                        </Paper>
-                        <IconButton size="small" sx={fioriIconButtonSx} disabled={currentPage >= lastPage} onClick={() => goToPage(currentPage + 1)}>
-                            <ChevronRightIcon fontSize="small" />
-                        </IconButton>
-                        <IconButton size="small" sx={fioriIconButtonSx} disabled={currentPage >= lastPage} onClick={() => goToPage(lastPage)}>
-                            <LastPageIcon fontSize="small" />
-                        </IconButton>
-                    </Stack>
-                </Stack>
-            </Box>
+                <MasterPagination currentPage={currentPage} lastPage={lastPage} label={tGrid('pageOf', { lastPage })} onPageChange={goToPage} />
+            </MasterListPage>
 
             <FioriMessageBox
                 open={deleteId !== null}
@@ -263,9 +186,9 @@ export default function CurrencyIndex({ currencies, filters }: Props) {
                     const inUse = (target?.channels_count ?? 0) + (target?.vendors_count ?? 0);
                     if (!inUse) return null;
                     return (
-                        <Alert severity="warning" sx={{ mt: 1.5 }}>
+                        <FioriMessageStrip severity="warning" style={{ marginTop: '0.75rem' }}>
                             {t('currencyInUseWarning', { channels: target?.channels_count ?? 0, vendors: target?.vendors_count ?? 0 })}
-                        </Alert>
+                        </FioriMessageStrip>
                     );
                 })()}
             </FioriMessageBox>

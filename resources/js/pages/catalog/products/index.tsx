@@ -1,70 +1,53 @@
+import { NewProductSkuField, useSkuAvailability } from '@/components/catalog/new-product-sku-field';
+import { FioriField } from '@/components/fiori-form';
+import { FioriMessageBox } from '@/components/fiori-message-box';
+import { FioriResponsiveColumn, FioriResponsiveTable, type FioriColumnPriority } from '@/components/fiori-responsive-table';
+import { FLOATING_STRIP_STYLE } from '@/components/flash-toast';
+import { ClickableThumbnail, ImagePreviewProvider } from '@/components/image-preview';
+import { ManageColumnsDialog, type ManageColumnOption } from '@/components/manage-columns-dialog';
+import { ProductFilterDrawer, type AttributeFilterRow, type ProductFamilyOption, type ProductFilters } from '@/components/product-filter-drawer';
 import AppLayout from '@/layouts/app-layout';
+import { FioriStatus, percentToneFiori } from '@/lib/fiori-style';
+import { isProductStatus, PRODUCT_STATUS_LABEL_KEYS, PRODUCT_STATUS_TONES } from '@/lib/product-status';
 import { type BreadcrumbItem, type SharedData } from '@/types';
 import { Head, Link, router, usePage } from '@inertiajs/react';
-import FactCheckOutlinedIcon from '@mui/icons-material/FactCheckOutlined';
-import ViewColumnOutlinedIcon from '@mui/icons-material/ViewColumnOutlined';
-import FileUploadOutlinedIcon from '@mui/icons-material/FileUploadOutlined';
-import ShareOutlinedIcon from '@mui/icons-material/ShareOutlined';
-import CategoryOutlinedIcon from '@mui/icons-material/CategoryOutlined';
-import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
-// Pilot batch (see resources/js/components/icon.tsx's docblock) — Search/
-// Edit/ContentCopy(→copy)/Delete/FilterList(→filter)/FirstPage/LastPage/
-// ChevronLeft/ChevronRight/Close now render via SAP-icons instead of MUI's
-// icon set. The rest of this file's icons (FactCheckOutlined,
-// ViewColumnOutlined, ...) aren't in the pilot's curated name list yet —
-// left as MUI icons rather than guessing an unreviewed mapping for them.
-import { Icon } from '@/components/icon';
+import '@ui5/webcomponents-icons/dist/arrow-bottom.js';
+import '@ui5/webcomponents-icons/dist/copy.js';
+import '@ui5/webcomponents-icons/dist/decline.js';
+import '@ui5/webcomponents-icons/dist/delete.js';
+import '@ui5/webcomponents-icons/dist/edit.js';
+import '@ui5/webcomponents-icons/dist/filter.js';
+import '@ui5/webcomponents-icons/dist/inspection.js';
+import '@ui5/webcomponents-icons/dist/product.js';
+import '@ui5/webcomponents-icons/dist/search.js';
+import '@ui5/webcomponents-icons/dist/share.js';
+import '@ui5/webcomponents-icons/dist/slim-arrow-left.js';
+import '@ui5/webcomponents-icons/dist/slim-arrow-right.js';
+import '@ui5/webcomponents-icons/dist/sys-first-page.js';
+import '@ui5/webcomponents-icons/dist/sys-last-page.js';
+import '@ui5/webcomponents-icons/dist/table-column.js';
+import '@ui5/webcomponents-icons/dist/upload-to-cloud.js';
 import {
-    Alert,
-    Autocomplete,
-    Box,
+    Bar,
     Button,
-    Checkbox,
-    Chip,
-    CircularProgress,
+    CheckBox,
+    ComboBox,
+    ComboBoxItem,
     Dialog,
-    DialogActions,
-    DialogContent,
-    DialogTitle,
-    Divider,
-    IconButton,
-    InputAdornment,
-    MenuItem,
-    Paper,
+    Icon,
+    Input,
+    MessageStrip,
+    MultiComboBox,
+    MultiComboBoxItem,
+    Option,
     Select,
-    Snackbar,
-    Stack,
-    TableSortLabel,
-    TextField,
-    Tooltip,
-    Typography,
-} from '@mui/material';
+    Title,
+} from '@ui5/webcomponents-react';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FioriResponsiveColumn, type FioriColumnPriority, FioriResponsiveTable } from '@/components/fiori-responsive-table';
-import { ClickableThumbnail, ImagePreviewProvider } from '@/components/image-preview';
-import { FioriMessageBox } from '@/components/fiori-message-box';
-import { NewProductSkuField, useSkuAvailability } from '@/components/catalog/new-product-sku-field';
-import { ManageColumnsDialog, type ManageColumnOption } from '@/components/manage-columns-dialog';
-import {
-    ProductFilterDrawer,
-    type AttributeFilterRow,
-    type ProductFamilyOption,
-    type ProductFilters,
-} from '@/components/product-filter-drawer';
-import {
-    FIORI,
-    FioriStatus,
-    fioriCardSx,
-    fioriDefaultSx,
-    fioriEmphasizedSx,
-    fioriGhostSx,
-    fioriIconButtonSx,
-    fioriSearchFieldSx,
-    fioriTableRowSx,
-    percentToneFiori,
-} from '@/lib/fiori-style';
-import { isProductStatus, PRODUCT_STATUS_LABEL_KEYS, PRODUCT_STATUS_TONES } from '@/lib/product-status';
+
+import { SortableHeader } from '../master-crud';
+import styles from './index.module.css';
 
 interface GridColumn {
     label: string;
@@ -138,10 +121,7 @@ interface SalesChannelGroup {
 }
 
 function flattenCategoryTree(nodes: CategoryTreeNode[], depth = 0): ExportCategoryOption[] {
-    return nodes.flatMap((node) => [
-        { id: node.id, label: `${'— '.repeat(depth)}${node.name}` },
-        ...flattenCategoryTree(node.children, depth + 1),
-    ]);
+    return nodes.flatMap((node) => [{ id: node.id, label: `${'— '.repeat(depth)}${node.name}` }, ...flattenCategoryTree(node.children, depth + 1)]);
 }
 interface Props {
     gridConfig: GridConfig;
@@ -182,6 +162,8 @@ const DEFAULT_COLUMN_SPEC = [
     'updated_by',
 ];
 
+const PRODUCT_TYPE_OPTIONS = ['simple', 'configurable'] as const;
+
 function defaultColumnKeys(attributes: { id: number; code: string }[]): string[] {
     const idByCode = new Map(attributes.map((a) => [a.code, a.id]));
     return DEFAULT_COLUMN_SPEC.flatMap((spec) => {
@@ -214,23 +196,17 @@ function AttributeThumbnail({ src, alt }: { src: string; alt: string }) {
 
 function renderAttributeCellValue(attrType: string, value: unknown, alt: string): ReactNode {
     if (attrType === 'image') {
-        return typeof value === 'string' && value ? (
-            <AttributeThumbnail src={value} alt={alt} />
-        ) : (
-            <Typography variant="body2" color="text.disabled">-</Typography>
-        );
+        return typeof value === 'string' && value ? <AttributeThumbnail src={value} alt={alt} /> : <span className={styles.disabledText}>-</span>;
     }
 
     if (attrType === 'gallery') {
         const urls = Array.isArray(value) ? value.filter((v): v is string => typeof v === 'string') : [];
-        if (urls.length === 0) return <Typography variant="body2" color="text.disabled">-</Typography>;
+        if (urls.length === 0) return <span className={styles.disabledText}>-</span>;
         return (
-            <Stack direction="row" alignItems="center" spacing={0.5}>
+            <span className={styles.inlineRow}>
                 <AttributeThumbnail src={urls[0]} alt={alt} />
-                {urls.length > 1 && (
-                    <Typography variant="caption" color="text.secondary">+{urls.length - 1}</Typography>
-                )}
-            </Stack>
+                {urls.length > 1 && <span className={styles.caption}>+{urls.length - 1}</span>}
+            </span>
         );
     }
 
@@ -273,6 +249,7 @@ function productColumnPriority(key: string): FioriColumnPriority {
 export default function ProductIndex({ gridConfig, gridData, filters, attributes, families, salesChannels }: Props) {
     const { t } = useTranslation('catalog');
     const { t: tNav } = useTranslation('nav');
+    const { t: tGrid } = useTranslation('grid');
     const { auth } = usePage<SharedData>().props;
 
     const breadcrumbs: BreadcrumbItem[] = [
@@ -313,7 +290,10 @@ export default function ProductIndex({ gridConfig, gridData, filters, attributes
             { sku: duplicateSku.trim() },
             {
                 onSuccess: () => setDuplicateProductId(null),
-                onError: (errs) => setDuplicateSkuError((errs.sku as string | undefined) ?? (Object.values(errs)[0] as string | undefined) ?? t('duplicateProductError')),
+                onError: (errs) =>
+                    setDuplicateSkuError(
+                        (errs.sku as string | undefined) ?? (Object.values(errs)[0] as string | undefined) ?? t('duplicateProductError'),
+                    ),
                 onFinish: () => setDuplicating(false),
             },
         );
@@ -484,14 +464,9 @@ export default function ProductIndex({ gridConfig, gridData, filters, attributes
                 minWidth: 140,
                 // ลิงก์ไปหน้าดูสินค้า (catalog/products/{id}) — เป็น <a> จริง จะได้ ctrl/กลางคลิกเปิดแท็บใหม่ได้
                 render: (row) => (
-                    <Box
-                        component={Link}
-                        href={`/catalog/products/${row.id}`}
-                        onClick={(e: React.MouseEvent) => e.stopPropagation()}
-                        sx={{ color: FIORI.brand, fontWeight: 600, whiteSpace: 'nowrap', textDecoration: 'none', '&:hover': { textDecoration: 'underline' } }}
-                    >
+                    <Link href={`/catalog/products/${row.id}`} className={styles.skuLink}>
                         {row.sku}
-                    </Box>
+                    </Link>
                 ),
             },
             {
@@ -501,7 +476,7 @@ export default function ProductIndex({ gridConfig, gridData, filters, attributes
                     <ClickableThumbnail
                         src={row.image_url}
                         alt={row.name || row.sku}
-                        fallback={<CategoryOutlinedIcon sx={{ color: 'grey.500', fontSize: 20 }} />}
+                        fallback={<Icon name="product" style={{ color: 'var(--sapContent_IconColor)', width: 20, height: 20 }} />}
                     />
                 ),
             },
@@ -511,18 +486,16 @@ export default function ProductIndex({ gridConfig, gridData, filters, attributes
                 label: t('attributeFamily'),
                 render: (row) => row.family_code || row.family?.code || t('defaultFamily'),
                 headerRender: () => (
-                    <Stack direction="row" alignItems="center" spacing={0.5}>
+                    <span className={styles.inlineRow}>
                         <span>{t('attributeFamily')}</span>
-                        <ArrowDownwardIcon sx={{ fontSize: 14 }} />
-                    </Stack>
+                        <Icon name="arrow-bottom" style={{ width: 14, height: 14 }} />
+                    </span>
                 ),
             },
             {
                 key: 'status',
                 label: t('publishing'),
-                render: (row) => (
-                    <FioriStatus label={row.enabled ? t('published') : t('unpublished')} tone={row.enabled ? 'success' : 'neutral'} />
-                ),
+                render: (row) => <FioriStatus label={row.enabled ? t('published') : t('unpublished')} tone={row.enabled ? 'success' : 'neutral'} />,
             },
             {
                 key: 'product_status',
@@ -595,10 +568,7 @@ export default function ProductIndex({ gridConfig, gridData, filters, attributes
         return [...systemColumns, ...attributeColumns];
     }, [attributes, t, liveStatusOverrides]);
 
-    const columnsCatalog: ManageColumnOption[] = useMemo(
-        () => allColumns.map((col) => ({ key: col.key, label: col.label })),
-        [allColumns],
-    );
+    const columnsCatalog: ManageColumnOption[] = useMemo(() => allColumns.map((col) => ({ key: col.key, label: col.label })), [allColumns]);
 
     // ตรงกับ ProductRowExporter::columns() (sku, type, enabled, status,
     // แล้วตามด้วยทุก attribute ที่ view ได้) — เป็นชุดคอลัมน์จริงของไฟล์ export CSV
@@ -674,12 +644,22 @@ export default function ProductIndex({ gridConfig, gridData, filters, attributes
         }, 300);
 
         return () => clearTimeout(timeout);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [search]);
 
     const goToPage = (page: number) => {
         router.get(
             '/catalog/products',
-            { search, page, per_page: perPage, sort: sortField, dir: sortDir, filters: activeFilters, attribute_filters: activeAttributeFilters, category_id: categoryId },
+            {
+                search,
+                page,
+                per_page: perPage,
+                sort: sortField,
+                dir: sortDir,
+                filters: activeFilters,
+                attribute_filters: activeAttributeFilters,
+                category_id: categoryId,
+            },
             { preserveState: true },
         );
     };
@@ -688,7 +668,16 @@ export default function ProductIndex({ gridConfig, gridData, filters, attributes
         setPerPage(value);
         router.get(
             '/catalog/products',
-            { search, page: 1, per_page: value, sort: sortField, dir: sortDir, filters: activeFilters, attribute_filters: activeAttributeFilters, category_id: categoryId },
+            {
+                search,
+                page: 1,
+                per_page: value,
+                sort: sortField,
+                dir: sortDir,
+                filters: activeFilters,
+                attribute_filters: activeAttributeFilters,
+                category_id: categoryId,
+            },
             { preserveState: true },
         );
     };
@@ -723,22 +712,6 @@ export default function ProductIndex({ gridConfig, gridData, filters, attributes
         );
     };
 
-    const handleSelectAll = (checked: boolean) => {
-        if (checked) {
-            setSelectedIds(gridData.data.map((row) => row.id));
-        } else {
-            setSelectedIds([]);
-        }
-    };
-
-    const handleSelectOne = (id: number, checked: boolean) => {
-        if (checked) {
-            setSelectedIds((prev) => [...prev, id]);
-        } else {
-            setSelectedIds((prev) => prev.filter((item) => item !== id));
-        }
-    };
-
     // สร้างไฟล์ในคิว (QuickExportProductsJob) แล้วแจ้งที่กระดิ่งเมื่อพร้อม — เดิมดาวน์โหลดตรงๆ
     // (window.location) ไฟล์ทั้งระบบเกินเวลาของ request ตอนนี้ backend redirect กลับมาพร้อม flash
     // "กำลังเตรียมไฟล์" เลยใช้ router.get ให้อยู่หน้าเดิม ไม่โหลดหน้าใหม่
@@ -751,7 +724,7 @@ export default function ProductIndex({ gridConfig, gridData, filters, attributes
         if (selectedIds.length > 0) {
             // ถ้าเลือกแถวไว้ชัดเจนแล้ว หมายความว่าต้องการแค่สินค้าเหล่านี้เท่านั้น —
             // ตัวเลือก type/category ด้านล่างจะถูก disable ไว้ในสถานะนี้ (ดู prop
-            // `disabled` ของ Autocomplete) เลยไม่ต้องส่งไปด้วย
+            // `disabled` ของ ComboBox) เลยไม่ต้องส่งไปด้วย
             params.ids = selectedIds.map(String);
         } else {
             if (search) params.search = search;
@@ -770,20 +743,23 @@ export default function ProductIndex({ gridConfig, gridData, filters, attributes
     const currentPage = gridData.current_page ?? 1;
     const lastPage = gridData.last_page ?? 1;
 
+    // Snackbar เดิม (MUI autoHideDuration) — ปิดแถบแจ้งเตือนเองหลัง 10 วิ (error) / 6 วิ (info)
+    useEffect(() => {
+        if (!liveStatusError) return;
+        const timer = setTimeout(() => setLiveStatusError(null), 10000);
+        return () => clearTimeout(timer);
+    }, [liveStatusError]);
+
+    useEffect(() => {
+        if (!liveStatusInfo) return;
+        const timer = setTimeout(() => setLiveStatusInfo(null), 6000);
+        return () => clearTimeout(timer);
+    }, [liveStatusInfo]);
+
+    const shareBusy = sharing || deactivating;
+    const activeFilterCount = Object.keys(activeFilters).length + activeAttributeFilters.length;
+
     const tableColumns: FioriResponsiveColumn<ProductRow>[] = [
-        {
-            key: 'select',
-            header: (
-                <Checkbox
-                    indeterminate={selectedIds.length > 0 && selectedIds.length < gridData.data.length}
-                    checked={gridData.data.length > 0 && selectedIds.length === gridData.data.length}
-                    onChange={(e) => handleSelectAll(e.target.checked)}
-                />
-            ),
-            priority: 'always',
-            width: 48,
-            render: (row) => <Checkbox checked={selectedIds.includes(row.id)} onChange={(e) => handleSelectOne(row.id, e.target.checked)} />,
-        },
         ...visibleColumns.map((col): FioriResponsiveColumn<ProductRow> => {
             const sortKey = SORTABLE_FIELDS[col.key];
             return {
@@ -791,12 +767,11 @@ export default function ProductIndex({ gridConfig, gridData, filters, attributes
                 header: col.headerRender ? (
                     col.headerRender()
                 ) : sortKey ? (
-                    <TableSortLabel active={sortField === sortKey} direction={sortField === sortKey ? sortDir : 'asc'} onClick={() => handleSort(sortKey)}>
-                        {col.label}
-                    </TableSortLabel>
+                    <SortableHeader label={col.label} active={sortField === sortKey} direction={sortDir} onSort={() => handleSort(sortKey)} />
                 ) : (
                     col.label
                 ),
+                popinText: col.label,
                 priority: productColumnPriority(col.key),
                 minWidth: col.minWidth,
                 render: col.render,
@@ -807,481 +782,487 @@ export default function ProductIndex({ gridConfig, gridData, filters, attributes
             header: t('actions'),
             priority: 'always',
             align: 'right',
-            render: (row) => (
-                <Stack direction="row" spacing={0.5} justifyContent="flex-end">
+            render: (row: ProductRow) => (
+                <div className={styles.rowActions}>
                     {canEdit && (
-                        <IconButton size="small" sx={fioriIconButtonSx} onClick={() => router.visit(`/catalog/products/${row.id}/edit`)}>
-                            <Icon name="edit" fontSize="small" />
-                        </IconButton>
+                        <Button
+                            design="Transparent"
+                            icon="edit"
+                            tooltip={tGrid('rowActions.edit')}
+                            accessibleName={tGrid('rowActions.edit')}
+                            onClick={() => router.visit(`/catalog/products/${row.id}/edit`)}
+                        />
                     )}
                     {canCreate && (
-                        <Tooltip title={t('duplicateProduct')}>
-                            <span>
-                                <IconButton size="small" sx={fioriIconButtonSx} onClick={() => openDuplicateDialog(row.id)}>
-                                    <Icon name="copy" fontSize="small" />
-                                </IconButton>
-                            </span>
-                        </Tooltip>
+                        <Button
+                            design="Transparent"
+                            icon="copy"
+                            tooltip={t('duplicateProduct')}
+                            accessibleName={t('duplicateProduct')}
+                            onClick={() => openDuplicateDialog(row.id)}
+                        />
                     )}
                     {canEdit && (
-                        <Tooltip title={t('checkLiveStatus')}>
-                            <span>
-                                <IconButton
-                                    size="small"
-                                    sx={fioriIconButtonSx}
-                                    disabled={checkingLiveIds.has(row.id)}
-                                    onClick={() => checkLiveStatus(row.id)}
-                                >
-                                    {checkingLiveIds.has(row.id) ? <CircularProgress size={16} color="inherit" /> : <FactCheckOutlinedIcon fontSize="small" />}
-                                </IconButton>
-                            </span>
-                        </Tooltip>
+                        <Button
+                            design="Transparent"
+                            icon="inspection"
+                            tooltip={t('checkLiveStatus')}
+                            accessibleName={t('checkLiveStatus')}
+                            loading={checkingLiveIds.has(row.id)}
+                            loadingDelay={0}
+                            disabled={checkingLiveIds.has(row.id)}
+                            onClick={() => checkLiveStatus(row.id)}
+                        />
                     )}
                     {canDelete && (
-                        <IconButton size="small" sx={fioriIconButtonSx} onClick={() => setDeleteProductId(row.id)}>
-                            <Icon name="delete" fontSize="small" />
-                        </IconButton>
+                        <Button
+                            design="Transparent"
+                            icon="delete"
+                            tooltip={tGrid('rowActions.delete')}
+                            accessibleName={tGrid('rowActions.delete')}
+                            onClick={() => setDeleteProductId(row.id)}
+                        />
                     )}
-                </Stack>
+                </div>
             ),
         },
     ];
 
     return (
         <ImagePreviewProvider>
-        <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title={t('products')} />
-            <Box sx={{ p: { xs: 2, md: 4 }, bgcolor: FIORI.pageBg, minHeight: '100%' }}>
-                {/* หัวหน้า: ชื่อหน้า + ปุ่ม action ต่างๆ */}
-                <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 3 }}>
-                    <Box>
-                        <Typography variant="h5" fontWeight={600} sx={{ color: FIORI.textPrimary }}>
-                            {t('products')}
-                        </Typography>
-                        <Typography variant="body2" sx={{ color: FIORI.textSecondary, mt: 0.25 }}>
-                            {t('results', { count: gridData.total })}
-                        </Typography>
-                    </Box>
+            <AppLayout breadcrumbs={breadcrumbs}>
+                <Head title={t('products')} />
+                <div className={styles.page}>
+                    {/* หัวหน้า: ชื่อหน้า + ปุ่ม action ต่างๆ */}
+                    <div className={styles.header}>
+                        <div>
+                            <Title level="H2" size="H4">
+                                {t('products')}
+                            </Title>
+                            <span className={styles.results}>{t('results', { count: gridData.total })}</span>
+                        </div>
 
-                    <Stack direction="row" spacing={1.5}>
-                        <Button
-                            variant="text"
-                            startIcon={<FileUploadOutlinedIcon />}
-                            onClick={() => setQuickExportOpen(true)}
-                            sx={fioriGhostSx}
-                        >
-                            {t('quickExport')}
-                        </Button>
-                        {canEdit && (
-                            <Button
-                                variant="outlined"
-                                startIcon={<ShareOutlinedIcon />}
-                                onClick={openShareDialog}
-                                disabled={selectedIds.length === 0}
-                                sx={fioriDefaultSx}
-                            >
-                                {t('share')}
-                                {selectedIds.length > 0 ? ` (${selectedIds.length})` : ''}
+                        <div className={styles.headerActions}>
+                            <Button design="Transparent" icon="upload-to-cloud" onClick={() => setQuickExportOpen(true)}>
+                                {t('quickExport')}
                             </Button>
-                        )}
-                        {canCreate && (
-                            <Button
-                                variant="contained"
-                                onClick={() => router.visit('/catalog/products/create')}
-                                sx={{ ...fioriEmphasizedSx, px: 2.5, py: 1 }}
-                            >
-                                {t('createProduct')}
-                            </Button>
-                        )}
-                    </Stack>
-                </Stack>
-
-                {/* การ์ดตาราง: รวม toolbar + หัวตาราง + แถวข้อมูล ไว้บนพื้นผิว "Table" แบบ Fiori เดียวกัน */}
-                <Paper elevation={0} sx={fioriCardSx}>
-                    {/* แถบเครื่องมือ (Toolbar) */}
-                    <Stack
-                        direction={{ xs: 'column', md: 'row' }}
-                        justifyContent="space-between"
-                        alignItems="center"
-                        spacing={2}
-                        sx={{ p: 2 }}
-                    >
-                        <Stack direction="row" alignItems="center" spacing={2} sx={{ width: { xs: '100%', md: 'auto' } }}>
-                            <TextField
-                                value={search}
-                                onChange={(e) => setSearch(e.target.value)}
-                                placeholder={t('search')}
-                                size="small"
-                                sx={{ ...fioriSearchFieldSx, minWidth: 240 }}
-                                InputProps={{
-                                    endAdornment: (
-                                        <InputAdornment position="end">
-                                            <Icon name="search" sx={{ color: FIORI.textSecondary, fontSize: 20 }} />
-                                        </InputAdornment>
-                                    ),
-                                }}
-                            />
-                            {categoryId && (
-                                <Chip
-                                    label={t('filteredByCategory', { name: categoryName || categoryId })}
-                                    size="small"
-                                    onDelete={clearCategoryFilter}
-                                    variant="outlined"
-                                    sx={{ borderColor: FIORI.borderStrong, borderRadius: '6px', color: FIORI.textPrimary }}
-                                />
+                            {canEdit && (
+                                <Button icon="share" onClick={openShareDialog} disabled={selectedIds.length === 0}>
+                                    {t('share')}
+                                    {selectedIds.length > 0 ? ` (${selectedIds.length})` : ''}
+                                </Button>
                             )}
-                        </Stack>
+                            {canCreate && (
+                                <Button design="Emphasized" onClick={() => router.visit('/catalog/products/create')}>
+                                    {t('createProduct')}
+                                </Button>
+                            )}
+                        </div>
+                    </div>
 
-                        <Stack direction="row" alignItems="center" spacing={1.5} useFlexGap flexWrap="wrap" sx={{ width: { xs: '100%', md: 'auto' }, rowGap: 1, justifyContent: { xs: 'space-between', md: 'flex-end' } }}>
-                            <Button
-                                variant="outlined"
-                                startIcon={<ViewColumnOutlinedIcon />}
-                                onClick={() => setColumnsDialogOpen(true)}
-                                sx={fioriDefaultSx}
-                            >
-                                {t('columns')}
-                            </Button>
-                            <Button
-                                variant="outlined"
-                                startIcon={<Icon name="filter" />}
-                                onClick={() => setFilterDrawerOpen(true)}
-                                sx={fioriDefaultSx}
-                            >
-                                {t('filter')}
-                                {Object.keys(activeFilters).length + activeAttributeFilters.length > 0 &&
-                                    ` (${Object.keys(activeFilters).length + activeAttributeFilters.length})`}
-                            </Button>
+                    {/* การ์ดตาราง: รวม toolbar + หัวตาราง + แถวข้อมูล ไว้บนพื้นผิว "Table" แบบ Fiori เดียวกัน */}
+                    <div className={styles.card}>
+                        {/* แถบเครื่องมือ (Toolbar) */}
+                        <div className={styles.toolbar}>
+                            <div className={styles.toolbarStart}>
+                                <Input
+                                    className={styles.search}
+                                    value={search}
+                                    onInput={(e) => setSearch(e.target.value)}
+                                    placeholder={t('search')}
+                                    accessibleName={t('search')}
+                                    icon={<Icon name="search" />}
+                                />
+                                {categoryId && (
+                                    <span className={styles.categoryFilter}>
+                                        {t('filteredByCategory', { name: categoryName || categoryId })}
+                                        <Button
+                                            design="Transparent"
+                                            icon="decline"
+                                            tooltip={t('close')}
+                                            accessibleName={t('close')}
+                                            onClick={clearCategoryFilter}
+                                        />
+                                    </span>
+                                )}
+                            </div>
 
+                            <div className={styles.toolbarEnd}>
+                                <Button icon="table-column" onClick={() => setColumnsDialogOpen(true)}>
+                                    {t('columns')}
+                                </Button>
+                                <Button icon="filter" onClick={() => setFilterDrawerOpen(true)}>
+                                    {t('filter')}
+                                    {activeFilterCount > 0 && ` (${activeFilterCount})`}
+                                </Button>
+
+                                <Select
+                                    className={styles.perPage}
+                                    accessibleName={t('perPage')}
+                                    value={String(perPage)}
+                                    onChange={(e) => handlePerPageChange(Number(e.detail.selectedOption.value))}
+                                >
+                                    <Option value="10">10</Option>
+                                    <Option value="25">25</Option>
+                                    <Option value="50">50</Option>
+                                </Select>
+
+                                <span className={styles.muted}>{t('perPage')}</span>
+
+                                <span className={styles.currentPage}>{currentPage}</span>
+
+                                <span className={styles.muted}>{t('pageOf', { lastPage })}</span>
+
+                                <div className={styles.pagerButtons}>
+                                    <Button
+                                        design="Transparent"
+                                        icon="sys-first-page"
+                                        accessibleName="«"
+                                        disabled={currentPage <= 1}
+                                        onClick={() => goToPage(1)}
+                                    />
+                                    <Button
+                                        design="Transparent"
+                                        icon="slim-arrow-left"
+                                        accessibleName="‹"
+                                        disabled={currentPage <= 1}
+                                        onClick={() => goToPage(currentPage - 1)}
+                                    />
+                                    <Button
+                                        design="Transparent"
+                                        icon="slim-arrow-right"
+                                        accessibleName="›"
+                                        disabled={currentPage >= lastPage}
+                                        onClick={() => goToPage(currentPage + 1)}
+                                    />
+                                    <Button
+                                        design="Transparent"
+                                        icon="sys-last-page"
+                                        accessibleName="»"
+                                        disabled={currentPage >= lastPage}
+                                        onClick={() => goToPage(lastPage)}
+                                    />
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* ตารางข้อมูล */}
+                        <FioriResponsiveTable
+                            variant="plain"
+                            columns={tableColumns}
+                            rows={gridData.data}
+                            getRowKey={(row: ProductRow) => row.id}
+                            selectedKeys={selectedIds}
+                            onSelectionChange={(keys) => setSelectedIds(keys.map(Number))}
+                            emptyMessage={t('noProductsFound')}
+                        />
+                    </div>
+                </div>
+
+                {/* Dialog สำหรับ Export แบบด่วน */}
+                <Dialog
+                    open={quickExportOpen}
+                    className={styles.dialog}
+                    onClose={() => setQuickExportOpen(false)}
+                    header={
+                        <Bar
+                            startContent={<Title level="H5">{t('quickExport')}</Title>}
+                            endContent={
+                                <Button
+                                    design="Transparent"
+                                    icon="decline"
+                                    tooltip={t('close')}
+                                    accessibleName={t('close')}
+                                    onClick={() => setQuickExportOpen(false)}
+                                />
+                            }
+                        />
+                    }
+                    footer={
+                        <Bar
+                            design="Footer"
+                            endContent={
+                                <>
+                                    <Button design="Transparent" onClick={() => setQuickExportOpen(false)}>
+                                        {t('cancel')}
+                                    </Button>
+                                    <Button
+                                        design="Emphasized"
+                                        onClick={handleQuickExport}
+                                        disabled={queuingExport}
+                                        loading={queuingExport}
+                                        loadingDelay={0}
+                                    >
+                                        {t('download')}
+                                    </Button>
+                                </>
+                            }
+                        />
+                    }
+                >
+                    <div className={styles.dialogBody}>
+                        <FioriField label={t('selectOption')} htmlFor="quick-export-format" labelWidth={160} fullWidth>
                             <Select
-                                value={perPage}
-                                onChange={(e) => handlePerPageChange(Number(e.target.value))}
-                                size="small"
-                                sx={{
-                                    bgcolor: FIORI.surface,
-                                    borderRadius: '8px',
-                                    minWidth: 60,
-                                    height: 34,
-                                    '& .MuiOutlinedInput-notchedOutline': { borderColor: FIORI.border },
+                                id="quick-export-format"
+                                className={styles.fullWidth}
+                                value={exportFormat}
+                                onChange={(e) => setExportFormat(e.detail.selectedOption.value as 'CSV' | 'XLS' | 'XLSX')}
+                            >
+                                {(['CSV', 'XLS', 'XLSX'] as const).map((format) => (
+                                    <Option key={format} value={format}>
+                                        {format}
+                                    </Option>
+                                ))}
+                            </Select>
+                        </FioriField>
+
+                        {/* placeholder โชว์เฉพาะตอนช่องว่าง — hint บอกให้เห็นตลอดว่าไม่เลือก = ส่งออกทุกคอลัมน์ */}
+                        <FioriField
+                            label={t('exportColumns')}
+                            htmlFor="quick-export-columns"
+                            labelWidth={160}
+                            fullWidth
+                            hint={exportColumns.length === 0 ? t('exportAllColumnsHint') : undefined}
+                        >
+                            <MultiComboBox
+                                id="quick-export-columns"
+                                className={styles.fullWidth}
+                                placeholder={exportColumns.length === 0 ? t('exportAllColumns') : undefined}
+                                selectedValues={exportColumns.map((col) => col.code)}
+                                onSelectionChange={(e) => {
+                                    const codes = new Set(e.detail.items.map((item) => item.value));
+                                    setExportColumns(exportColumnCatalog.filter((col) => codes.has(col.code)));
                                 }}
                             >
-                                <MenuItem value={10}>10</MenuItem>
-                                <MenuItem value={25}>25</MenuItem>
-                                <MenuItem value={50}>50</MenuItem>
-                            </Select>
+                                {exportColumnCatalog.map((col) => (
+                                    <MultiComboBoxItem key={col.code} value={col.code} text={col.label} />
+                                ))}
+                            </MultiComboBox>
+                        </FioriField>
 
-                            <Typography variant="body2" sx={{ color: FIORI.textSecondary }}>
-                                {t('perPage')}
-                            </Typography>
-
-                            <Paper
-                                variant="outlined"
-                                sx={{ px: 1.5, py: 0.5, bgcolor: FIORI.surface, borderRadius: '8px', borderColor: FIORI.border, display: 'flex', alignItems: 'center' }}
+                        <FioriField
+                            label={t('exportProductTypes')}
+                            htmlFor="quick-export-types"
+                            labelWidth={160}
+                            fullWidth
+                            hint={selectedIds.length > 0 ? t('exportFiltersDisabledForSelection') : undefined}
+                        >
+                            <MultiComboBox
+                                id="quick-export-types"
+                                className={styles.fullWidth}
+                                disabled={selectedIds.length > 0}
+                                placeholder={exportTypes.length === 0 ? t('exportAllProductTypes') : undefined}
+                                selectedValues={exportTypes}
+                                onSelectionChange={(e) => {
+                                    const values = new Set(e.detail.items.map((item) => item.value));
+                                    setExportTypes(PRODUCT_TYPE_OPTIONS.filter((type) => values.has(type)));
+                                }}
                             >
-                                <Typography variant="body2" sx={{ color: FIORI.textPrimary }}>{currentPage}</Typography>
-                            </Paper>
+                                {PRODUCT_TYPE_OPTIONS.map((type) => (
+                                    <MultiComboBoxItem key={type} value={type} text={t(type)} />
+                                ))}
+                            </MultiComboBox>
+                        </FioriField>
 
-                            <Typography variant="body2" sx={{ color: FIORI.textSecondary }}>
-                                {t('pageOf', { lastPage })}
-                            </Typography>
+                        <FioriField
+                            label={t('exportCategory')}
+                            htmlFor="quick-export-category"
+                            labelWidth={160}
+                            fullWidth
+                            hint={selectedIds.length > 0 ? t('exportFiltersDisabledForSelection') : undefined}
+                        >
+                            <ComboBox
+                                id="quick-export-category"
+                                className={styles.fullWidth}
+                                disabled={selectedIds.length > 0}
+                                showClearIcon
+                                placeholder={!exportCategory ? t('exportAllCategories') : undefined}
+                                selectedValue={exportCategory ? String(exportCategory.id) : undefined}
+                                value={exportCategory ? exportCategory.label : ''}
+                                onInput={(e) => {
+                                    // ช่องถูกล้าง (ปุ่ม clear หรือลบจนว่าง) = ไม่กรองตามหมวดหมู่
+                                    if ((e.target.value ?? '') === '' && exportCategory) setExportCategory(null);
+                                }}
+                                onSelectionChange={(e) => {
+                                    const id = e.detail.item?.value;
+                                    setExportCategory(id ? (exportCategoryOptions.find((opt) => String(opt.id) === id) ?? null) : null);
+                                }}
+                            >
+                                {exportCategoryOptions.map((opt) => (
+                                    <ComboBoxItem key={opt.id} value={String(opt.id)} text={opt.label} />
+                                ))}
+                            </ComboBox>
+                        </FioriField>
+                    </div>
+                </Dialog>
 
-                            <Stack direction="row" spacing={0.2}>
-                                <IconButton size="small" sx={fioriIconButtonSx} disabled={currentPage <= 1} onClick={() => goToPage(1)}>
-                                    <Icon name="firstPage" fontSize="small" />
-                                </IconButton>
-                                <IconButton size="small" sx={fioriIconButtonSx} disabled={currentPage <= 1} onClick={() => goToPage(currentPage - 1)}>
-                                    <Icon name="chevronLeft" fontSize="small" />
-                                </IconButton>
-                                <IconButton size="small" sx={fioriIconButtonSx} disabled={currentPage >= lastPage} onClick={() => goToPage(currentPage + 1)}>
-                                    <Icon name="chevronRight" fontSize="small" />
-                                </IconButton>
-                                <IconButton size="small" sx={fioriIconButtonSx} disabled={currentPage >= lastPage} onClick={() => goToPage(lastPage)}>
-                                    <Icon name="lastPage" fontSize="small" />
-                                </IconButton>
-                            </Stack>
-                        </Stack>
-                    </Stack>
-
-                    <Divider sx={{ borderColor: FIORI.border }} />
-
-                    {/* ตารางข้อมูล */}
-                    <FioriResponsiveTable
-                        variant="plain"
-                        columns={tableColumns}
-                        rows={gridData.data}
-                        getRowKey={(row) => row.id}
-                        rowSx={(row) => fioriTableRowSx(selectedIds.includes(row.id))}
-                        emptyMessage={t('noProductsFound')}
-                    />
-                </Paper>
-            </Box>
-
-            {/* Dialog สำหรับ Export แบบด่วน */}
-            <Dialog open={quickExportOpen} onClose={() => setQuickExportOpen(false)} maxWidth="sm" fullWidth>
-                <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontWeight: 700 }}>
-                    {t('quickExport')}
-                    <IconButton size="small" onClick={() => setQuickExportOpen(false)}>
-                        <Icon name="close" fontSize="small" />
-                    </IconButton>
-                </DialogTitle>
-                <Divider />
-                <DialogContent sx={{ pt: 3 }}>
-                    <Stack spacing={2.5}>
-                        <Autocomplete
-                            disableClearable
-                            options={['CSV', 'XLS', 'XLSX'] as const}
-                            value={exportFormat}
-                            onChange={(_e, value) => value && setExportFormat(value)}
-                            renderInput={(params) => (
-                                <TextField {...params} label={t('selectOption')} size="small" />
-                            )}
-                        />
-                        <Autocomplete
-                            multiple
-                            disableCloseOnSelect
-                            options={exportColumnCatalog}
-                            getOptionLabel={(opt) => opt.label}
-                            isOptionEqualToValue={(a, b) => a.code === b.code}
-                            value={exportColumns}
-                            onChange={(_e, value) => setExportColumns(value)}
-                            renderInput={(params) => (
-                                <TextField
-                                    {...params}
-                                    label={t('exportColumns')}
-                                    placeholder={exportColumns.length === 0 ? t('exportAllColumns') : undefined}
-                                    // placeholder โชว์เฉพาะตอนโฟกัสช่อง — บอกให้เห็นตลอดว่าไม่เลือก = ส่งออกทุกคอลัมน์
-                                    helperText={exportColumns.length === 0 ? t('exportAllColumnsHint') : undefined}
-                                    size="small"
+                {/* Dialog Share (push สินค้าไปหลายช่องทางขายพร้อมกัน) */}
+                <Dialog
+                    open={shareDialogOpen}
+                    className={styles.dialog}
+                    onBeforeClose={(e) => {
+                        // ระหว่างกำลังส่งคำขอ ห้ามปิด dialog (รวมถึงกด ESC)
+                        if (shareBusy) e.preventDefault();
+                    }}
+                    onClose={() => setShareDialogOpen(false)}
+                    header={
+                        <Bar
+                            startContent={<Title level="H5">{t('shareToChannels')}</Title>}
+                            endContent={
+                                <Button
+                                    design="Transparent"
+                                    icon="decline"
+                                    tooltip={t('close')}
+                                    accessibleName={t('close')}
+                                    disabled={shareBusy}
+                                    onClick={() => setShareDialogOpen(false)}
                                 />
-                            )}
+                            }
                         />
-                        <Autocomplete
-                            multiple
-                            disableCloseOnSelect
-                            disabled={selectedIds.length > 0}
-                            options={['simple', 'configurable'] as const}
-                            getOptionLabel={(opt) => t(opt)}
-                            value={exportTypes}
-                            onChange={(_e, value) => setExportTypes(value)}
-                            renderInput={(params) => (
-                                <TextField
-                                    {...params}
-                                    label={t('exportProductTypes')}
-                                    placeholder={exportTypes.length === 0 ? t('exportAllProductTypes') : undefined}
-                                    helperText={selectedIds.length > 0 ? t('exportFiltersDisabledForSelection') : undefined}
-                                    size="small"
-                                />
-                            )}
+                    }
+                    footer={
+                        <Bar
+                            design="Footer"
+                            endContent={
+                                <>
+                                    <Button design="Transparent" onClick={() => setShareDialogOpen(false)} disabled={shareBusy}>
+                                        {t('cancel')}
+                                    </Button>
+                                    <Button
+                                        design="Negative"
+                                        onClick={deactivateSelectedProducts}
+                                        disabled={selectedShopIds.length === 0 || shareBusy}
+                                        loading={deactivating}
+                                        loadingDelay={0}
+                                    >
+                                        {t('deactivate')}
+                                    </Button>
+                                    <Button
+                                        design="Emphasized"
+                                        onClick={shareSelectedProducts}
+                                        disabled={selectedShopIds.length === 0 || shareBusy}
+                                        loading={sharing}
+                                        loadingDelay={0}
+                                    >
+                                        {t('share')}
+                                    </Button>
+                                </>
+                            }
                         />
-                        <Autocomplete
-                            disabled={selectedIds.length > 0}
-                            options={exportCategoryOptions}
-                            getOptionLabel={(opt) => opt.label}
-                            isOptionEqualToValue={(a, b) => a.id === b.id}
-                            value={exportCategory}
-                            onChange={(_e, value) => setExportCategory(value)}
-                            renderInput={(params) => (
-                                <TextField
-                                    {...params}
-                                    label={t('exportCategory')}
-                                    placeholder={!exportCategory ? t('exportAllCategories') : undefined}
-                                    helperText={selectedIds.length > 0 ? t('exportFiltersDisabledForSelection') : undefined}
-                                    size="small"
-                                />
-                            )}
-                        />
-                    </Stack>
-                </DialogContent>
-                <Divider />
-                <DialogActions sx={{ px: 3, py: 2 }}>
-                    <Button onClick={() => setQuickExportOpen(false)} color="inherit" sx={{ textTransform: 'none' }}>
-                        {t('cancel')}
-                    </Button>
-                    <Button
-                        onClick={handleQuickExport}
-                        variant="contained"
-                        disabled={queuingExport}
-                        startIcon={queuingExport ? <CircularProgress size={14} color="inherit" /> : undefined}
-                        sx={{ ...fioriEmphasizedSx, px: 3 }}
-                    >
-                        {t('download')}
-                    </Button>
-                </DialogActions>
-            </Dialog>
+                    }
+                >
+                    <div className={styles.dialogBody}>
+                        <span className={styles.muted}>{t('shareSelectChannelsHelp')}</span>
 
-            {/* Dialog Share (push สินค้าไปหลายช่องทางขายพร้อมกัน) */}
-            <Dialog open={shareDialogOpen} onClose={() => (sharing || deactivating ? null : setShareDialogOpen(false))} maxWidth="sm" fullWidth>
-                <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontWeight: 700 }}>
-                    {t('shareToChannels')}
-                    <IconButton size="small" onClick={() => setShareDialogOpen(false)} disabled={sharing || deactivating}>
-                        <Icon name="close" fontSize="small" />
-                    </IconButton>
-                </DialogTitle>
-                <Divider />
-                <DialogContent sx={{ pt: 3 }}>
-                    <Stack spacing={2.5}>
-                        <Typography variant="body2" color="text.secondary">
-                            {t('shareSelectChannelsHelp')}
-                        </Typography>
-
-                        {salesChannels.length === 0 && (
-                            <Typography variant="body2" color="text.disabled" sx={{ fontStyle: 'italic' }}>
-                                {t('shareNoChannels')}
-                            </Typography>
-                        )}
+                        {salesChannels.length === 0 && <span className={`${styles.disabledText} ${styles.italic}`}>{t('shareNoChannels')}</span>}
 
                         {salesChannels.map((group) => (
-                            <Box key={group.platform}>
-                                <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 0.5 }}>
-                                    {group.platform}
-                                </Typography>
-                                <Stack spacing={0}>
+                            <div key={group.platform}>
+                                <div className={styles.shopGroupTitle}>{group.platform}</div>
+                                <div>
                                     {group.shops.map((shop) => {
                                         const publishStatus = shopPublishStatus(shop.id);
                                         const checked = selectedShopIds.includes(shop.id);
 
                                         return (
-                                            <Stack key={shop.id} direction="row" alignItems="center" spacing={1}>
-                                                <Checkbox
-                                                    size="small"
+                                            <div key={shop.id} className={styles.shopRow}>
+                                                <CheckBox
+                                                    accessibleName={shop.name}
                                                     checked={checked}
                                                     indeterminate={publishStatus === 'some' && !checked}
                                                     onChange={(e) => toggleShareShop(shop.id, e.target.checked)}
-                                                    disabled={sharing || deactivating}
+                                                    disabled={shareBusy}
                                                 />
-                                                <Typography variant="body2">{shop.name}</Typography>
-                                                {publishStatus === 'all' && (
-                                                    <Typography variant="caption" color="text.secondary">
-                                                        ({t('alreadyShared')})
-                                                    </Typography>
-                                                )}
-                                                {publishStatus === 'some' && (
-                                                    <Typography variant="caption" color="text.secondary">
-                                                        ({t('alreadySharedPartial')})
-                                                    </Typography>
-                                                )}
-                                            </Stack>
+                                                <span>{shop.name}</span>
+                                                {publishStatus === 'all' && <span className={styles.caption}>({t('alreadyShared')})</span>}
+                                                {publishStatus === 'some' && <span className={styles.caption}>({t('alreadySharedPartial')})</span>}
+                                            </div>
                                         );
                                     })}
-                                </Stack>
-                            </Box>
+                                </div>
+                            </div>
                         ))}
-                    </Stack>
-                </DialogContent>
-                <Divider />
-                <DialogActions sx={{ px: 3, py: 2 }}>
-                    <Button onClick={() => setShareDialogOpen(false)} color="inherit" sx={{ textTransform: 'none' }} disabled={sharing || deactivating}>
-                        {t('cancel')}
-                    </Button>
-                    <Button
-                        onClick={deactivateSelectedProducts}
-                        variant="outlined"
-                        color="error"
-                        disabled={selectedShopIds.length === 0 || sharing || deactivating}
-                        startIcon={deactivating ? <CircularProgress size={16} color="inherit" /> : undefined}
-                        sx={{ textTransform: 'none', fontWeight: 700 }}
-                    >
-                        {t('deactivate')}
-                    </Button>
-                    <Button
-                        onClick={shareSelectedProducts}
-                        variant="contained"
-                        disabled={selectedShopIds.length === 0 || sharing || deactivating}
-                        startIcon={sharing ? <CircularProgress size={16} color="inherit" /> : undefined}
-                        sx={{ ...fioriEmphasizedSx, px: 3 }}
-                    >
-                        {t('share')}
-                    </Button>
-                </DialogActions>
-            </Dialog>
+                    </div>
+                </Dialog>
 
-            <ManageColumnsDialog
-                open={columnsDialogOpen}
-                onClose={() => setColumnsDialogOpen(false)}
-                columns={columnsCatalog}
-                selected={selectedColumnKeys}
-                onApply={handleApplyColumns}
-            />
+                <ManageColumnsDialog
+                    open={columnsDialogOpen}
+                    onClose={() => setColumnsDialogOpen(false)}
+                    columns={columnsCatalog}
+                    selected={selectedColumnKeys}
+                    onApply={handleApplyColumns}
+                />
 
-            {/* Dialog ยืนยันการลบ */}
-            <FioriMessageBox
-                open={deleteProductId !== null}
-                onCancel={() => setDeleteProductId(null)}
-                onConfirm={() => {
-                    if (deleteProductId !== null) {
-                        setDeleting(true);
-                        router.delete(`/catalog/products/${deleteProductId}`, {
-                            onSuccess: () => setDeleteProductId(null),
-                            onFinish: () => setDeleting(false),
-                        });
-                    }
-                }}
-                title={t('confirmDeletion')}
-                severity="warning"
-                destructive
-                confirmLabel={t('delete')}
-                cancelLabel={t('cancel')}
-                confirmLoading={deleting}
-            >
-                {t('confirmDeleteMessage')}
-            </FioriMessageBox>
+                {/* Dialog ยืนยันการลบ */}
+                <FioriMessageBox
+                    open={deleteProductId !== null}
+                    onCancel={() => setDeleteProductId(null)}
+                    onConfirm={() => {
+                        if (deleteProductId !== null) {
+                            setDeleting(true);
+                            router.delete(`/catalog/products/${deleteProductId}`, {
+                                onSuccess: () => setDeleteProductId(null),
+                                onFinish: () => setDeleting(false),
+                            });
+                        }
+                    }}
+                    title={t('confirmDeletion')}
+                    severity="warning"
+                    destructive
+                    confirmLabel={t('delete')}
+                    cancelLabel={t('cancel')}
+                    confirmLoading={deleting}
+                >
+                    {t('confirmDeleteMessage')}
+                </FioriMessageBox>
 
-            {/* Dialog ยืนยันการทำสำเนา (Duplicate) */}
-            <FioriMessageBox
-                open={duplicateProductId !== null}
-                onCancel={() => setDuplicateProductId(null)}
-                onConfirm={duplicateProduct}
-                title={t('confirmDuplication')}
-                severity="confirm"
-                confirmLabel={t('duplicateProduct')}
-                cancelLabel={t('cancel')}
-                confirmLoading={duplicating}
-                confirmDisabled={duplicateSkuStatus !== 'available'}
-            >
-                {t('confirmDuplicateMessage')}
-                <Box sx={{ mt: 2 }}>
-                    <NewProductSkuField
-                        value={duplicateSku}
-                        onChange={(value) => {
-                            setDuplicateSku(value);
-                            setDuplicateSkuError(null);
-                        }}
-                        status={duplicateSkuStatus}
-                        serverError={duplicateSkuError}
-                    />
-                </Box>
-            </FioriMessageBox>
-            <ProductFilterDrawer
-                open={filterDrawerOpen}
-                onClose={() => setFilterDrawerOpen(false)}
-                families={families}
-                attributes={attributes}
-                filters={activeFilters}
-                attributeFilters={activeAttributeFilters}
-                onApply={applyFilters}
-            />
+                {/* Dialog ยืนยันการทำสำเนา (Duplicate) */}
+                <FioriMessageBox
+                    open={duplicateProductId !== null}
+                    onCancel={() => setDuplicateProductId(null)}
+                    onConfirm={duplicateProduct}
+                    title={t('confirmDuplication')}
+                    severity="confirm"
+                    confirmLabel={t('duplicateProduct')}
+                    cancelLabel={t('cancel')}
+                    confirmLoading={duplicating}
+                    confirmDisabled={duplicateSkuStatus !== 'available'}
+                >
+                    {t('confirmDuplicateMessage')}
+                    <div style={{ marginTop: '1rem' }}>
+                        <NewProductSkuField
+                            value={duplicateSku}
+                            onChange={(value) => {
+                                setDuplicateSku(value);
+                                setDuplicateSkuError(null);
+                            }}
+                            status={duplicateSkuStatus}
+                            serverError={duplicateSkuError}
+                        />
+                    </div>
+                </FioriMessageBox>
+                <ProductFilterDrawer
+                    open={filterDrawerOpen}
+                    onClose={() => setFilterDrawerOpen(false)}
+                    families={families}
+                    attributes={attributes}
+                    filters={activeFilters}
+                    attributeFilters={activeAttributeFilters}
+                    onApply={applyFilters}
+                />
 
-            <Snackbar
-                open={!!liveStatusError}
-                autoHideDuration={10000}
-                onClose={() => setLiveStatusError(null)}
-                anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
-            >
-                <Alert severity="error" variant="filled" onClose={() => setLiveStatusError(null)} sx={{ maxWidth: 480 }}>
-                    {liveStatusError}
-                </Alert>
-            </Snackbar>
+                {liveStatusError && (
+                    <MessageStrip design="Negative" onClose={() => setLiveStatusError(null)} style={FLOATING_STRIP_STYLE}>
+                        {liveStatusError}
+                    </MessageStrip>
+                )}
 
-            <Snackbar
-                open={!!liveStatusInfo}
-                autoHideDuration={6000}
-                onClose={() => setLiveStatusInfo(null)}
-                anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
-            >
-                <Alert severity="info" variant="filled" onClose={() => setLiveStatusInfo(null)} sx={{ maxWidth: 480 }}>
-                    {liveStatusInfo}
-                </Alert>
-            </Snackbar>
-        </AppLayout>
+                {liveStatusInfo && (
+                    <MessageStrip design="Information" onClose={() => setLiveStatusInfo(null)} style={FLOATING_STRIP_STYLE}>
+                        {liveStatusInfo}
+                    </MessageStrip>
+                )}
+            </AppLayout>
         </ImagePreviewProvider>
     );
 }

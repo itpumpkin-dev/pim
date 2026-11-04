@@ -1,19 +1,14 @@
 import LocaleLabelFields from '@/components/catalog/locale-label-fields';
+import { FioriFormErrorSummary } from '@/components/fiori-form';
 import { useUnsavedChangesGuard } from '@/hooks/use-unsaved-changes-guard';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
-import { Head, Link, router, useForm } from '@inertiajs/react';
-import {
-    Box,
-    Button,
-    CircularProgress,
-    Stack,
-    Typography,
-} from '@mui/material';
+import { Head, router, useForm } from '@inertiajs/react';
+import '@ui5/webcomponents-icons/dist/nav-back.js';
+import '@ui5/webcomponents-icons/dist/save.js';
+import { Button, FlexBox, Title } from '@ui5/webcomponents-react';
 import { FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FioriFormErrorSummary } from '@/components/fiori-form';
-import { FIORI, fioriDefaultSx, fioriEmphasizedSx } from '@/lib/fiori-style';
 
 export default function AttributeGroupCreate() {
     const { t } = useTranslation('catalog');
@@ -30,8 +25,8 @@ export default function AttributeGroupCreate() {
     });
     const skipNavigationGuardRef = useUnsavedChangesGuard(isDirty);
 
-    const submit = (e: FormEvent) => {
-        e.preventDefault();
+    const submit = (e?: FormEvent) => {
+        e?.preventDefault();
         skipNavigationGuardRef.current = true;
         post('/catalog/attributeGroups', {
             onSuccess: () => router.visit('/catalog/attributeGroups', { replace: true }),
@@ -44,43 +39,33 @@ export default function AttributeGroupCreate() {
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={t('addAttributeGroupTitle')} />
-            <Box component="form" onSubmit={submit} sx={{ p: { xs: 2, md: 4 }, bgcolor: FIORI.pageBg, minHeight: '100%' }}>
+            <form
+                onSubmit={submit}
+                style={{ padding: 'clamp(1rem, 3vw, 2rem)', background: 'var(--sapBackgroundColor)', minHeight: '100%', boxSizing: 'border-box' }}
+            >
                 {/* หัวข้อและปุ่มต่างๆ */}
-                <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 3 }}>
-                    <Typography variant="h5" fontWeight={600} sx={{ color: FIORI.textPrimary }}>
-                        {t('addAttributeGroupTitle')}
-                    </Typography>
-                    <Stack direction="row" spacing={1.5}>
-                        <Button
-                            component={Link}
-                            href="/catalog/attributeGroups"
-                            variant="outlined"
-                            sx={fioriDefaultSx}
-                        >
+                <FlexBox justifyContent="SpaceBetween" alignItems="Center" wrap="Wrap" style={{ gap: '1rem', marginBottom: '1.5rem' }}>
+                    <Title level="H3">{t('addAttributeGroupTitle')}</Title>
+                    <FlexBox style={{ gap: '0.75rem' }}>
+                        <Button icon="nav-back" onClick={() => router.visit('/catalog/attributeGroups')}>
                             {t('back')}
                         </Button>
-                        <Button
-                            type="submit"
-                            variant="contained"
-                            disabled={processing}
-                            startIcon={processing ? <CircularProgress size={16} color="inherit" /> : undefined}
-                            sx={{ ...fioriEmphasizedSx, px: 2.5 }}
-                        >
+                        <Button design="Emphasized" icon="save" disabled={processing} onClick={() => submit()}>
                             {processing ? t('saving') : t('saveAttributeGroup')}
                         </Button>
-                    </Stack>
-                </Stack>
+                    </FlexBox>
+                </FlexBox>
 
-                <Stack spacing={3} sx={{ maxWidth: 760 }}>
+                <FlexBox direction="Column" style={{ gap: '1.5rem', maxWidth: 760 }}>
                     <LocaleLabelFields
                         title={t('labelTitle')}
                         values={data.translations}
                         onChange={(localeId, value) => setData('translations', { ...data.translations, [localeId]: value })}
                     />
-                </Stack>
+                </FlexBox>
 
-                <FioriFormErrorSummary errors={errors} message={t('correctHighlightedFields')} sx={{ mt: 3, maxWidth: 760 }} />
-            </Box>
+                <FioriFormErrorSummary errors={errors} message={t('correctHighlightedFields')} style={{ marginTop: '1.5rem', maxWidth: 760 }} />
+            </form>
         </AppLayout>
     );
 }

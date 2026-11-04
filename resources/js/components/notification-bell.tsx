@@ -1,28 +1,20 @@
-import { xsrfToken } from '@/lib/csrf';
-import { getFioriShell } from '@/theme';
-import { type SharedData } from '@/types';
 import echo from '@/echo';
+import { xsrfToken } from '@/lib/csrf';
+import { type SharedData } from '@/types';
 import { router, usePage } from '@inertiajs/react';
-import DoneAllIcon from '@mui/icons-material/DoneAll';
-import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
-import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
-import NotificationsIcon from '@mui/icons-material/Notifications';
-import WarningAmberIcon from '@mui/icons-material/WarningAmber';
+import '@ui5/webcomponents-icons/dist/accept.js';
 import {
-    Badge,
-    Box,
-    Divider,
-    IconButton,
-    ListItemButton,
-    Menu,
-    Stack,
-    Tooltip,
-    Typography,
-    useTheme,
-} from '@mui/material';
-import { useEffect, useState } from 'react';
+    Bar,
+    Button,
+    NotificationList,
+    NotificationListItem,
+    ResponsivePopover,
+    Title,
+    type NotificationListPropTypes,
+} from '@ui5/webcomponents-react';
+import { useCallback, useEffect, useState } from 'react';
 
-interface NotificationRow {
+export interface NotificationRow {
     id: string;
     title: string;
     body: string;
@@ -32,17 +24,19 @@ interface NotificationRow {
     created_at: string;
 }
 
-const STATUS_COLOR: Record<NotificationRow['status'], string> = {
-    failed: 'error.main',
-    warning: 'warning.main',
-    success: 'success.main',
+const STATUS_STATE: Record<NotificationRow['status'], 'Negative' | 'Critical' | 'Positive'> = {
+    failed: 'Negative',
+    warning: 'Critical',
+    success: 'Positive',
 };
 
 /**
- * Shell-bar bell — real-time notification list for background jobs the
+ * Shell-bar bell — real-time notification feed for background jobs the
  * user themselves triggered (brand/category sync, marketplace push/
- * deactivate — see AppNotifier's call sites for the full list). Sits next
- * to LocaleDropdown/AppearanceToggleDropdown in AppSidebarHeader.
+ * deactivate — see AppNotifier's call sites for the full list). The bell
+ * itself is the UI5 ShellBar's built-in notifications button
+ * (app-sidebar-header.tsx: `showNotifications` + `notificationsCount`); this
+ * hook owns the data and NotificationPopover below renders the list.
  *
  * Two data sources kept in sync deliberately:
  *  - GET /notifications on mount — the persisted list (survives a reload,
@@ -52,15 +46,12 @@ const STATUS_COLOR: Record<NotificationRow['status'], string> = {
  *    just a different event name. Lets a job's result show up the instant
  *    it happens instead of only on the next page load.
  */
-export function NotificationBell() {
+export function useNotifications() {
     const { auth } = usePage<SharedData>().props;
     const userId = auth?.user?.id;
-    const theme = useTheme();
-    const shell = getFioriShell(theme.palette.mode);
 
     const [notifications, setNotifications] = useState<NotificationRow[]>([]);
     const [unreadCount, setUnreadCount] = useState(0);
-    const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
 
     useEffect(() => {
         fetch('/notifications', { headers: { Accept: 'application/json' } })
@@ -69,7 +60,8 @@ export function NotificationBell() {
                 if (!body) return;
                 setNotifications(body.data);
                 setUnreadCount(body.unread_count);
-            });
+            })
+            .catch(() => {});
     }, []);
 
     useEffect(() => {
@@ -88,7 +80,7 @@ export function NotificationBell() {
         };
     }, [userId]);
 
-    const markOneRead = (notification: NotificationRow) => {
+    const markOneRead = useCallback((notification: NotificationRow) => {
         if (notification.read_at) return;
 
         setNotifications((prev) => prev.map((n) => (n.id === notification.id ? { ...n, read_at: new Date().toISOString() } : n)));
@@ -98,9 +90,9 @@ export function NotificationBell() {
             method: 'POST',
             headers: { 'X-XSRF-TOKEN': xsrfToken(), Accept: 'application/json' },
         }).catch(() => {});
-    };
+    }, []);
 
-    const markAllRead = () => {
+    const markAllRead = useCallback(() => {
         setNotifications((prev) => prev.map((n) => ({ ...n, read_at: n.read_at ?? new Date().toISOString() })));
         setUnreadCount(0);
 
@@ -108,106 +100,81 @@ export function NotificationBell() {
             method: 'POST',
             headers: { 'X-XSRF-TOKEN': xsrfToken(), Accept: 'application/json' },
         }).catch(() => {});
+    }, []);
+
+    return { notifications, unreadCount, markOneRead, markAllRead };
+}
+
+type NotificationFeed = ReturnType<typeof useNotifications>;
+
+interface NotificationPopoverProps {
+    feed: NotificationFeed;
+    open: boolean;
+    opener: HTMLElement | null;
+    onClose: () => void;
+}
+
+export function NotificationPopover({ feed, open, opener, onClose }: NotificationPopoverProps) {
+    const { notifications, unreadCount, markOneRead, markAllRead } = feed;
+
+    const onItemClick: NotificationListPropTypes['onItemClick'] = (e) => {
+        const id = (e.detail.item as HTMLElement).dataset.id;
+        const n = notifications.find((row) => row.id === id);
+        if (!n) return;
+
+        markOneRead(n);
+        onClose();
+        // ลิงก์ดาวน์โหลดไฟล์ (เช่น ส่งออกด่วน — QuickExportProductsJob) ไม่ใช่หน้า
+        // Inertia — router.visit() จะได้ไฟล์กลับมาแทน page response ต้องให้
+        // เบราว์เซอร์โหลดตรงๆ
+        if (n.url) {
+            if (/\/download(\?|$)/.test(n.url)) window.location.assign(n.url);
+            else router.visit(n.url);
+        }
     };
 
-    const handleOpen = (e: React.MouseEvent<HTMLElement>) => setAnchorEl(e.currentTarget);
-    const handleClose = () => setAnchorEl(null);
-
-    const shellIconSx = {
-        width: 36,
-        height: 36,
-        borderRadius: `${shell.borderRadius}px`,
-        color: shell.textColor,
-        '&:hover': { bgcolor: shell.hoverBg },
-        '&:active': { bgcolor: shell.activeBg },
-    } as const;
-
     return (
-        <>
-            <Tooltip title="การแจ้งเตือน">
-                <IconButton onClick={handleOpen} sx={shellIconSx}>
-                    <Badge badgeContent={unreadCount} color="error" max={99}>
-                        <NotificationsIcon sx={{ fontSize: 20 }} />
-                    </Badge>
-                </IconButton>
-            </Tooltip>
-
-            <Menu
-                anchorEl={anchorEl}
-                open={Boolean(anchorEl)}
-                onClose={handleClose}
-                slotProps={{ paper: { sx: { width: 360, maxHeight: 480 } } }}
-                anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
-                transformOrigin={{ vertical: 'top', horizontal: 'right' }}
-            >
-                <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ px: 2, py: 1 }}>
-                    <Typography variant="subtitle2" fontWeight={700}>
-                        การแจ้งเตือน
-                    </Typography>
-                    {unreadCount > 0 && (
-                        <Tooltip title="อ่านทั้งหมดแล้ว">
-                            <IconButton size="small" onClick={markAllRead}>
-                                <DoneAllIcon fontSize="small" />
-                            </IconButton>
-                        </Tooltip>
-                    )}
-                </Stack>
-                <Divider />
-
-                {notifications.length === 0 ? (
-                    <Typography variant="body2" color="text.secondary" align="center" sx={{ py: 4 }}>
-                        ยังไม่มีการแจ้งเตือน
-                    </Typography>
-                ) : (
-                    notifications.map((n) => (
-                        <ListItemButton
+        <ResponsivePopover
+            open={open && !!opener}
+            opener={opener ?? undefined}
+            onClose={onClose}
+            placement="Bottom"
+            horizontalAlign="End"
+            accessibleName="การแจ้งเตือน"
+            style={{ width: 360, maxWidth: '100vw' }}
+            header={
+                <Bar
+                    startContent={<Title level="H5">การแจ้งเตือน</Title>}
+                    endContent={
+                        unreadCount > 0 ? (
+                            <Button
+                                design="Transparent"
+                                icon="accept"
+                                tooltip="อ่านทั้งหมดแล้ว"
+                                accessibleName="อ่านทั้งหมดแล้ว"
+                                onClick={markAllRead}
+                            />
+                        ) : undefined
+                    }
+                />
+            }
+        >
+            <div style={{ maxHeight: 420, overflowY: 'auto', margin: '-1rem' }}>
+                <NotificationList noDataText="ยังไม่มีการแจ้งเตือน" onItemClick={onItemClick}>
+                    {notifications.map((n) => (
+                        <NotificationListItem
                             key={n.id}
-                            onClick={() => {
-                                markOneRead(n);
-                                handleClose();
-                                // ลิงก์ดาวน์โหลดไฟล์ (เช่น ส่งออกด่วน — QuickExportProductsJob) ไม่ใช่หน้า
-                                // Inertia — router.visit() จะได้ไฟล์กลับมาแทน page response ต้องให้
-                                // เบราว์เซอร์โหลดตรงๆ
-                                if (n.url) {
-                                    if (/\/download(\?|$)/.test(n.url)) window.location.assign(n.url);
-                                    else router.visit(n.url);
-                                }
-                            }}
-                            sx={{
-                                alignItems: 'flex-start',
-                                gap: 1,
-                                bgcolor: n.read_at ? 'transparent' : 'action.hover',
-                                whiteSpace: 'normal',
-                            }}
+                            data-id={n.id}
+                            titleText={n.title}
+                            state={STATUS_STATE[n.status]}
+                            read={!!n.read_at}
+                            footnotes={<span>{new Date(n.created_at).toLocaleString()}</span>}
                         >
-                            <Box sx={{ mt: 0.25, color: STATUS_COLOR[n.status], display: 'flex' }}>
-                                {n.status === 'failed' ? (
-                                    <ErrorOutlineIcon fontSize="small" />
-                                ) : n.status === 'warning' ? (
-                                    <WarningAmberIcon fontSize="small" />
-                                ) : (
-                                    <CheckCircleOutlineIcon fontSize="small" />
-                                )}
-                            </Box>
-                            <Box sx={{ minWidth: 0, flex: 1 }}>
-                                <Typography variant="body2" fontWeight={n.read_at ? 400 : 600} noWrap>
-                                    {n.title}
-                                </Typography>
-                                <Typography
-                                    variant="caption"
-                                    color="text.secondary"
-                                    sx={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}
-                                >
-                                    {n.body}
-                                </Typography>
-                                <Typography variant="caption" color="text.disabled" sx={{ display: 'block', mt: 0.25 }}>
-                                    {new Date(n.created_at).toLocaleString()}
-                                </Typography>
-                            </Box>
-                        </ListItemButton>
-                    ))
-                )}
-            </Menu>
-        </>
+                            {n.body}
+                        </NotificationListItem>
+                    ))}
+                </NotificationList>
+            </div>
+        </ResponsivePopover>
     );
 }

@@ -1,0 +1,125 @@
+/* Shared layout for the system/locale pages (index, create, edit, translations). */
+
+.page {
+    box-sizing: border-box;
+    min-height: 100%;
+    padding: 1rem;
+    background: var(--sapBackgroundColor);
+}
+
+.header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.headerActions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.formBody {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    max-width: 800px;
+}
+
+/* Search & controls row: stacked on narrow screens, one row from md (900px) up. */
+.toolbar {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.toolbarGroup {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    width: 100%;
+}
+
+.toolbarGroupEnd {
+    justify-content: flex-end;
+}
+
+.pageBox {
+    display: flex;
+    align-items: center;
+    padding: 0.25rem 0.75rem;
+    border: 1px solid var(--sapGroup_ContentBorderColor);
+    border-radius: var(--sapElement_BorderCornerRadius);
+    background: var(--sapGroup_ContentBackground);
+    color: var(--sapTextColor);
+    font-size: var(--sapFontSize);
+}
+
+.mutedText {
+    color: var(--sapContent_LabelColor);
+    font-size: var(--sapFontSize);
+    white-space: nowrap;
+}
+
+.monoText {
+    color: var(--sapContent_LabelColor);
+    font-family: var(--sapFontFamilyMonospace, monospace);
+    font-size: var(--sapFontSize);
+    word-break: break-word;
+}
+
+.tabStrip {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+    border: 1px solid var(--sapGroup_ContentBorderColor);
+    border-radius: var(--sapElement_BorderCornerRadius);
+    background: var(--sapGroup_ContentBackground);
+}
+
+.tabStripBusy {
+    opacity: 0.6;
+    pointer-events: none;
+}
+
+.loadingOverlay {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.75rem;
+    padding-top: 4rem;
+    background: color-mix(in srgb, var(--sapBackgroundColor) 70%, transparent);
+}
+
+/* Unsaved (edited but not yet saved) translation value. */
+.dirtyField {
+    outline: 1px solid var(--sapCriticalColor);
+    outline-offset: -1px;
+    border-radius: var(--sapField_BorderCornerRadius, 0.25rem);
+}
+
+@media (min-width: 900px) {
+    .page {
+        padding: 2rem;
+    }
+
+    .toolbar {
+        flex-direction: row;
+        align-items: center;
+        justify-content: space-between;
+    }
+
+    .toolbarGroup {
+        width: auto;
+    }
+}

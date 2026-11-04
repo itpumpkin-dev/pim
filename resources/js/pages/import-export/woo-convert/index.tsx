@@ -1,31 +1,17 @@
+import { FioriResponsiveColumn, FioriResponsiveTable } from '@/components/fiori-responsive-table';
+import PagePagination from '@/components/import-export/page-pagination';
 import AppLayout from '@/layouts/app-layout';
+import { FioriStatus } from '@/lib/fiori-style';
 import { type BreadcrumbItem, type SharedData } from '@/types';
 import { Head, router, usePage } from '@inertiajs/react';
-import AddIcon from '@mui/icons-material/Add';
-import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
-import VisibilityIcon from '@mui/icons-material/Visibility';
-import UploadFileIcon from '@mui/icons-material/UploadFile';
-import DownloadIcon from '@mui/icons-material/Download';
-import {
-    Box,
-    Button,
-    IconButton,
-    Pagination,
-    Paper,
-    Stack,
-    Typography,
-} from '@mui/material';
-import { type ReactNode } from 'react';
+import '@ui5/webcomponents-icons/dist/add.js';
+import '@ui5/webcomponents-icons/dist/download.js';
+import '@ui5/webcomponents-icons/dist/navigation-right-arrow.js';
+import '@ui5/webcomponents-icons/dist/show.js';
+import '@ui5/webcomponents-icons/dist/upload.js';
+import { Button, Icon, Title } from '@ui5/webcomponents-react';
 import { useTranslation } from 'react-i18next';
-import { FioriResponsiveColumn, FioriResponsiveTable } from '@/components/fiori-responsive-table';
-import {
-    FIORI,
-    FioriStatus,
-    fioriCardSx,
-    fioriEmphasizedSx,
-    fioriGhostSx,
-    fioriIconButtonSx,
-} from '@/lib/fiori-style';
+import styles from '../import-export.module.css';
 
 interface UserSummary {
     id: number;
@@ -77,58 +63,39 @@ function DirectionCard({
     buttonLabel,
     onClick,
 }: {
-    icon: ReactNode;
+    /** SAP icon name */
+    icon: string;
     title: string;
     description: string;
     buttonLabel: string;
     onClick: () => void;
 }) {
     return (
-        <Paper
-            elevation={0}
-            sx={{
-                ...fioriCardSx,
-                p: 3,
-                flex: 1,
-                display: 'flex',
-                flexDirection: 'column',
-                gap: 1,
-                cursor: 'pointer',
-                transition: 'border-color 0.15s',
-                '&:hover': { borderColor: FIORI.brand },
-            }}
-            onClick={onClick}
-        >
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                <Box
-                    sx={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        width: 40,
-                        height: 40,
-                        borderRadius: '50%',
-                        bgcolor: FIORI.selected,
-                        color: FIORI.brand,
-                        flexShrink: 0,
-                    }}
-                >
-                    {icon}
-                </Box>
-                <Typography variant="h6" fontWeight={600} sx={{ color: FIORI.textPrimary }}>{title}</Typography>
-            </Box>
-            <Typography variant="body2" sx={{ color: FIORI.textSecondary, flex: 1 }}>
+        <div className={styles.directionCard} onClick={onClick}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <div className={styles.iconCircle}>
+                    <Icon name={icon} style={{ width: '1.25rem', height: '1.25rem', color: 'var(--sapBrandColor)' }} />
+                </div>
+                <Title level="H4" size="H5" wrappingType="Normal">
+                    {title}
+                </Title>
+            </div>
+            <span className={styles.secondaryText} style={{ flex: 1 }}>
                 {description}
-            </Typography>
+            </span>
             <Button
-                variant="text"
-                endIcon={<ArrowForwardIcon />}
-                sx={{ ...fioriGhostSx, alignSelf: 'flex-start', mt: 1 }}
-                onClick={onClick}
+                design="Transparent"
+                endIcon="navigation-right-arrow"
+                style={{ alignSelf: 'flex-start', marginTop: '0.5rem' }}
+                onClick={(e) => {
+                    // the card itself already navigates on click - don't visit twice
+                    e.stopPropagation();
+                    onClick();
+                }}
             >
                 {buttonLabel}
             </Button>
-        </Paper>
+        </div>
     );
 }
 
@@ -152,7 +119,7 @@ export default function WooConvertIndex({ conversions }: Props) {
         return fullName || user.username;
     };
 
-    const handlePageChange = (_: unknown, page: number) => {
+    const handlePageChange = (page: number) => {
         router.get('/import-export/woo-convert', { page }, { preserveState: true });
     };
 
@@ -173,7 +140,7 @@ export default function WooConvertIndex({ conversions }: Props) {
             key: 'filename',
             header: t('uploadedFile'),
             priority: 'always',
-            render: (row) => <Typography sx={{ fontWeight: 600 }}>{row.original_filename}</Typography>,
+            render: (row) => <span className={styles.mono}>{row.original_filename}</span>,
         },
         {
             key: 'rowCount',
@@ -211,16 +178,13 @@ export default function WooConvertIndex({ conversions }: Props) {
             priority: 'always',
             align: 'right',
             render: (row) => (
-                <IconButton
-                    size="small"
-                    sx={fioriIconButtonSx}
-                    onClick={(e) => {
-                        e.stopPropagation();
-                        router.visit(`/import-export/woo-convert/${row.id}`);
-                    }}
-                >
-                    <VisibilityIcon fontSize="small" />
-                </IconButton>
+                <Button
+                    design="Transparent"
+                    icon="show"
+                    tooltip={t('viewJob')}
+                    accessibleName={t('viewJob')}
+                    onClick={() => router.visit(`/import-export/woo-convert/${row.id}`)}
+                />
             ),
         },
     ];
@@ -228,16 +192,20 @@ export default function WooConvertIndex({ conversions }: Props) {
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={t('wooConvertTitle')} />
-            <Box sx={{ p: 4, bgcolor: FIORI.pageBg, minHeight: '100%' }}>
-                <Box sx={{ mb: 3 }}>
-                    <Typography variant="h5" fontWeight={600} sx={{ color: FIORI.textPrimary }}>{t('wooConvertTitle')}</Typography>
-                    <Typography variant="body2" sx={{ color: FIORI.textSecondary, mt: 0.25 }}>{t('wooHubSubtitle')}</Typography>
-                </Box>
+            <div className={styles.page}>
+                <div style={{ marginBottom: '1.5rem' }}>
+                    <Title level="H3" size="H3" wrappingType="Normal">
+                        {t('wooConvertTitle')}
+                    </Title>
+                    <div className={styles.secondaryText} style={{ marginTop: '0.125rem' }}>
+                        {t('wooHubSubtitle')}
+                    </div>
+                </div>
 
-                <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ mb: 4 }}>
+                <div className={styles.directionRow}>
                     {canCreate && (
                         <DirectionCard
-                            icon={<UploadFileIcon />}
+                            icon="upload"
                             title={t('wooImportCardTitle')}
                             description={t('wooImportCardDesc')}
                             buttonLabel={t('wooConvertNewConversion')}
@@ -245,34 +213,33 @@ export default function WooConvertIndex({ conversions }: Props) {
                         />
                     )}
                     <DirectionCard
-                        icon={<DownloadIcon />}
+                        icon="download"
                         title={t('wooExportTitle')}
                         description={t('wooExportCardDesc')}
                         buttonLabel={t('wooExportCardButton')}
                         onClick={() => router.visit('/import-export/woo-convert/export')}
                     />
-                </Stack>
+                </div>
 
-                <Stack direction="row" justifyContent="space-between" alignItems="baseline" sx={{ mb: 1.5 }}>
-                    <Typography variant="h6" fontWeight={600} sx={{ color: FIORI.textPrimary }}>{t('wooConvertHistoryTitle')}</Typography>
-                    <Typography variant="body2" sx={{ color: FIORI.textSecondary }}>{tGrid('results', { count: conversions.total })}</Typography>
-                </Stack>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: '1rem', marginBottom: '0.75rem' }}>
+                    <Title level="H4" size="H5" wrappingType="Normal">
+                        {t('wooConvertHistoryTitle')}
+                    </Title>
+                    <span className={styles.secondaryText}>{tGrid('results', { count: conversions.total })}</span>
+                </div>
 
                 {conversions.data.length === 0 ? (
-                    <Paper elevation={0} sx={{ ...fioriCardSx, p: 6, textAlign: 'center' }}>
-                        <UploadFileIcon sx={{ fontSize: 40, color: FIORI.textSecondary, mb: 1 }} />
-                        <Typography sx={{ color: FIORI.textSecondary, mb: canCreate ? 2 : 0 }}>{t('wooConvertNoneFound')}</Typography>
+                    <div className={styles.emptyState}>
+                        <Icon name="upload" style={{ width: 40, height: 40, color: 'var(--sapContent_LabelColor)', marginBottom: '0.5rem' }} />
+                        <div className={styles.secondaryText} style={{ marginBottom: canCreate ? '1rem' : 0 }}>
+                            {t('wooConvertNoneFound')}
+                        </div>
                         {canCreate && (
-                            <Button
-                                variant="contained"
-                                startIcon={<AddIcon />}
-                                onClick={() => router.visit('/import-export/woo-convert/create')}
-                                sx={fioriEmphasizedSx}
-                            >
+                            <Button design="Emphasized" icon="add" onClick={() => router.visit('/import-export/woo-convert/create')}>
                                 {t('wooConvertNewConversion')}
                             </Button>
                         )}
-                    </Paper>
+                    </div>
                 ) : (
                     <FioriResponsiveTable
                         columns={columns}
@@ -283,19 +250,9 @@ export default function WooConvertIndex({ conversions }: Props) {
                 )}
 
                 {conversions.last_page > 1 && (
-                    <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
-                        <Pagination
-                            count={conversions.last_page}
-                            page={conversions.current_page}
-                            onChange={handlePageChange}
-                            sx={{
-                                '& .MuiPaginationItem-root': { borderRadius: '6px', color: FIORI.textPrimary },
-                                '& .Mui-selected': { bgcolor: `${FIORI.brand} !important`, color: '#fff' },
-                            }}
-                        />
-                    </Box>
+                    <PagePagination count={conversions.last_page} page={conversions.current_page} onChange={handlePageChange} />
                 )}
-            </Box>
+            </div>
         </AppLayout>
     );
 }

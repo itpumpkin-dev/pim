@@ -1,5 +1,16 @@
-import { fioriSwitchSx } from '@/lib/fiori-style';
-import { Checkbox, MenuItem, Select, Switch, TextField } from '@mui/material';
+import {
+    CheckBox,
+    DatePicker,
+    DateTimePicker,
+    FileUploader,
+    Input,
+    MultiComboBox,
+    MultiComboBoxItem,
+    Option,
+    Select,
+    Switch,
+    TextArea,
+} from '@ui5/webcomponents-react';
 
 export interface CategoryFieldItem {
     id: number;
@@ -13,10 +24,14 @@ export interface CategoryFieldItem {
     display_section: string | null;
 }
 
+const FULL_WIDTH = { width: '100%' } as const;
+
 /**
  * เรนเดอร์อินพุตที่เหมาะกับ Category field แบบไดนามิก โดยดูจาก `type`
  * (เป็นหนึ่งใน 10 ชนิดของ CategoryField ที่ UnoPim เอกสารไว้) ใช้ร่วมกันทั้ง
  * ฟอร์มสร้างและแก้ไข category เพื่อให้ switch นี้มีอยู่ที่เดียว ไม่ต้องเขียนซ้ำ
+ *
+ * ข้อความ error เองแสดงโดย FioriField ที่ห่ออยู่ — ตรงนี้แค่ตั้ง valueState
  */
 export function CategoryFieldInput({
     field,
@@ -32,103 +47,76 @@ export function CategoryFieldInput({
     error?: string;
 }) {
     const options = field.options ?? [];
+    const valueState = error ? ('Negative' as const) : ('None' as const);
 
     switch (field.type) {
         case 'Textarea':
-            return (
-                <TextField
-                    multiline
-                    rows={4}
-                    fullWidth
-                    value={value ?? ''}
-                    onChange={(e) => onChange(e.target.value)}
-                    error={Boolean(error)}
-                    helperText={error}
-                />
-            );
+            return <TextArea rows={4} style={FULL_WIDTH} value={value ?? ''} valueState={valueState} onInput={(e) => onChange(e.target.value)} />;
         case 'Boolean':
-            return <Switch sx={fioriSwitchSx} checked={Boolean(value)} onChange={(e) => onChange(e.target.checked)} />;
+            return <Switch checked={Boolean(value)} onChange={(e) => onChange(e.target.checked)} />;
         case 'Checkbox':
-            return <Checkbox checked={Boolean(value)} onChange={(e) => onChange(e.target.checked)} />;
+            return <CheckBox checked={Boolean(value)} onChange={(e) => onChange(e.target.checked)} />;
         case 'Select':
             return (
-                <Select fullWidth size="small" value={value ?? ''} onChange={(e) => onChange(e.target.value)} error={Boolean(error)}>
-                    <MenuItem value="">
-                        <em>None</em>
-                    </MenuItem>
+                <Select
+                    style={FULL_WIDTH}
+                    value={value ?? ''}
+                    valueState={valueState}
+                    onChange={(e) => onChange(e.detail.selectedOption.value ?? '')}
+                >
+                    <Option value="">None</Option>
                     {options.map((opt) => (
-                        <MenuItem key={opt} value={opt}>
+                        <Option key={opt} value={opt}>
                             {opt}
-                        </MenuItem>
+                        </Option>
                     ))}
                 </Select>
             );
-        case 'Multiselect':
+        case 'Multiselect': {
+            const selected: string[] = Array.isArray(value) ? value : [];
             return (
-                <Select
-                    fullWidth
-                    size="small"
-                    multiple
-                    value={Array.isArray(value) ? value : []}
-                    onChange={(e) => onChange(e.target.value)}
-                    error={Boolean(error)}
+                <MultiComboBox
+                    style={FULL_WIDTH}
+                    valueState={valueState}
+                    onSelectionChange={(e) => onChange(e.detail.items.map((item) => item.text ?? ''))}
                 >
                     {options.map((opt) => (
-                        <MenuItem key={opt} value={opt}>
-                            {opt}
-                        </MenuItem>
+                        <MultiComboBoxItem key={opt} text={opt} selected={selected.includes(opt)} />
                     ))}
-                </Select>
+                </MultiComboBox>
             );
+        }
         case 'Datetime':
             return (
-                <TextField
-                    type="datetime-local"
-                    fullWidth
-                    size="small"
+                <DateTimePicker
+                    style={FULL_WIDTH}
+                    valueFormat="yyyy-MM-dd'T'HH:mm"
                     value={value ?? ''}
-                    onChange={(e) => onChange(e.target.value)}
-                    error={Boolean(error)}
-                    helperText={error}
-                    slotProps={{ inputLabel: { shrink: true } }}
+                    valueState={valueState}
+                    onChange={(e) => onChange(e.detail.value)}
                 />
             );
         case 'Date':
             return (
-                <TextField
-                    type="date"
-                    fullWidth
-                    size="small"
+                <DatePicker
+                    style={FULL_WIDTH}
+                    valueFormat="yyyy-MM-dd"
                     value={value ?? ''}
-                    onChange={(e) => onChange(e.target.value)}
-                    error={Boolean(error)}
-                    helperText={error}
-                    slotProps={{ inputLabel: { shrink: true } }}
+                    valueState={valueState}
+                    onChange={(e) => onChange(e.detail.value)}
                 />
             );
         case 'Image':
         case 'File':
             return (
-                <TextField
-                    type="file"
-                    fullWidth
-                    size="small"
-                    onChange={(e) => onChange((e.target as HTMLInputElement).files?.[0] ?? null)}
-                    error={Boolean(error)}
-                    helperText={error}
-                    slotProps={{ htmlInput: { accept: field.type === 'Image' ? 'image/*' : undefined } }}
+                <FileUploader
+                    style={FULL_WIDTH}
+                    accept={field.type === 'Image' ? 'image/*' : undefined}
+                    valueState={valueState}
+                    onChange={(e) => onChange(e.detail.files?.[0] ?? null)}
                 />
             );
         default:
-            return (
-                <TextField
-                    size="small"
-                    fullWidth
-                    value={value ?? ''}
-                    onChange={(e) => onChange(e.target.value)}
-                    error={Boolean(error)}
-                    helperText={error}
-                />
-            );
+            return <Input style={FULL_WIDTH} value={value ?? ''} valueState={valueState} onInput={(e) => onChange(e.target.value)} />;
     }
 }

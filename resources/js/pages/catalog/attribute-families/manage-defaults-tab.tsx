@@ -1,34 +1,19 @@
+import { FioriMessageBox } from '@/components/fiori-message-box';
+import { FioriResponsiveColumn, FioriResponsiveTable } from '@/components/fiori-responsive-table';
+import { FioriBusyOverlay } from '@/lib/fiori-style';
 import { router } from '@inertiajs/react';
-import SearchIcon from '@mui/icons-material/Search';
-import EditIcon from '@mui/icons-material/Edit';
-import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
-import LinkOffIcon from '@mui/icons-material/LinkOff';
-import OpenInNewIcon from '@mui/icons-material/OpenInNew';
-import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
-import FirstPageIcon from '@mui/icons-material/FirstPage';
-import LastPageIcon from '@mui/icons-material/LastPage';
-import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
-import ChevronRightIcon from '@mui/icons-material/ChevronRight';
-import {
-    Autocomplete,
-    Box,
-    Divider,
-    IconButton,
-    InputAdornment,
-    MenuItem,
-    Paper,
-    Select,
-    Stack,
-    TextField,
-    Tooltip,
-    Typography,
-} from '@mui/material';
+import '@ui5/webcomponents-icons/dist/broken-link.js';
+import '@ui5/webcomponents-icons/dist/edit.js';
+import '@ui5/webcomponents-icons/dist/popup-window.js';
+import '@ui5/webcomponents-icons/dist/search.js';
+import '@ui5/webcomponents-icons/dist/slim-arrow-left.js';
+import '@ui5/webcomponents-icons/dist/slim-arrow-right.js';
+import '@ui5/webcomponents-icons/dist/switch-views.js';
+import '@ui5/webcomponents-icons/dist/sys-first-page.js';
+import '@ui5/webcomponents-icons/dist/sys-last-page.js';
+import { Button, ComboBox, ComboBoxItem, FlexBox, Icon, Input, Option, Select, Text } from '@ui5/webcomponents-react';
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FioriResponsiveColumn, FioriResponsiveTable } from '@/components/fiori-responsive-table';
-import { FioriMessageBox } from '@/components/fiori-message-box';
-import { fioriComboBoxPaperSx, fioriComboBoxSx } from '@/components/fiori-form';
-import { FIORI, FioriBusyOverlay, fioriCardSx, fioriIconButtonSx, fioriSearchFieldSx } from '@/lib/fiori-style';
 
 interface FamilyOption {
     id: number;
@@ -142,23 +127,21 @@ export function ManageDefaultsTab({ families, canEdit, canAssignDefault, canEdit
 
     const columns: FioriResponsiveColumn<DefaultAssignmentRow>[] = [
         { key: 'id', header: t('fields.id'), priority: 'low', render: (row) => row.family_id },
-        { key: 'code', header: t('fields.code'), priority: 'always', render: (row) => <Typography sx={{ fontWeight: 500 }}>{row.family_code}</Typography> },
+        { key: 'code', header: t('fields.code'), priority: 'always', render: (row) => <span style={{ fontWeight: 500 }}>{row.family_code}</span> },
         { key: 'name', header: t('fields.name'), priority: 'high', render: (row) => row.family_name || row.family_code },
         {
             key: 'group',
             header: tCatalog('manageDefaultsProductGroup'),
             priority: 'always',
             render: (row) => (
-                <Box>
-                    <Typography variant="body2" sx={{ fontWeight: 500, color: FIORI.textPrimary }}>
-                        {row.group_name}
-                    </Typography>
+                <div>
+                    <div style={{ fontWeight: 500, color: 'var(--sapTextColor)', fontSize: 'var(--sapFontSize)' }}>{row.group_name}</div>
                     {(row.category_name || row.subcategory_name) && (
-                        <Typography variant="caption" sx={{ color: FIORI.textSecondary }}>
+                        <div style={{ color: 'var(--sapContent_LabelColor)', fontSize: 'var(--sapFontSmallSize)' }}>
                             {[row.category_name, row.subcategory_name].filter(Boolean).join(' › ')}
-                        </Typography>
+                        </div>
                     )}
-                </Box>
+                </div>
             ),
         },
         {
@@ -167,166 +150,152 @@ export function ManageDefaultsTab({ families, canEdit, canAssignDefault, canEdit
             priority: 'always',
             align: 'right',
             render: (row) => (
-                <Stack direction="row" spacing={0.5} justifyContent="flex-end">
+                <FlexBox justifyContent="End" style={{ gap: '0.25rem' }}>
                     {canEdit && (
-                        <Tooltip title={tCatalog('manageDefaultsEditFamily')}>
-                            <IconButton size="small" sx={fioriIconButtonSx} onClick={() => router.visit(`/catalog/attributeFamilies/${row.family_id}/edit`)}>
-                                <EditIcon fontSize="small" />
-                            </IconButton>
-                        </Tooltip>
+                        <Button
+                            design="Transparent"
+                            icon="edit"
+                            tooltip={tCatalog('manageDefaultsEditFamily')}
+                            accessibleName={tCatalog('manageDefaultsEditFamily')}
+                            onClick={() => router.visit(`/catalog/attributeFamilies/${row.family_id}/edit`)}
+                        />
                     )}
                     {canEditProductGroup && (
-                        <Tooltip title={tCatalog('manageDefaultsOpenProductGroup')}>
-                            <IconButton size="small" sx={fioriIconButtonSx} onClick={() => router.visit(`/catalog/product-groups/${row.group_id}/edit`)}>
-                                <OpenInNewIcon fontSize="small" />
-                            </IconButton>
-                        </Tooltip>
+                        <Button
+                            design="Transparent"
+                            icon="popup-window"
+                            tooltip={tCatalog('manageDefaultsOpenProductGroup')}
+                            accessibleName={tCatalog('manageDefaultsOpenProductGroup')}
+                            onClick={() => router.visit(`/catalog/product-groups/${row.group_id}/edit`)}
+                        />
                     )}
                     {canAssignDefault && (
-                        <Tooltip title={tCatalog('manageDefaultsChange')}>
-                            <IconButton
-                                size="small"
-                                sx={fioriIconButtonSx}
-                                onClick={() => {
-                                    setChangeRow(row);
-                                    setChangeTarget(null);
-                                }}
-                            >
-                                <SwapHorizIcon fontSize="small" />
-                            </IconButton>
-                        </Tooltip>
+                        <Button
+                            design="Transparent"
+                            icon="switch-views"
+                            tooltip={tCatalog('manageDefaultsChange')}
+                            accessibleName={tCatalog('manageDefaultsChange')}
+                            onClick={() => {
+                                setChangeRow(row);
+                                setChangeTarget(null);
+                            }}
+                        />
                     )}
                     {canAssignDefault && (
-                        <Tooltip title={tCatalog('manageDefaultsUnassign')}>
-                            <IconButton size="small" sx={fioriIconButtonSx} onClick={() => setUnassignRow(row)}>
-                                <LinkOffIcon fontSize="small" />
-                            </IconButton>
-                        </Tooltip>
+                        <Button
+                            design="Transparent"
+                            icon="broken-link"
+                            tooltip={tCatalog('manageDefaultsUnassign')}
+                            accessibleName={tCatalog('manageDefaultsUnassign')}
+                            onClick={() => setUnassignRow(row)}
+                        />
                     )}
-                </Stack>
+                </FlexBox>
             ),
         },
     ];
 
+    const changeOptions = changeRow ? families.filter((f) => f.id !== changeRow.family_id) : [];
+
     return (
         <>
-            <Paper elevation={0} sx={fioriCardSx}>
-                <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" alignItems="center" spacing={2} sx={{ p: 2 }}>
-                    <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} sx={{ width: { xs: '100%', md: 'auto' } }}>
-                        <TextField
+            <div
+                style={{
+                    background: 'var(--sapGroup_ContentBackground)',
+                    border: '1px solid var(--sapGroup_ContentBorderColor)',
+                    borderRadius: 'var(--sapElement_BorderCornerRadius)',
+                    overflow: 'hidden',
+                }}
+            >
+                <FlexBox justifyContent="SpaceBetween" alignItems="Center" wrap="Wrap" style={{ gap: '1rem', padding: '1rem' }}>
+                    <FlexBox alignItems="Center" wrap="Wrap" style={{ gap: '0.75rem' }}>
+                        <Input
                             value={search}
-                            onChange={(e) => setSearch(e.target.value)}
+                            onInput={(event) => setSearch(event.target.value)}
                             placeholder={tCatalog('manageDefaultsSearch')}
-                            size="small"
-                            sx={{ ...fioriSearchFieldSx, minWidth: 260 }}
-                            InputProps={{
-                                endAdornment: (
-                                    <InputAdornment position="end">
-                                        <SearchIcon sx={{ color: FIORI.textSecondary, fontSize: 20 }} />
-                                    </InputAdornment>
-                                ),
-                            }}
+                            icon={<Icon name="search" />}
+                            style={{ minWidth: 260 }}
                         />
-                        <Autocomplete
-                            size="small"
-                            options={families}
-                            value={familyFilter}
-                            onChange={(_, v) => {
-                                setFamilyFilter(v);
+                        <ComboBox
+                            placeholder={tCatalog('manageDefaultsAllFamilies')}
+                            showClearIcon
+                            selectedValue={familyFilter ? String(familyFilter.id) : undefined}
+                            value={familyFilter ? familyLabel(familyFilter) : ''}
+                            onInput={(e) => {
+                                // ช่องถูกล้าง (ปุ่ม clear หรือลบจนว่าง) = กลับไปแสดงทุกตระกูล
+                                if ((e.target.value ?? '') === '' && familyFilter) {
+                                    setFamilyFilter(null);
+                                    setPage(1);
+                                }
+                            }}
+                            onSelectionChange={(e) => {
+                                const id = e.detail.item?.value;
+                                const next = id ? (families.find((f) => String(f.id) === id) ?? null) : null;
+                                setFamilyFilter(next);
                                 setPage(1);
                             }}
-                            getOptionLabel={familyLabel}
-                            isOptionEqualToValue={(a, b) => a.id === b.id}
-                            popupIcon={<KeyboardArrowDownIcon />}
-                            slotProps={{ paper: { sx: fioriComboBoxPaperSx } }}
-                            // ให้สูง/มุม/สีขอบเท่ากับช่องค้นหา (fioriSearchFieldSx) ข้างๆ
-                            sx={{
-                                ...(fioriComboBoxSx('none') as object),
-                                minWidth: 260,
-                                // selector ยาวกว่าของ fioriComboBoxSx หนึ่ง class เพื่อชนะ specificity
-                                '& .MuiOutlinedInput-root.MuiInputBase-root.MuiAutocomplete-inputRoot': {
-                                    minHeight: 40,
-                                    borderRadius: '8px',
-                                    '& fieldset': { borderColor: FIORI.border },
-                                    '&:hover fieldset': { borderColor: FIORI.borderStrong },
-                                    '&.Mui-focused fieldset': { borderColor: FIORI.brand, borderWidth: '1px' },
-                                    '& .MuiAutocomplete-input': { padding: '8.5px 4px 8.5px 14px' },
-                                },
-                            }}
-                            renderInput={(params) => <TextField {...params} placeholder={tCatalog('manageDefaultsAllFamilies')} />}
-                        />
-                    </Stack>
+                            style={{ minWidth: 260 }}
+                        >
+                            {families.map((f) => (
+                                <ComboBoxItem key={f.id} value={String(f.id)} text={familyLabel(f)} />
+                            ))}
+                        </ComboBox>
+                    </FlexBox>
 
-                    <Stack direction="row" alignItems="center" spacing={1.5} useFlexGap flexWrap="wrap" sx={{ width: { xs: '100%', md: 'auto' }, rowGap: 1, justifyContent: { xs: 'space-between', md: 'flex-end' } }}>
-                        <Typography variant="body2" sx={{ color: FIORI.textSecondary }}>
-                            {t('results', { count: data?.total ?? 0 })}
-                        </Typography>
+                    <FlexBox alignItems="Center" wrap="Wrap" style={{ gap: '0.75rem', rowGap: '0.5rem' }}>
+                        <Text style={{ color: 'var(--sapContent_LabelColor)' }}>{t('results', { count: data?.total ?? 0 })}</Text>
                         <Select
-                            value={perPage}
+                            value={String(perPage)}
                             onChange={(e) => {
-                                setPerPage(Number(e.target.value));
+                                setPerPage(Number(e.detail.selectedOption.value));
                                 setPage(1);
                             }}
-                            size="small"
-                            sx={{
-                                bgcolor: FIORI.surface,
-                                borderRadius: '8px',
-                                minWidth: 60,
-                                height: 34,
-                                '& .MuiOutlinedInput-notchedOutline': { borderColor: FIORI.border },
-                            }}
+                            style={{ width: '5rem' }}
                         >
-                            <MenuItem value={10}>10</MenuItem>
-                            <MenuItem value={15}>15</MenuItem>
-                            <MenuItem value={25}>25</MenuItem>
-                            <MenuItem value={50}>50</MenuItem>
+                            <Option value="10">10</Option>
+                            <Option value="15">15</Option>
+                            <Option value="25">25</Option>
+                            <Option value="50">50</Option>
                         </Select>
-                        <Typography variant="body2" sx={{ color: FIORI.textSecondary }}>
-                            {t('perPage')}
-                        </Typography>
-                        <Paper
-                            variant="outlined"
-                            sx={{ px: 1.5, py: 0.5, bgcolor: FIORI.surface, borderRadius: '8px', borderColor: FIORI.border, display: 'flex', alignItems: 'center' }}
-                        >
-                            <Typography variant="body2" sx={{ color: FIORI.textPrimary }}>{currentPage}</Typography>
-                        </Paper>
-                        <Typography variant="body2" sx={{ color: FIORI.textSecondary }}>
-                            {t('pageOf', { lastPage })}
-                        </Typography>
-                        <Stack direction="row" spacing={0.2}>
-                            <IconButton size="small" sx={fioriIconButtonSx} disabled={currentPage <= 1} onClick={() => setPage(1)}>
-                                <FirstPageIcon fontSize="small" />
-                            </IconButton>
-                            <IconButton size="small" sx={fioriIconButtonSx} disabled={currentPage <= 1} onClick={() => setPage(currentPage - 1)}>
-                                <ChevronLeftIcon fontSize="small" />
-                            </IconButton>
-                            <IconButton size="small" sx={fioriIconButtonSx} disabled={currentPage >= lastPage} onClick={() => setPage(currentPage + 1)}>
-                                <ChevronRightIcon fontSize="small" />
-                            </IconButton>
-                            <IconButton size="small" sx={fioriIconButtonSx} disabled={currentPage >= lastPage} onClick={() => setPage(lastPage)}>
-                                <LastPageIcon fontSize="small" />
-                            </IconButton>
-                        </Stack>
-                    </Stack>
-                </Stack>
+                        <Text style={{ color: 'var(--sapContent_LabelColor)' }}>{t('perPage')}</Text>
+                        <Text>{currentPage}</Text>
+                        <Text style={{ color: 'var(--sapContent_LabelColor)' }}>{t('pageOf', { lastPage })}</Text>
+                        <FlexBox style={{ gap: '0.125rem' }}>
+                            <Button design="Transparent" icon="sys-first-page" disabled={currentPage <= 1} onClick={() => setPage(1)} />
+                            <Button
+                                design="Transparent"
+                                icon="slim-arrow-left"
+                                disabled={currentPage <= 1}
+                                onClick={() => setPage(currentPage - 1)}
+                            />
+                            <Button
+                                design="Transparent"
+                                icon="slim-arrow-right"
+                                disabled={currentPage >= lastPage}
+                                onClick={() => setPage(currentPage + 1)}
+                            />
+                            <Button design="Transparent" icon="sys-last-page" disabled={currentPage >= lastPage} onClick={() => setPage(lastPage)} />
+                        </FlexBox>
+                    </FlexBox>
+                </FlexBox>
 
-                <Divider sx={{ borderColor: FIORI.border }} />
+                <div style={{ borderTop: '1px solid var(--sapGroup_ContentBorderColor)' }} />
 
                 {/* โชว์ indicator ทันทีทุกครั้งที่โหลด (ไม่รอ delay) ให้รู้ว่ากำลังดึงข้อมูล
                     และกันความสูงไว้ตอนยังไม่มีแถว ไม่งั้น spinner จะเบียดอยู่ในพื้นที่แคบๆ */}
                 <FioriBusyOverlay busy={loading} delayMs={0}>
-                    {initialLoading && <Box sx={{ minHeight: 160 }} />}
+                    {initialLoading && <div style={{ minHeight: 160 }} />}
                     {!initialLoading && (
-                    <FioriResponsiveTable
-                        variant="plain"
-                        columns={columns}
-                        rows={data?.data ?? []}
-                        getRowKey={(row) => `${row.group_id}-${row.family_id}`}
-                        emptyMessage={tCatalog('manageDefaultsEmpty')}
-                    />
+                        <FioriResponsiveTable
+                            variant="plain"
+                            columns={columns}
+                            rows={data?.data ?? []}
+                            getRowKey={(row) => `${row.group_id}-${row.family_id}`}
+                            emptyMessage={tCatalog('manageDefaultsEmpty')}
+                        />
                     )}
                 </FioriBusyOverlay>
-            </Paper>
+            </div>
 
             {/* เปลี่ยนตระกูลเริ่มต้นของกลุ่มสินค้านี้ */}
             <FioriMessageBox
@@ -345,26 +314,32 @@ export function ManageDefaultsTab({ families, canEdit, canAssignDefault, canEdit
                 confirmDisabled={!changeTarget || changeTarget.id === changeRow?.family_id}
             >
                 {changeRow && (
-                    <Stack spacing={1.5} sx={{ minWidth: { sm: 400 } }}>
-                        <Typography variant="body2">
+                    <FlexBox direction="Column" style={{ gap: '0.75rem', minWidth: 'min(400px, 100%)' }}>
+                        <Text>
                             {tCatalog('manageDefaultsChangeMessage', {
                                 group: changeRow.group_name,
                                 family: familyLabel({ code: changeRow.family_code, name: changeRow.family_name }),
                             })}
-                        </Typography>
-                        <Autocomplete
-                            size="small"
-                            options={families.filter((f) => f.id !== changeRow.family_id)}
-                            value={changeTarget}
-                            onChange={(_, v) => setChangeTarget(v)}
-                            getOptionLabel={familyLabel}
-                            isOptionEqualToValue={(a, b) => a.id === b.id}
-                            popupIcon={<KeyboardArrowDownIcon />}
-                            slotProps={{ paper: { sx: fioriComboBoxPaperSx } }}
-                            sx={fioriComboBoxSx('none')}
-                            renderInput={(params) => <TextField {...params} placeholder={tCatalog('manageDefaultsPickFamily')} />}
-                        />
-                    </Stack>
+                        </Text>
+                        <ComboBox
+                            placeholder={tCatalog('manageDefaultsPickFamily')}
+                            showClearIcon
+                            selectedValue={changeTarget ? String(changeTarget.id) : undefined}
+                            value={changeTarget ? familyLabel(changeTarget) : ''}
+                            onInput={(e) => {
+                                if ((e.target.value ?? '') === '' && changeTarget) setChangeTarget(null);
+                            }}
+                            onSelectionChange={(e) => {
+                                const id = e.detail.item?.value;
+                                setChangeTarget(id ? (changeOptions.find((f) => String(f.id) === id) ?? null) : null);
+                            }}
+                            style={{ width: '100%' }}
+                        >
+                            {changeOptions.map((f) => (
+                                <ComboBoxItem key={f.id} value={String(f.id)} text={familyLabel(f)} />
+                            ))}
+                        </ComboBox>
+                    </FlexBox>
                 )}
             </FioriMessageBox>
 
@@ -374,7 +349,9 @@ export function ManageDefaultsTab({ families, canEdit, canAssignDefault, canEdit
                 onCancel={() => setUnassignRow(null)}
                 onConfirm={() => {
                     if (unassignRow) {
-                        submit(`/catalog/attributeFamilies/${unassignRow.family_id}/unset-default-for-groups`, unassignRow.group_id, () => setUnassignRow(null));
+                        submit(`/catalog/attributeFamilies/${unassignRow.family_id}/unset-default-for-groups`, unassignRow.group_id, () =>
+                            setUnassignRow(null),
+                        );
                     }
                 }}
                 title={tCatalog('manageDefaultsUnassign')}

@@ -1,0 +1,92 @@
+/* Shared layout for the system/translationProvider pages (index, create, edit). */
+
+.page {
+    box-sizing: border-box;
+    min-height: 100%;
+    padding: 1rem;
+    background: var(--sapBackgroundColor);
+}
+
+.header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.headerActions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.formBody {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    max-width: 800px;
+}
+
+.card {
+    border: 1px solid var(--sapGroup_ContentBorderColor);
+    border-radius: var(--sapElement_BorderCornerRadius);
+    background: var(--sapGroup_ContentBackground);
+    overflow: hidden;
+}
+
+/* Search & controls row: stacked on narrow screens, one row from md (900px) up. */
+.toolbar {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 1rem;
+    padding: 1rem;
+    border-bottom: 1px solid var(--sapGroup_ContentBorderColor);
+}
+
+.toolbarGroup {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    width: 100%;
+}
+
+.toolbarGroupEnd {
+    justify-content: flex-end;
+}
+
+.pageBox {
+    display: flex;
+    align-items: center;
+    padding: 0.25rem 0.75rem;
+    border: 1px solid var(--sapGroup_ContentBorderColor);
+    border-radius: var(--sapElement_BorderCornerRadius);
+    background: var(--sapGroup_ContentBackground);
+    color: var(--sapTextColor);
+    font-size: var(--sapFontSize);
+}
+
+.mutedText {
+    color: var(--sapContent_LabelColor);
+    font-size: var(--sapFontSize);
+    white-space: nowrap;
+}
+
+@media (min-width: 900px) {
+    .page {
+        padding: 2rem;
+    }
+
+    .toolbar {
+        flex-direction: row;
+        align-items: center;
+        justify-content: space-between;
+    }
+
+    .toolbarGroup {
+        width: auto;
+    }
+}

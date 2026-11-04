@@ -1,15 +1,27 @@
 import { type BreadcrumbItem, type SharedData } from '@/types';
 import { Head, Link, useForm, usePage } from '@inertiajs/react';
-import { Box, Button, CircularProgress, Fade, Link as MuiLink, Stack, TextField, Typography } from '@mui/material';
-import { FormEventHandler } from 'react';
+import { Button, FlexBox, Input, Label, Text } from '@ui5/webcomponents-react';
+import { FormEventHandler, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import DeleteUser from '@/components/delete-user';
 import HeadingSmall from '@/components/heading-small';
+import InputError from '@/components/input-error';
 import { useUnsavedChangesGuard } from '@/hooks/use-unsaved-changes-guard';
 import AppLayout from '@/layouts/app-layout';
 import SettingsLayout from '@/layouts/settings/layout';
-import { fioriEmphasizedSx } from '@/lib/fiori-style';
+
+function Field({ id, label, error, children }: { id: string; label: string; error?: string; children: ReactNode }) {
+    return (
+        <FlexBox direction="Column" style={{ gap: '0.25rem', flex: 1, minWidth: 0 }}>
+            <Label for={id} required showColon={false}>
+                {label}
+            </Label>
+            {children}
+            <InputError message={error} />
+        </FlexBox>
+    );
+}
 
 export default function Profile({ mustVerifyEmail, status }: { mustVerifyEmail: boolean; status?: string }) {
     const { t } = useTranslation('settings');
@@ -48,102 +60,118 @@ export default function Profile({ mustVerifyEmail, status }: { mustVerifyEmail: 
         });
     };
 
+    const stateOf = (error?: string) => (error ? 'Negative' : 'None');
+
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={t('profileInformation')} />
 
             <SettingsLayout>
-                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                <FlexBox direction="Column" style={{ gap: '1.5rem' }}>
                     <HeadingSmall title={t('profileInformation')} description={t('profileInformationDesc')} />
 
-                    <Box component="form" onSubmit={submit}>
-                        <Stack spacing={3}>
-                            <TextField
-                                id="username"
-                                label={t('username')}
-                                fullWidth
-                                value={data.username}
-                                onChange={(e) => setData('username', e.target.value)}
-                                required
-                                autoComplete="username"
-                                placeholder={t('username')}
-                                error={Boolean(errors.username)}
-                                helperText={errors.username}
-                            />
-
-                            <Stack direction="row" spacing={2}>
-                                <TextField
-                                    id="first_name"
-                                    label={t('firstName')}
-                                    fullWidth
-                                    value={data.first_name}
-                                    onChange={(e) => setData('first_name', e.target.value)}
+                    <form onSubmit={submit}>
+                        <FlexBox direction="Column" style={{ gap: '1.5rem' }}>
+                            <Field id="username" label={t('username')} error={errors.username}>
+                                <Input
+                                    id="username"
+                                    style={{ width: '100%' }}
+                                    value={data.username}
+                                    onInput={(e) => setData('username', e.target.value)}
                                     required
-                                    autoComplete="given-name"
-                                    placeholder={t('firstName')}
-                                    error={Boolean(errors.first_name)}
-                                    helperText={errors.first_name}
+                                    placeholder={t('username')}
+                                    valueState={stateOf(errors.username)}
                                 />
+                            </Field>
 
-                                <TextField
-                                    id="last_name"
-                                    label={t('lastName')}
-                                    fullWidth
-                                    value={data.last_name}
-                                    onChange={(e) => setData('last_name', e.target.value)}
+                            <FlexBox style={{ gap: '1rem' }}>
+                                <Field id="first_name" label={t('firstName')} error={errors.first_name}>
+                                    <Input
+                                        id="first_name"
+                                        style={{ width: '100%' }}
+                                        value={data.first_name}
+                                        onInput={(e) => setData('first_name', e.target.value)}
+                                        required
+                                        placeholder={t('firstName')}
+                                        valueState={stateOf(errors.first_name)}
+                                    />
+                                </Field>
+
+                                <Field id="last_name" label={t('lastName')} error={errors.last_name}>
+                                    <Input
+                                        id="last_name"
+                                        style={{ width: '100%' }}
+                                        value={data.last_name}
+                                        onInput={(e) => setData('last_name', e.target.value)}
+                                        required
+                                        placeholder={t('lastName')}
+                                        valueState={stateOf(errors.last_name)}
+                                    />
+                                </Field>
+                            </FlexBox>
+
+                            <Field id="email" label={t('emailAddress')} error={errors.email}>
+                                <Input
+                                    id="email"
+                                    type="Email"
+                                    style={{ width: '100%' }}
+                                    value={data.email}
+                                    onInput={(e) => setData('email', e.target.value)}
                                     required
-                                    autoComplete="family-name"
-                                    placeholder={t('lastName')}
-                                    error={Boolean(errors.last_name)}
-                                    helperText={errors.last_name}
+                                    placeholder={t('emailAddress')}
+                                    valueState={stateOf(errors.email)}
                                 />
-                            </Stack>
-
-                            <TextField
-                                id="email"
-                                type="email"
-                                label={t('emailAddress')}
-                                fullWidth
-                                value={data.email}
-                                onChange={(e) => setData('email', e.target.value)}
-                                required
-                                autoComplete="username"
-                                placeholder={t('emailAddress')}
-                                error={Boolean(errors.email)}
-                                helperText={errors.email}
-                            />
+                            </Field>
 
                             {mustVerifyEmail && auth.user.email_verified_at === null && (
-                                <Box>
-                                    <Typography variant="body2" color="text.secondary">
+                                <div>
+                                    <Text style={{ color: 'var(--sapContent_LabelColor)' }}>
                                         {t('emailUnverified')}{' '}
-                                        <MuiLink component={Link} href={route('verification.send')} method="post" as="button" underline="hover">
+                                        <Link
+                                            href={route('verification.send')}
+                                            method="post"
+                                            as="button"
+                                            style={{
+                                                background: 'none',
+                                                border: 0,
+                                                padding: 0,
+                                                cursor: 'pointer',
+                                                font: 'inherit',
+                                                color: 'var(--sapLinkColor)',
+                                            }}
+                                        >
                                             {t('resendVerification')}
-                                        </MuiLink>
-                                    </Typography>
+                                        </Link>
+                                    </Text>
 
                                     {status === 'verification-link-sent' && (
-                                        <Typography variant="body2" color="success.main" sx={{ mt: 1, fontWeight: 500 }}>
+                                        <Text
+                                            style={{ display: 'block', marginTop: '0.5rem', fontWeight: 500, color: 'var(--sapPositiveTextColor)' }}
+                                        >
                                             {t('verificationSent')}
-                                        </Typography>
+                                        </Text>
                                     )}
-                                </Box>
+                                </div>
                             )}
 
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                                <Button type="submit" variant="contained" disabled={processing} startIcon={processing ? <CircularProgress size={16} color="inherit" /> : undefined} sx={fioriEmphasizedSx}>
+                            <FlexBox alignItems="Center" style={{ gap: '1rem' }}>
+                                <Button type="Submit" design="Emphasized" disabled={processing} loading={processing} loadingDelay={0}>
                                     {processing ? t('saving') : t('save')}
                                 </Button>
 
-                                <Fade in={recentlySuccessful}>
-                                    <Typography variant="body2" color="text.secondary">
-                                        {t('saved')}
-                                    </Typography>
-                                </Fade>
-                            </Box>
-                        </Stack>
-                    </Box>
-                </Box>
+                                <Text
+                                    style={{
+                                        color: 'var(--sapContent_LabelColor)',
+                                        opacity: recentlySuccessful ? 1 : 0,
+                                        transition: 'opacity 225ms ease-in-out',
+                                    }}
+                                >
+                                    {t('saved')}
+                                </Text>
+                            </FlexBox>
+                        </FlexBox>
+                    </form>
+                </FlexBox>
 
                 <DeleteUser />
             </SettingsLayout>

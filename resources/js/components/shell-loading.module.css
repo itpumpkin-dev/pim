@@ -1,0 +1,100 @@
+/* Shared keyframes/classes for the app-shell loading indicators
+   (route-loading-skeleton.tsx, route-top-progress-bar.tsx, splash-screen.tsx). */
+
+/* Originally from Uiverse.io by adamgiebl; recolored to the brand blue so it
+   matches the Fiori-themed UI. */
+@keyframes pulse {
+    0% {
+        transform: scale(0.8);
+        background-color: rgba(0, 112, 242, 0.35);
+        box-shadow: 0 0 0 0 rgba(0, 112, 242, 0.35);
+    }
+    50% {
+        transform: scale(1.2);
+        background-color: var(--sapBrandColor);
+        box-shadow: 0 0 0 10px rgba(0, 112, 242, 0);
+    }
+    100% {
+        transform: scale(0.8);
+        background-color: rgba(0, 112, 242, 0.35);
+        box-shadow: 0 0 0 0 rgba(0, 112, 242, 0.35);
+    }
+}
+
+.pulseDot {
+    background-color: rgba(0, 112, 242, 0.35);
+    animation: pulse 1.5s infinite ease-in-out;
+}
+
+/* Indeterminate top bar — a brand-colored segment sliding across a faint track. */
+@keyframes slide {
+    0% {
+        left: -35%;
+        right: 100%;
+    }
+    60% {
+        left: 100%;
+        right: -90%;
+    }
+    100% {
+        left: 100%;
+        right: -90%;
+    }
+}
+
+.progressTrack {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    z-index: 1200;
+    overflow: hidden;
+    background-color: color-mix(in srgb, var(--sapBrandColor) 25%, transparent);
+}
+
+.progressBar {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    background-color: var(--sapBrandColor);
+    animation: slide 2.1s cubic-bezier(0.65, 0.815, 0.735, 0.395) infinite;
+}
+
+/* splash-screen.tsx */
+@keyframes breathe {
+    0%,
+    100% {
+        transform: scale(1);
+    }
+    50% {
+        transform: scale(1.06);
+    }
+}
+
+/* transform/opacity only so the browser can run it on the compositor thread
+   instead of repainting every frame. */
+@keyframes dotPulse {
+    0%,
+    80%,
+    100% {
+        opacity: 0.3;
+        transform: translateY(0);
+    }
+    40% {
+        opacity: 1;
+        transform: translateY(-4px);
+    }
+}
+
+.breathe {
+    animation: breathe 1.8s ease-in-out infinite;
+}
+
+.splashDot {
+    width: 10px;
+    height: 10px;
+    border-radius: 999px;
+    background-color: #f26522;
+    animation: dotPulse 1.2s ease-in-out infinite;
+}

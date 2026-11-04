@@ -19,60 +19,39 @@ body {
 }
 
 /*
- * SAP Fiori (Horizon) design tokens — consumed as var(--fiori-*) by
- * resources/js/lib/fiori-style.tsx and resources/js/lib/ui-style.ts.
- * `data-fiori-mode` is set on <html> by app.tsx's ThemedPage based on the
- * app's existing light/dark appearance toggle, so every page built on the
- * FIORI tokens gets dark mode for free without any per-page changes.
+ * Legacy SAP Fiori tokens — consumed as var(--fiori-*) by the FIORI object in
+ * resources/js/lib/fiori-tokens.ts (re-exported from fiori-style.tsx /
+ * ui-style.ts). They are now plain aliases of the official UI5 theme
+ * variables (--sap*), so legacy MUI pages and UI5 Web Components share one
+ * source of truth and light/dark comes from the UI5 theme itself
+ * (sap_horizon / sap_horizon_dark, switched by app.tsx's setTheme()) —
+ * the old [data-fiori-mode='dark'] override block is gone.
+ * The literal fallbacks are the Horizon light values, used only until the
+ * UI5 theme CSS has been applied (first paint) and in non-browser tests.
+ * New code: use the --sap* variables directly.
  */
 :root {
-    --fiori-brand: #0070f2;
-    --fiori-brand-dark: #0040b0;
-    --fiori-text-primary: #1d2d3e;
-    --fiori-text-secondary: #6a6d70;
-    --fiori-placeholder: #b3b7bb;
-    --fiori-border: #d9d9d9;
-    --fiori-border-strong: #89919a;
-    --fiori-page-bg: #f7f7f7;
-    --fiori-header-bg: #f7f7f7;
-    --fiori-hover: #f5f5f5;
-    --fiori-selected: #e9f2fe;
-    --fiori-success: #257a3e;
-    --fiori-warning: #e76500;
-    --fiori-error: #bb0000;
-    --fiori-neutral: #6a6d70;
-    --fiori-information: #0070f2;
-    --fiori-surface: #ffffff;
-    --fiori-success-bg: #e9f5ec;
-    --fiori-warning-bg: #fdf1e0;
-    --fiori-error-bg: #fbeaea;
-    --fiori-neutral-bg: #f2f2f2;
-    --fiori-brand-bg: rgba(0, 112, 242, 0.08);
-    --fiori-scrim: rgba(255, 255, 255, 0.65);
-}
-
-[data-fiori-mode='dark'] {
-    --fiori-brand: #4da3ff;
-    --fiori-brand-dark: #1f7ae0;
-    --fiori-text-primary: #e8eaed;
-    --fiori-text-secondary: #9aa4ae;
-    --fiori-placeholder: #6b7278;
-    --fiori-border: #383c40;
-    --fiori-border-strong: #565c63;
-    --fiori-page-bg: #17191b;
-    --fiori-header-bg: #202325;
-    --fiori-hover: #26292c;
-    --fiori-selected: rgba(77, 163, 255, 0.18);
-    --fiori-success: #3fb964;
-    --fiori-warning: #f0923d;
-    --fiori-error: #f1685f;
-    --fiori-neutral: #9aa4ae;
-    --fiori-information: #4da3ff;
-    --fiori-surface: #1e2124;
-    --fiori-success-bg: rgba(63, 185, 100, 0.16);
-    --fiori-warning-bg: rgba(240, 146, 61, 0.16);
-    --fiori-error-bg: rgba(241, 104, 95, 0.16);
-    --fiori-neutral-bg: rgba(154, 164, 174, 0.14);
-    --fiori-brand-bg: rgba(77, 163, 255, 0.16);
-    --fiori-scrim: rgba(23, 25, 27, 0.65);
+    --fiori-brand: var(--sapBrandColor, #0070f2);
+    --fiori-brand-dark: var(--sapButton_Emphasized_Hover_Background, #0064d9);
+    --fiori-text-primary: var(--sapTextColor, #1d2d3e);
+    --fiori-text-secondary: var(--sapContent_LabelColor, #556b82);
+    --fiori-placeholder: var(--sapField_PlaceholderTextColor, #556b82);
+    --fiori-border: var(--sapGroup_ContentBorderColor, #d9d9d9);
+    --fiori-border-strong: var(--sapField_BorderColor, #556b81);
+    --fiori-page-bg: var(--sapBackgroundColor, #f5f6f7);
+    --fiori-header-bg: var(--sapList_HeaderBackground, #ffffff);
+    --fiori-hover: var(--sapList_Hover_Background, #eaecee);
+    --fiori-selected: var(--sapList_SelectionBackgroundColor, #ebf8ff);
+    --fiori-success: var(--sapPositiveColor, #256f3a);
+    --fiori-warning: var(--sapCriticalColor, #e76500);
+    --fiori-error: var(--sapNegativeColor, #aa0808);
+    --fiori-neutral: var(--sapNeutralColor, #788fa6);
+    --fiori-information: var(--sapInformativeColor, #0070f2);
+    --fiori-surface: var(--sapGroup_ContentBackground, #ffffff);
+    --fiori-success-bg: var(--sapSuccessBackground, #f5fae5);
+    --fiori-warning-bg: var(--sapWarningBackground, #fff8d6);
+    --fiori-error-bg: var(--sapErrorBackground, #ffeaf4);
+    --fiori-neutral-bg: var(--sapNeutralBackground, #eff1f2);
+    --fiori-brand-bg: color-mix(in srgb, var(--sapBrandColor, #0070f2) 8%, transparent);
+    --fiori-scrim: color-mix(in srgb, var(--sapBackgroundColor, #f5f6f7) 65%, transparent);
 }

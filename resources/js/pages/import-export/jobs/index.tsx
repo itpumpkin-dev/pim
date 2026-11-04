@@ -1,40 +1,16 @@
+import { FioriMessageBox } from '@/components/fiori-message-box';
+import { FioriResponsiveColumn, FioriResponsiveTable } from '@/components/fiori-responsive-table';
+import PagePagination from '@/components/import-export/page-pagination';
 import AppLayout from '@/layouts/app-layout';
+import { FioriStatus, type FioriTone } from '@/lib/fiori-style';
 import { type BreadcrumbItem } from '@/types';
 import { Head, router } from '@inertiajs/react';
-import CancelIcon from '@mui/icons-material/Cancel';
-import VisibilityIcon from '@mui/icons-material/Visibility';
-import {
-    Box,
-    Button,
-    CircularProgress,
-    Dialog,
-    DialogActions,
-    DialogContent,
-    DialogContentText,
-    DialogTitle,
-    Divider,
-    FormControl,
-    IconButton,
-    InputLabel,
-    MenuItem,
-    Paper,
-    Select,
-    Typography,
-    Pagination,
-    Stack,
-} from '@mui/material';
+import '@ui5/webcomponents-icons/dist/show.js';
+import '@ui5/webcomponents-icons/dist/sys-cancel.js';
+import { Button, Label, Option, Select, Title } from '@ui5/webcomponents-react';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FioriResponsiveColumn, FioriResponsiveTable } from '@/components/fiori-responsive-table';
-import {
-    FIORI,
-    FioriStatus,
-    type FioriTone,
-    fioriCardSx,
-    fioriGhostSx,
-    fioriIconButtonSx,
-    fioriSearchFieldSx,
-} from '@/lib/fiori-style';
+import styles from '../import-export.module.css';
 
 interface UserSummary {
     id: number;
@@ -101,7 +77,11 @@ export default function JobTrackerIndex({ jobs, filters }: Props) {
     const [cancelling, setCancelling] = useState(false);
 
     const applyFilters = (nextStatus: string, nextJobType: string) => {
-        router.get('/import-export/jobs', { status: nextStatus || undefined, job_type: nextJobType || undefined }, { preserveState: true, replace: true });
+        router.get(
+            '/import-export/jobs',
+            { status: nextStatus || undefined, job_type: nextJobType || undefined },
+            { preserveState: true, replace: true },
+        );
     };
 
     const hasActiveJobs = jobs.data.some((j) => j.status === 'pending' || j.status === 'processing');
@@ -134,7 +114,7 @@ export default function JobTrackerIndex({ jobs, filters }: Props) {
         return translated === key ? type : translated;
     };
 
-    const handlePageChange = (_: unknown, page: number) => {
+    const handlePageChange = (page: number) => {
         router.get('/import-export/jobs', { status: status || undefined, job_type: jobType || undefined, page }, { preserveState: true });
     };
 
@@ -169,7 +149,7 @@ export default function JobTrackerIndex({ jobs, filters }: Props) {
             key: 'job',
             header: t('job'),
             priority: 'always',
-            render: (row) => <Typography sx={{ fontWeight: 600 }}>{row.config_code}</Typography>,
+            render: (row) => <span className={styles.mono}>{row.config_code}</span>,
         },
         {
             key: 'entityType',
@@ -218,16 +198,24 @@ export default function JobTrackerIndex({ jobs, filters }: Props) {
             priority: 'always',
             align: 'right',
             render: (row) => (
-                <Box sx={{ display: 'flex', gap: 0.5, justifyContent: 'flex-end' }}>
+                <div style={{ display: 'flex', gap: '0.25rem', justifyContent: 'flex-end' }}>
                     {(row.status === 'pending' || row.status === 'processing') && !row.cancel_requested_at && (
-                        <IconButton size="small" sx={fioriIconButtonSx} title={t('cancelJob')} onClick={() => setCancelId(row.id)}>
-                            <CancelIcon fontSize="small" />
-                        </IconButton>
+                        <Button
+                            design="Transparent"
+                            icon="sys-cancel"
+                            tooltip={t('cancelJob')}
+                            accessibleName={t('cancelJob')}
+                            onClick={() => setCancelId(row.id)}
+                        />
                     )}
-                    <IconButton size="small" sx={fioriIconButtonSx} onClick={() => router.visit(`/import-export/jobs/${row.id}`)}>
-                        <VisibilityIcon fontSize="small" />
-                    </IconButton>
-                </Box>
+                    <Button
+                        design="Transparent"
+                        icon="show"
+                        tooltip={t('viewJob')}
+                        accessibleName={t('viewJob')}
+                        onClick={() => router.visit(`/import-export/jobs/${row.id}`)}
+                    />
+                </div>
             ),
         },
     ];
@@ -235,51 +223,59 @@ export default function JobTrackerIndex({ jobs, filters }: Props) {
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={t('jobTrackerTitle')} />
-            <Box sx={{ p: 4, bgcolor: FIORI.pageBg, minHeight: '100%' }}>
-                <Box sx={{ mb: 3 }}>
-                    <Typography variant="h5" fontWeight={600} sx={{ color: FIORI.textPrimary }}>{t('jobTrackerTitle')}</Typography>
-                    <Typography variant="body2" sx={{ color: FIORI.textSecondary, mt: 0.25 }}>{tGrid('results', { count: jobs.total })}</Typography>
-                </Box>
+            <div className={styles.page}>
+                <div style={{ marginBottom: '1.5rem' }}>
+                    <Title level="H3" size="H3" wrappingType="Normal">
+                        {t('jobTrackerTitle')}
+                    </Title>
+                    <div className={styles.secondaryText} style={{ marginTop: '0.125rem' }}>
+                        {tGrid('results', { count: jobs.total })}
+                    </div>
+                </div>
 
-                <Paper elevation={0} sx={fioriCardSx}>
-                    <Stack direction="row" spacing={2} sx={{ p: 2 }}>
-                        <FormControl size="small" sx={{ ...fioriSearchFieldSx, minWidth: 180 }}>
-                            <InputLabel id="job-status-filter">{t('statusLabel')}</InputLabel>
+                <div className={styles.card}>
+                    <div className={styles.toolbar} style={{ gap: '1rem' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                            <Label for="job-status-filter" showColon={false}>
+                                {t('statusLabel')}
+                            </Label>
                             <Select
-                                labelId="job-status-filter"
-                                label={t('statusLabel')}
+                                id="job-status-filter"
+                                style={{ minWidth: 180 }}
                                 value={status}
                                 onChange={(e) => {
-                                    setStatus(e.target.value);
-                                    applyFilters(e.target.value, jobType);
+                                    const value = e.detail.selectedOption.value ?? '';
+                                    setStatus(value);
+                                    applyFilters(value, jobType);
                                 }}
                             >
-                                <MenuItem value="">{t('allStatuses')}</MenuItem>
-                                <MenuItem value="pending">{t('statusPending')}</MenuItem>
-                                <MenuItem value="processing">{t('statusProcessing')}</MenuItem>
-                                <MenuItem value="completed">{t('statusCompleted')}</MenuItem>
-                                <MenuItem value="failed">{t('statusFailed')}</MenuItem>
+                                <Option value="">{t('allStatuses')}</Option>
+                                <Option value="pending">{t('statusPending')}</Option>
+                                <Option value="processing">{t('statusProcessing')}</Option>
+                                <Option value="completed">{t('statusCompleted')}</Option>
+                                <Option value="failed">{t('statusFailed')}</Option>
                             </Select>
-                        </FormControl>
-                        <FormControl size="small" sx={{ ...fioriSearchFieldSx, minWidth: 180 }}>
-                            <InputLabel id="job-type-filter">{t('jobType')}</InputLabel>
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                            <Label for="job-type-filter" showColon={false}>
+                                {t('jobType')}
+                            </Label>
                             <Select
-                                labelId="job-type-filter"
-                                label={t('jobType')}
+                                id="job-type-filter"
+                                style={{ minWidth: 180 }}
                                 value={jobType}
                                 onChange={(e) => {
-                                    setJobType(e.target.value);
-                                    applyFilters(status, e.target.value);
+                                    const value = e.detail.selectedOption.value ?? '';
+                                    setJobType(value);
+                                    applyFilters(status, value);
                                 }}
                             >
-                                <MenuItem value="">{t('allJobTypes')}</MenuItem>
-                                <MenuItem value="import">{t('jobTypeImport')}</MenuItem>
-                                <MenuItem value="export">{t('jobTypeExport')}</MenuItem>
+                                <Option value="">{t('allJobTypes')}</Option>
+                                <Option value="import">{t('jobTypeImport')}</Option>
+                                <Option value="export">{t('jobTypeExport')}</Option>
                             </Select>
-                        </FormControl>
-                    </Stack>
-
-                    <Divider sx={{ borderColor: FIORI.border }} />
+                        </div>
+                    </div>
 
                     <FioriResponsiveTable
                         variant="plain"
@@ -288,44 +284,24 @@ export default function JobTrackerIndex({ jobs, filters }: Props) {
                         getRowKey={(row) => row.id}
                         emptyMessage={t('noJobsFound')}
                     />
-                </Paper>
+                </div>
 
-                {jobs.last_page > 1 && (
-                    <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
-                        <Pagination
-                            count={jobs.last_page}
-                            page={jobs.current_page}
-                            onChange={handlePageChange}
-                            sx={{
-                                '& .MuiPaginationItem-root': { borderRadius: '6px', color: FIORI.textPrimary },
-                                '& .Mui-selected': { bgcolor: `${FIORI.brand} !important`, color: '#fff' },
-                            }}
-                        />
-                    </Box>
-                )}
-            </Box>
+                {jobs.last_page > 1 && <PagePagination count={jobs.last_page} page={jobs.current_page} onChange={handlePageChange} />}
+            </div>
 
-            <Dialog open={cancelId !== null} onClose={() => (cancelling ? null : setCancelId(null))}>
-                <DialogTitle>{t('cancelJob')}</DialogTitle>
-                <DialogContent>
-                    <DialogContentText>{t('cancelJobConfirm')}</DialogContentText>
-                </DialogContent>
-                <DialogActions>
-                    <Button onClick={() => setCancelId(null)} sx={fioriGhostSx} disabled={cancelling}>
-                        {tGrid('cancel')}
-                    </Button>
-                    <Button
-                        onClick={handleCancelConfirm}
-                        color="error"
-                        variant="contained"
-                        sx={{ textTransform: 'none', borderRadius: '8px', fontWeight: 600 }}
-                        disabled={cancelling}
-                        startIcon={cancelling ? <CircularProgress size={16} color="inherit" /> : undefined}
-                    >
-                        {t('cancelJob')}
-                    </Button>
-                </DialogActions>
-            </Dialog>
+            <FioriMessageBox
+                open={cancelId !== null}
+                title={t('cancelJob')}
+                severity="warning"
+                destructive
+                confirmLabel={t('cancelJob')}
+                cancelLabel={tGrid('cancel')}
+                confirmLoading={cancelling}
+                onConfirm={handleCancelConfirm}
+                onCancel={() => setCancelId(null)}
+            >
+                {t('cancelJobConfirm')}
+            </FioriMessageBox>
         </AppLayout>
     );
 }

@@ -1,5 +1,6 @@
-import { Autocomplete, TextField } from '@mui/material';
 import { useEffect, useState } from 'react';
+
+import { AsyncSearchComboBox } from '@/components/catalog/async-search-combo-box';
 
 export interface PimBrandOption {
     id: number;
@@ -15,9 +16,9 @@ export interface PimBrandOption {
  * แบรนด์ของ Shopee (ตามหมวดหมู่ที่เลือกไว้ด้านบน) ไม่ใช่เริ่มจากลิสต์แบรนด์
  * PIM ทั้งหมด
  *
- * ต่างจาก Autocomplete แบบ debounce ทั่วไป ตรงที่การ fetch จะทำงานก็ต่อเมื่อ
- * dropdown ถูกเปิดอยู่จริงๆ (`open`/`onOpen`/`onClose` ด้านล่าง) ไม่ใช่ยิงตอน
- * mount — เพราะตารางนั้น render ตัวนี้หนึ่งตัวต่อหนึ่งแถวแบรนด์ (ปกติเป็น
+ * ต่างจาก picker แบบ debounce ทั่วไป ตรงที่การ fetch จะเริ่มทำงานก็ต่อเมื่อ
+ * ผู้ใช้แตะช่องนี้จริงๆ แล้ว (`active` / `onActivate` ด้านล่าง — ตอน focus
+ * ครั้งแรก) ไม่ใช่ยิงตอน mount — เพราะตารางนั้น render ตัวนี้หนึ่งตัวต่อหนึ่งแถวแบรนด์ (ปกติเป็น
  * สิบๆ ตัวพร้อมกัน มองเห็นทุกตัวพร้อมกันแบบ select) ถ้ายิง fetch ตอน mount
  * แบบไม่มีเงื่อนไข จะยิง request query ว่างพร้อมกันเยอะขนาดนั้นทันทีที่
  * แบรนด์ของหมวดหมู่โหลดเสร็จ ทั้งที่ผู้ใช้ยังไม่ได้แตะตัวไหนเลย
@@ -33,13 +34,13 @@ export function PimBrandPicker({
     placeholder?: string;
     disabled?: boolean;
 }) {
-    const [open, setOpen] = useState(false);
+    const [active, setActive] = useState(false);
     const [query, setQuery] = useState('');
     const [results, setResults] = useState<PimBrandOption[]>([]);
     const [loading, setLoading] = useState(false);
 
     useEffect(() => {
-        if (!open) return;
+        if (!active) return;
 
         setLoading(true);
         const timer = setTimeout(() => {
@@ -53,34 +54,24 @@ export function PimBrandPicker({
 
         return () => clearTimeout(timer);
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [query, open]);
+    }, [query, active]);
 
+    // ตั้งใจให้ AsyncSearchComboBox ถือข้อความในช่องเอง (ไม่ผูกกับ `query`) —
+    // component นี้ mount ค้างอยู่ถาวร (หนึ่งตัวต่อหนึ่งแถวแบรนด์) เลยต้องคงแสดง
+    // label ของ `value` ไว้ตอนที่ไม่ได้พิมพ์อยู่ ส่วน `query` ใช้แค่กับการค้นหา
+    // แบบ debounce ด้านบนเท่านั้น
     return (
-        <Autocomplete
-            size="small"
-            disabled={disabled}
-            open={open}
-            onOpen={() => setOpen(true)}
-            onClose={() => setOpen(false)}
-            options={results}
-            loading={loading}
-            filterOptions={(options) => options}
-            getOptionLabel={(opt) => opt.name}
-            isOptionEqualToValue={(opt, val) => opt.id === val.id}
+        <AsyncSearchComboBox
             value={value}
-            onChange={(_, val) => onChange(val)}
-            // ตั้งใจไม่ควบคุม `inputValue` เอง — component นี้จะ mount ค้างอยู่
-            // ถาวร (หนึ่งตัวต่อหนึ่งแถวแบรนด์ แบบ select) ไม่ได้ unmount ทันที
-            // หลังเลือกเหมือน category picker ตัวอื่น เลยต้องคงแสดง label ของ
-            // `value` ไว้ตอนที่ปิดอยู่ ถ้าไปควบคุม `inputValue` ให้ผูกกับ
-            // `query` จะทำให้ field ค้างอยู่กับค่าที่พิมพ์ล่าสุด (ว่างเปล่า
-            // สำหรับแถวที่ยังไม่มีใครค้นหาเลย) แล้วโชว์เป็นช่องว่างแทนที่จะ
-            // เป็นชื่อแบรนด์ที่ map ไว้ แค่ `onInputChange` อย่างเดียวก็พอแล้ว
-            // สำหรับจับสิ่งที่ผู้ใช้พิมพ์ไปใช้กับการค้นหาแบบ debounce ด้านล่าง
-            onInputChange={(_, val, reason) => {
-                if (reason === 'input') setQuery(val);
-            }}
-            renderInput={(params) => <TextField {...params} placeholder={placeholder} />}
+            onChange={onChange}
+            results={results}
+            loading={loading}
+            getKey={(opt) => opt.id}
+            getLabel={(opt) => opt.name}
+            onQueryChange={setQuery}
+            onActivate={() => setActive(true)}
+            placeholder={placeholder}
+            disabled={disabled}
         />
     );
 }

@@ -1,10 +1,15 @@
-import { Icon, type IconName } from '@/components/icon';
 import { filterNavItemsByPermission, flattenNavItems, useMainNavItems } from '@/hooks/use-nav-items';
-import { FIORI } from '@/lib/fiori-style';
-import { type getFioriShell } from '@/theme';
 import { type SharedData } from '@/types';
 import { router, usePage } from '@inertiajs/react';
-import { Autocomplete, Box, CircularProgress, IconButton, TextField, Tooltip, Typography } from '@mui/material';
+import '@ui5/webcomponents-icons/dist/badge.js';
+import '@ui5/webcomponents-icons/dist/building.js';
+import '@ui5/webcomponents-icons/dist/database.js';
+import '@ui5/webcomponents-icons/dist/employee.js';
+import '@ui5/webcomponents-icons/dist/product.js';
+import '@ui5/webcomponents-icons/dist/role.js';
+import '@ui5/webcomponents-icons/dist/show.js';
+import '@ui5/webcomponents-icons/dist/tag.js';
+import { SearchItem, SearchItemGroup, SearchMessageArea, ShellBarSearch, type ShellBarSearchDomRef } from '@ui5/webcomponents-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -62,8 +67,7 @@ const EMPTY_RESULTS: ObjectResults = {
 };
 
 // Fixed render order for the object-suggestion groups below the menu group —
-// Autocomplete's groupBy renders groups in the order options already appear
-// in (it does not sort them), so this order IS the on-screen group order.
+// each kind renders as its own SearchItemGroup, in this order.
 const OBJECT_KINDS: ObjectKind[] = [
     'products',
     'categories',
@@ -102,90 +106,91 @@ interface ObjectOption extends ObjectSuggestion {
 
 type SearchOption = MenuOption | ObjectOption;
 
-/**
- * SAP Fiori "Shell Search" — https://www.sap.com/design-system/fiori-design-web/v1-151/ui-elements/shell-search
- * Suggestions split the same way Fiori's spec does: "App suggestions" (jump
- * straight to a menu page — matched client-side against the sidebar's own
- * nav tree, see hooks/use-nav-items.ts) render first, then "Object
- * suggestions" (live records — products/categories/subcategories/product
- * groups/brands/attributes, fetched from GlobalSearchController) follow in
- * their own groups. Each object group only appears for a viewer who holds
- * that resource's `list_*` permission — the backend enforces this itself,
- * this component just renders whatever groups come back.
- */
-function highlightMatch(text: string, query: string) {
-    if (!query) return text;
-    const idx = text.toLowerCase().indexOf(query.toLowerCase());
-    if (idx === -1) return text;
-
-    return (
-        <>
-            {text.slice(0, idx)}
-            <Box component="span" sx={{ color: FIORI.brand, fontWeight: 700 }}>
-                {text.slice(idx, idx + query.length)}
-            </Box>
-            {text.slice(idx + query.length)}
-        </>
-    );
-}
+const GROUP_ICON: Record<SearchOption['kind'], string> = {
+    menu: 'show',
+    products: 'product',
+    categories: 'database',
+    subcategories: 'database',
+    productGroups: 'database',
+    brands: 'database',
+    baseUnits: 'database',
+    businessTypes: 'database',
+    productGrades: 'database',
+    vendors: 'database',
+    currencies: 'database',
+    points: 'database',
+    commissionGroups: 'database',
+    attributes: 'tag',
+    attributeGroups: 'tag',
+    attributeFamilies: 'tag',
+    users: 'employee',
+    roles: 'role',
+    departments: 'building',
+    jobPositions: 'badge',
+};
 
 interface ShellSearchProps {
-    /** Shell-bar color tokens from getFioriShell() — the collapsed input pill
-     * borrows the shell bar's own colors. The suggestion panel below it does
-     * NOT use these: it floats over ordinary page content, so it always uses
-     * the page's regular Fiori surface tokens (FIORI.*) instead. */
-    shell: ReturnType<typeof getFioriShell>;
-    /** Below `md`, the field collapses to a magnifier button that expands on tap (matches the rest of the shell bar's responsive behavior). */
-    isCompact: boolean;
+    /** Set by the ShellBar `searchField` slot prop — must land on the outermost element. */
+    slot?: string;
+    /** Called when Ctrl/⌘+K needs the (possibly collapsed) field shown — the ShellBar owns that state. */
+    onExpandRequest?: () => void;
 }
 
-export function ShellSearch({ shell, isCompact }: ShellSearchProps) {
+/**
+ * SAP Fiori "Shell Search" — https://www.sap.com/design-system/fiori-design-web/v1-151/ui-elements/shell-search
+ * on the official UI5 `ShellBarSearch`, slotted into the ShellBar's
+ * `searchField` slot (app-sidebar-header.tsx). Suggestions split the same way
+ * Fiori's spec does: "App suggestions" (jump straight to a menu page —
+ * matched client-side against the sidebar's own nav tree, see
+ * hooks/use-nav-items.ts) render first, then "Object suggestions" (live
+ * records — products/categories/subcategories/product groups/brands/
+ * attributes, fetched from GlobalSearchController) follow in their own
+ * groups. Each object group only appears for a viewer who holds that
+ * resource's `list_*` permission — the backend enforces this itself, this
+ * component just renders whatever groups come back.
+ *
+ * UI5 highlights the typed text inside each suggestion itself, and the
+ * ShellBar collapses the field to a magnifier button when the bar is narrow
+ * (`onExpandRequest` lets Ctrl+K re-open it).
+ */
+export function ShellSearch({ slot, onExpandRequest }: ShellSearchProps) {
     const { t } = useTranslation('common');
     const { auth } = usePage<SharedData>().props;
 
     const mainNavItems = useMainNavItems();
-    const flatPages = useMemo(
-        () => flattenNavItems(filterNavItemsByPermission(mainNavItems, auth.permissions)),
-        [mainNavItems, auth.permissions],
-    );
+    const flatPages = useMemo(() => flattenNavItems(filterNavItemsByPermission(mainNavItems, auth.permissions)), [mainNavItems, auth.permissions]);
 
-    const [mobileOpen, setMobileOpen] = useState(false);
     const [query, setQuery] = useState('');
-    const [dropdownOpen, setDropdownOpen] = useState(false);
     const [loading, setLoading] = useState(false);
     const [objectResults, setObjectResults] = useState<ObjectResults>(EMPTY_RESULTS);
-    const [focused, setFocused] = useState(false);
-    const inputRef = useRef<HTMLInputElement>(null);
+    const searchRef = useRef<ShellBarSearchDomRef>(null);
     const requestIdRef = useRef(0);
 
-    const showField = !isCompact || mobileOpen;
     const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform);
 
-    useEffect(() => {
-        if (showField && isCompact) inputRef.current?.focus();
-    }, [showField, isCompact]);
-
-    // Ctrl+K (⌘K on macOS) jumps to the search field from anywhere — on
-    // compact layouts it first expands the collapsed magnifier button, and the
-    // effect above focuses the input once it mounts. Matches on e.code (the
-    // physical key) rather than e.key, because with the Thai keyboard layout
-    // active the K key reports e.key === 'า' and the browser's own Ctrl+K
-    // (address-bar search) would fire instead.
+    // Ctrl+K (⌘K on macOS) jumps to the search field from anywhere — on a
+    // narrow shell bar it first asks the ShellBar to expand the collapsed
+    // magnifier button. Matches on e.code (the physical key) rather than
+    // e.key, because with the Thai keyboard layout active the K key reports
+    // e.key === 'า' and the browser's own Ctrl+K (address-bar search) would
+    // fire instead. Capture phase so a focused widget can't swallow it first.
     useEffect(() => {
         const onKeyDown = (e: KeyboardEvent) => {
             if (e.code !== 'KeyK' || !(e.ctrlKey || e.metaKey) || e.altKey || e.shiftKey) return;
             e.preventDefault();
-            if (isCompact && !mobileOpen) {
-                setMobileOpen(true);
-                return;
-            }
-            inputRef.current?.focus();
-            inputRef.current?.select();
+            onExpandRequest?.();
+            // give the ShellBar a frame to un-collapse the field before focusing it
+            requestAnimationFrame(() => {
+                const el = searchRef.current;
+                if (!el) return;
+                el.focus();
+                el.shadowRoot?.querySelector('input')?.select();
+            });
         };
 
         window.addEventListener('keydown', onKeyDown, true);
         return () => window.removeEventListener('keydown', onKeyDown, true);
-    }, [isCompact, mobileOpen]);
+    }, [onExpandRequest]);
 
     // Object suggestions come from the server — debounced the same way
     // ProductPicker (resources/js/components/product-picker.tsx) debounces
@@ -213,6 +218,7 @@ export function ShellSearch({ shell, isCompact }: ShellSearchProps) {
                 .then((data: ObjectResults | null) => {
                     if (data && requestIdRef.current === requestId) setObjectResults(data);
                 })
+                .catch(() => {})
                 .finally(() => {
                     if (requestIdRef.current === requestId) setLoading(false);
                 });
@@ -233,183 +239,61 @@ export function ShellSearch({ shell, isCompact }: ShellSearchProps) {
             .map((page) => ({ kind: 'menu' as const, key: `menu-${page.url}`, title: page.title, url: page.url, path: page.path }));
     }, [flatPages, query]);
 
-    const options: SearchOption[] = useMemo(() => {
-        const objectOptions: ObjectOption[] = OBJECT_KINDS.flatMap((kind) =>
-            (objectResults[kind] ?? []).map((item) => ({ ...item, kind, key: `${kind}-${item.id}` })),
-        );
-        return [...menuOptions, ...objectOptions];
+    const groups = useMemo(() => {
+        const result: { kind: SearchOption['kind']; options: SearchOption[] }[] = [];
+        if (menuOptions.length > 0) result.push({ kind: 'menu', options: menuOptions });
+        for (const kind of OBJECT_KINDS) {
+            const rows = objectResults[kind] ?? [];
+            if (rows.length > 0) {
+                result.push({ kind, options: rows.map((item) => ({ ...item, kind, key: `${kind}-${item.id}` })) });
+            }
+        }
+        return result;
     }, [menuOptions, objectResults]);
 
     const groupLabel = (kind: SearchOption['kind']): string => t(`search${kind.charAt(0).toUpperCase()}${kind.slice(1)}`);
-    const groupIcon = (kind: SearchOption['kind']): IconName =>
-        ({
-            menu: 'view',
-            products: 'navProduct',
-            categories: 'navMaster',
-            subcategories: 'navMaster',
-            productGroups: 'navMaster',
-            brands: 'navMaster',
-            baseUnits: 'navMaster',
-            businessTypes: 'navMaster',
-            productGrades: 'navMaster',
-            vendors: 'navMaster',
-            currencies: 'navMaster',
-            points: 'navMaster',
-            commissionGroups: 'navMaster',
-            attributes: 'navAttributes',
-            attributeGroups: 'navAttributes',
-            attributeFamilies: 'navAttributes',
-            users: 'navUsers',
-            roles: 'navRoles',
-            departments: 'navDepartments',
-            jobPositions: 'navJobPositions',
-        })[kind] as IconName;
 
     const navigate = (url: string) => {
         setQuery('');
-        setDropdownOpen(false);
-        if (isCompact) setMobileOpen(false);
         router.visit(url);
     };
 
-    const shellIconSx = {
-        width: 36,
-        height: 36,
-        borderRadius: `${shell.borderRadius}px`,
-        color: shell.textColor,
-        '&:hover': { bgcolor: shell.hoverBg },
-        '&:active': { bgcolor: shell.activeBg },
-    } as const;
-
-    if (!showField) {
-        return (
-            <Tooltip title={t('search')}>
-                <IconButton aria-label={t('search')} onClick={() => setMobileOpen(true)} sx={shellIconSx}>
-                    <Icon name="search" sx={{ fontSize: 18 }} />
-                </IconButton>
-            </Tooltip>
-        );
-    }
+    const showNoResults = query.trim().length > 0 && !loading && groups.length === 0;
 
     return (
-        <Autocomplete<SearchOption, false, false, false>
-            clearIcon={null}
-            popupIcon={null}
-            open={dropdownOpen && query.trim().length > 0}
-            onOpen={() => setDropdownOpen(true)}
-            onClose={(_, reason) => {
-                if (reason !== 'selectOption') setDropdownOpen(false);
+        <ShellBarSearch
+            ref={searchRef}
+            slot={slot}
+            value={query}
+            noTypeahead
+            showClearIcon
+            fieldLoading={loading}
+            placeholder={`${t('search')} (${isMac ? '⌘K' : 'Ctrl+K'})`}
+            accessibleName={t('search')}
+            onInput={(e) => setQuery(e.target.value)}
+            onSearch={(e) => {
+                const item = (e.detail as { item?: HTMLElement } | undefined)?.item;
+                const url = item?.dataset.url;
+                // Enter with nothing picked doesn't navigate (same as the old
+                // Autocomplete) — only choosing a suggestion does. Not
+                // preventDefault()-ed so UI5 still closes its popup.
+                if (url) navigate(url);
             }}
-            options={options}
-            loading={loading}
-            groupBy={(option) => option.kind}
-            getOptionLabel={(option) => (option.kind === 'menu' ? option.title : option.label)}
-            filterOptions={(opts) => opts}
-            inputValue={query}
-            onInputChange={(_, value, reason) => {
-                if (reason !== 'reset') setQuery(value);
-            }}
-            onChange={(_, value) => value && navigate(value.url)}
-            value={null}
-            noOptionsText={t('noResultsFound')}
-            sx={{ width: { xs: 200, md: 300 } }}
-            slotProps={{
-                paper: {
-                    sx: {
-                        mt: 0.5,
-                        border: `1px solid ${FIORI.border}`,
-                        borderRadius: '8px',
-                        boxShadow: '0 4px 16px rgba(0,0,0,0.16)',
-                    },
-                },
-            }}
-            renderGroup={(params) => (
-                <li key={params.key}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, px: 2, py: 0.75, bgcolor: FIORI.hover }}>
-                        <Icon name={groupIcon(params.group as SearchOption['kind'])} sx={{ fontSize: '0.85rem', color: FIORI.textSecondary }} />
-                        <Typography
-                            variant="caption"
-                            fontWeight={700}
-                            sx={{ color: FIORI.textSecondary, textTransform: 'uppercase', letterSpacing: '0.04em' }}
-                        >
-                            {groupLabel(params.group as SearchOption['kind'])}
-                        </Typography>
-                    </Box>
-                    <ul style={{ padding: 0, margin: 0 }}>{params.children}</ul>
-                </li>
-            )}
-            renderOption={(props, option) => {
-                const { key, ...optionProps } = props;
-                const sub = option.kind === 'menu' ? option.path.join(' > ') : option.sub;
-
-                return (
-                    <Box component="li" key={key} {...optionProps} sx={{ display: 'block !important', px: 2, py: 0.75 }}>
-                        <Typography variant="body2" noWrap sx={{ color: FIORI.textPrimary }}>
-                            {highlightMatch(option.kind === 'menu' ? option.title : option.label, query)}
-                        </Typography>
-                        {sub && (
-                            <Typography variant="caption" noWrap sx={{ display: 'block', color: FIORI.textSecondary }}>
-                                {sub}
-                            </Typography>
-                        )}
-                    </Box>
-                );
-            }}
-            renderInput={(params) => (
-                <TextField
-                    {...params}
-                    inputRef={inputRef}
-                    variant="standard"
-                    placeholder={t('search')}
-                    onFocus={() => setFocused(true)}
-                    onBlur={() => {
-                        setFocused(false);
-                        if (isCompact && !query) setMobileOpen(false);
-                    }}
-                    InputProps={{
-                        ...params.InputProps,
-                        disableUnderline: true,
-                        startAdornment: <Icon name="search" sx={{ fontSize: 16, color: shell.textColor, mr: 0.75, flexShrink: 0 }} />,
-                        endAdornment: (
-                            <>
-                                {loading && <CircularProgress size={14} thickness={5} sx={{ color: shell.textColor, mr: 0.5 }} />}
-                                {!loading && !focused && !query && (
-                                    <Box
-                                        component="kbd"
-                                        sx={{
-                                            flexShrink: 0,
-                                            px: 0.75,
-                                            py: 0.125,
-                                            fontFamily: 'inherit',
-                                            fontSize: 11,
-                                            lineHeight: 1.4,
-                                            color: shell.textColor,
-                                            opacity: 0.7,
-                                            border: `1px solid ${shell.searchBorder}`,
-                                            borderRadius: '4px',
-                                            whiteSpace: 'nowrap',
-                                        }}
-                                    >
-                                        {isMac ? '⌘K' : 'Ctrl K'}
-                                    </Box>
-                                )}
-                                {params.InputProps.endAdornment}
-                            </>
-                        ),
-                    }}
-                    sx={{
-                        height: 32,
-                        px: 1,
-                        display: 'flex',
-                        alignItems: 'center',
-                        bgcolor: shell.searchBg,
-                        border: `1px solid ${shell.searchBorder}`,
-                        borderRadius: `${shell.borderRadius}px`,
-                        '&:focus-within': { borderColor: shell.interactiveColor },
-                        '& .MuiInputBase-root': { fontSize: 14, color: shell.textColor, width: '100%' },
-                    }}
-                />
-            )}
-        />
+            messageArea={showNoResults ? <SearchMessageArea text={t('noResultsFound')} /> : undefined}
+        >
+            {groups.map((group) => (
+                <SearchItemGroup key={group.kind} headerText={groupLabel(group.kind)}>
+                    {group.options.map((option) => (
+                        <SearchItem
+                            key={option.key}
+                            data-url={option.url}
+                            icon={GROUP_ICON[option.kind]}
+                            text={option.kind === 'menu' ? option.title : option.label}
+                            description={(option.kind === 'menu' ? option.path.join(' > ') : option.sub) || undefined}
+                        />
+                    ))}
+                </SearchItemGroup>
+            ))}
+        </ShellBarSearch>
     );
 }

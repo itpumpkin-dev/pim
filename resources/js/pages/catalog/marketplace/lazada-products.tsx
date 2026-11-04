@@ -1,79 +1,68 @@
 import { AssignPimCategoryPanel } from '@/components/catalog/assign-pim-category-panel';
-import { FioriResponsiveTable, type FioriResponsiveColumn } from '@/components/fiori-responsive-table';
-import { FioriMessageBox, useFioriConfirm } from '@/components/fiori-message-box';
-import { MarketplaceCategoryPicker } from '@/components/marketplace-category-picker';
-import { PimAttributePicker, type PimAttributeOption } from '@/components/catalog/pim-attribute-picker';
 import {
     LazadaAttributeOptionMappingDialog,
     type LazadaAttributeOptionMappingInfo,
 } from '@/components/catalog/lazada-attribute-option-mapping-dialog';
+import { PimAttributePicker, type PimAttributeOption } from '@/components/catalog/pim-attribute-picker';
+import { FioriMessageStrip } from '@/components/fiori-form';
+import { FioriMessageBox, useFioriConfirm } from '@/components/fiori-message-box';
+import { FioriResponsiveTable, type FioriResponsiveColumn } from '@/components/fiori-responsive-table';
+import { MarketplaceCategoryPicker } from '@/components/marketplace-category-picker';
 import { TimelinePanel } from '@/components/timeline-panel';
 import AppLayout from '@/layouts/app-layout';
 import { xsrfToken } from '@/lib/csrf';
-import {
-    FIORI,
-    FioriStatus,
-    fioriCardSx,
-    fioriDefaultSx,
-    fioriEmphasizedSx,
-    fioriGhostSx,
-    fioriIconButtonSx,
-    fioriSearchFieldSx,
-    fioriTabsSx,
-    fioriTableRowSx,
-} from '@/lib/fiori-style';
+import { FioriStatus } from '@/lib/fiori-style';
 import { type BreadcrumbItem, type SharedData } from '@/types';
 import { Head, router, usePage } from '@inertiajs/react';
-import ArrowBackIcon from '@mui/icons-material/ArrowBack';
-import CheckCircleIcon from '@mui/icons-material/CheckCircle';
-import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
-import ChevronRightIcon from '@mui/icons-material/ChevronRight';
-import EditIcon from '@mui/icons-material/Edit';
-import FirstPageIcon from '@mui/icons-material/FirstPage';
-import LastPageIcon from '@mui/icons-material/LastPage';
-import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
-import CollectionsBookmarkIcon from '@mui/icons-material/CollectionsBookmark';
-import CloseIcon from '@mui/icons-material/Close';
-import KeyboardArrowRightIcon from '@mui/icons-material/KeyboardArrowRight';
-import PublishIcon from '@mui/icons-material/Publish';
-import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
-import SearchIcon from '@mui/icons-material/Search';
-import UnpublishedIcon from '@mui/icons-material/Unpublished';
-import SyncIcon from '@mui/icons-material/Sync';
-import WarningAmberIcon from '@mui/icons-material/WarningAmber';
-import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
+import '@ui5/webcomponents-icons/dist/accept.js';
+import '@ui5/webcomponents-icons/dist/ai.js';
+import '@ui5/webcomponents-icons/dist/collections-management.js';
+import '@ui5/webcomponents-icons/dist/decline.js';
+import '@ui5/webcomponents-icons/dist/delete.js';
+import '@ui5/webcomponents-icons/dist/edit.js';
+import '@ui5/webcomponents-icons/dist/hide.js';
+import '@ui5/webcomponents-icons/dist/nav-back.js';
+import '@ui5/webcomponents-icons/dist/slim-arrow-right.js';
+import '@ui5/webcomponents-icons/dist/synchronize.js';
+import '@ui5/webcomponents-icons/dist/upload.js';
 import {
-    Alert,
-    Box,
+    Bar,
     Button,
-    Checkbox,
-    Chip,
-    CircularProgress,
+    CheckBox,
     Dialog,
-    DialogActions,
-    DialogContent,
-    DialogContentText,
-    DialogTitle,
-    Divider,
-    Drawer,
-    FormControlLabel,
-    IconButton,
-    InputAdornment,
     Link,
-    MenuItem,
-    Paper,
+    Option,
+    SegmentedButton,
+    SegmentedButtonItem,
     Select,
-    Stack,
     Tab,
-    Tabs,
-    TextField,
-    ToggleButton,
-    ToggleButtonGroup,
-    Tooltip,
-    Typography,
-} from '@mui/material';
+    TabContainer,
+    Title,
+} from '@ui5/webcomponents-react';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+
+import {
+    Body,
+    Caption,
+    CenteredSpinner,
+    HStack,
+    ImageThumbs,
+    KpiTiles,
+    LockedNotice,
+    MappingTable,
+    PageHeader,
+    Pager,
+    SearchField,
+    SectionCard,
+    SectionHeading,
+    Spinner,
+    TONE_TEXT,
+    useMediaQuery,
+    ValueRows,
+    VStack,
+} from './marketplace-ui';
+import styles from './marketplace.module.css';
 
 type ProductFilter = 'all' | 'mapped' | 'unmapped';
 
@@ -210,10 +199,7 @@ interface LazadaAttributeRow {
     option_mappings: LazadaAttributeOptionMappingInfo[];
 }
 
-const MAPPABLE_LAZADA_INPUT_TYPES = [
-    'text', 'numeric', 'richText', 'date', 'img',
-    'singleSelect', 'multiSelect', 'enumInput', 'multiEnumInput',
-];
+const MAPPABLE_LAZADA_INPUT_TYPES = ['text', 'numeric', 'richText', 'date', 'img', 'singleSelect', 'multiSelect', 'enumInput', 'multiEnumInput'];
 
 // input_type ที่ต้อง "จับคู่ตัวเลือก" เพิ่ม (มีตัวเลือกที่กำหนดไว้ล่วงหน้า) — ตรงกับ
 // LazadaAttributeMappingController::SELECT_INPUT_TYPES ฝั่ง backend
@@ -538,7 +524,9 @@ export default function LazadaProductsMapping({ products, stats, filters, lazada
     // attribute ที่แมปไว้แล้ว แล้วผูกกับ PIM Category นี้ ให้ฟิลด์โผล่ในหน้า Edit
     // Product ทันที (ดู LazadaAttributeFamilyGenerator ฝั่ง backend)
     const [syncingFamily, setSyncingFamily] = useState(false);
-    const [familySyncResult, setFamilySyncResult] = useState<{ name: string; count: number; newlyCreatedCount: number; editUrl: string } | null>(null);
+    const [familySyncResult, setFamilySyncResult] = useState<{ name: string; count: number; newlyCreatedCount: number; editUrl: string } | null>(
+        null,
+    );
     const [familySyncError, setFamilySyncError] = useState<string | null>(null);
     // แถวที่กำลังเปิด dialog "จับคู่ตัวเลือก" อยู่ (null = ปิด) — เฉพาะแถวที่เป็น
     // select-type (SELECT_LAZADA_INPUT_TYPES) และมี PIM attribute ผูกไว้แล้ว
@@ -903,7 +891,9 @@ export default function LazadaProductsMapping({ products, stats, filters, lazada
             .then((res) => {
                 if (!res.ok) return;
                 setLazadaAttributes((prev) =>
-                    prev ? prev.map((a) => (a.name === attributeName ? { ...a, mapped: { id: pimAttribute.id, name: pimAttribute.name } } : a)) : prev,
+                    prev
+                        ? prev.map((a) => (a.name === attributeName ? { ...a, mapped: { id: pimAttribute.id, name: pimAttribute.name } } : a))
+                        : prev,
                 );
             })
             .finally(() => setSavingAttributeName(null));
@@ -1009,7 +999,9 @@ export default function LazadaProductsMapping({ products, stats, filters, lazada
             .then((res) => {
                 if (!res.ok) return;
                 setPayloadFields((prev) =>
-                    prev ? prev.map((f) => (f.target_field === field ? { ...f, mapped: { id: pimAttribute.id, name: pimAttribute.name } } : f)) : prev,
+                    prev
+                        ? prev.map((f) => (f.target_field === field ? { ...f, mapped: { id: pimAttribute.id, name: pimAttribute.name } } : f))
+                        : prev,
                 );
             })
             .finally(() => setSavingPayloadField(null));
@@ -1061,26 +1053,25 @@ export default function LazadaProductsMapping({ products, stats, filters, lazada
         );
     };
 
+    // จอแคบ = quick-view panel เต็มจอ (เดิม Drawer width xs:100%)
+    const isNarrow = useMediaQuery('(max-width: 599px)');
+
     const columns: FioriResponsiveColumn<ProductRow>[] = [
         {
             key: 'selection',
             header: (
-                <Checkbox
-                    size="small"
-                    checked={products.data.length > 0 && selectedRows.length === products.data.length}
+                <CheckBox
+                    accessibleName="Select all"
+                    checked={products.data.length > 0 && selectedRows.length > 0}
                     indeterminate={selectedRows.length > 0 && selectedRows.length < products.data.length}
                     onChange={toggleSelectAll}
                 />
             ),
+            popinText: 'Select',
             priority: 'always',
             width: 48,
-            render: (row) => (
-                <Checkbox
-                    size="small"
-                    checked={selectedRows.includes(row.id)}
-                    onChange={() => toggleSelectRow(row.id)}
-                />
-            ),
+            minWidth: 48,
+            render: (row) => <CheckBox accessibleName={row.sku} checked={selectedRows.includes(row.id)} onChange={() => toggleSelectRow(row.id)} />,
         },
         {
             key: 'product',
@@ -1088,40 +1079,26 @@ export default function LazadaProductsMapping({ products, stats, filters, lazada
             priority: 'always',
             minWidth: 260,
             render: (row) => (
-                <Box>
-                    <Stack direction="row" spacing={0.5} alignItems="center">
-                        <Typography
-                            variant="body2"
-                            fontWeight={600}
-                            sx={{ color: FIORI.brand, cursor: 'pointer' }}
-                            onClick={() => openProduct(row)}
-                        >
+                <div>
+                    <HStack gap="0.25rem">
+                        <Link onClick={() => openProduct(row)} style={{ fontWeight: 600 }}>
                             {row.name}
-                        </Typography>
+                        </Link>
                         {canEditProducts && (
-                            <Tooltip title="แก้ไขสินค้า">
-                                <IconButton
-                                    size="small"
-                                    sx={fioriIconButtonSx}
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        router.visit(`/catalog/products/${row.id}/edit?platform=lazada`);
-                                    }}
-                                >
-                                    <EditIcon fontSize="inherit" />
-                                </IconButton>
-                            </Tooltip>
+                            <Button
+                                design="Transparent"
+                                icon="edit"
+                                tooltip="แก้ไขสินค้า"
+                                accessibleName="แก้ไขสินค้า"
+                                onClick={() => router.visit(`/catalog/products/${row.id}/edit?platform=lazada`)}
+                            />
                         )}
-                    </Stack>
-                    <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 0.25 }}>
-                        <Typography variant="caption" sx={{ fontFamily: 'monospace', color: FIORI.textSecondary }}>
-                            {row.sku}
-                        </Typography>
-                        {row.variants_count > 0 && (
-                            <FioriStatus label={`${row.variants_count} variants`} tone="neutral" />
-                        )}
-                    </Stack>
-                </Box>
+                    </HStack>
+                    <HStack gap="0.5rem" style={{ marginTop: '0.125rem' }}>
+                        <Caption mono>{row.sku}</Caption>
+                        {row.variants_count > 0 && <FioriStatus label={`${row.variants_count} variants`} tone="neutral" />}
+                    </HStack>
+                </div>
             ),
         },
         {
@@ -1131,9 +1108,7 @@ export default function LazadaProductsMapping({ products, stats, filters, lazada
             minWidth: 220,
             render: (row) =>
                 row.master_category ? (
-                    <Typography variant="body2" sx={{ color: FIORI.textPrimary, fontSize: '0.8125rem' }}>
-                        {row.master_category.path || row.master_category.name}
-                    </Typography>
+                    <Body style={{ fontSize: '0.8125rem' }}>{row.master_category.path || row.master_category.name}</Body>
                 ) : (
                     <FioriStatus label="ไม่มีหมวดหมู่ PIM" tone="neutral" />
                 ),
@@ -1145,14 +1120,10 @@ export default function LazadaProductsMapping({ products, stats, filters, lazada
             minWidth: 240,
             render: (row) =>
                 row.lazada_category ? (
-                    <Box>
-                        <Typography variant="body2" fontWeight={600} sx={{ color: FIORI.textPrimary, fontSize: '0.8125rem' }}>
-                            {row.lazada_category.path || row.lazada_category.name}
-                        </Typography>
-                        <Typography variant="caption" sx={{ fontFamily: 'monospace', color: FIORI.textSecondary }}>
-                            lz:{row.lazada_category.id}
-                        </Typography>
-                    </Box>
+                    <div>
+                        <Body style={{ fontSize: '0.8125rem', fontWeight: 600 }}>{row.lazada_category.path || row.lazada_category.name}</Body>
+                        <Caption mono>lz:{row.lazada_category.id}</Caption>
+                    </div>
                 ) : (
                     <FioriStatus label="ยังไม่ได้ map" tone="warning" />
                 ),
@@ -1169,9 +1140,7 @@ export default function LazadaProductsMapping({ products, stats, filters, lazada
                         tone={row.attribute_stats.mapped === row.attribute_stats.total ? 'success' : 'warning'}
                     />
                 ) : (
-                    <Typography variant="caption" sx={{ color: FIORI.textSecondary }}>
-                        —
-                    </Typography>
+                    <Caption>—</Caption>
                 ),
         },
         {
@@ -1181,32 +1150,21 @@ export default function LazadaProductsMapping({ products, stats, filters, lazada
             minWidth: 170,
             render: (row) =>
                 row.lazada_sync.synced ? (
-                    <Tooltip
-                        arrow
-                        title={
-                            <Box>
-                                {row.lazada_sync.shops.map((shop) => (
-                                    <Typography key={shop.name} variant="caption" component="div">
-                                        {shop.name}
-                                        {shop.last_synced_at
-                                            ? ` — ${new Date(shop.last_synced_at).toLocaleString()}`
-                                            : ''}
-                                    </Typography>
-                                ))}
-                            </Box>
-                        }
+                    <span
+                        style={{ display: 'inline-block' }}
+                        title={row.lazada_sync.shops
+                            .map((shop) => `${shop.name}${shop.last_synced_at ? ` — ${new Date(shop.last_synced_at).toLocaleString()}` : ''}`)
+                            .join('\n')}
                     >
-                        <Box sx={{ display: 'inline-block' }}>
-                            <FioriStatus
-                                label={
-                                    row.lazada_sync.shops.length === 1
-                                        ? `Sync แล้ว: ${row.lazada_sync.shops[0].name}`
-                                        : `Sync แล้ว: ${row.lazada_sync.shops.length} ร้าน`
-                                }
-                                tone="success"
-                            />
-                        </Box>
-                    </Tooltip>
+                        <FioriStatus
+                            label={
+                                row.lazada_sync.shops.length === 1
+                                    ? `Sync แล้ว: ${row.lazada_sync.shops[0].name}`
+                                    : `Sync แล้ว: ${row.lazada_sync.shops.length} ร้าน`
+                            }
+                            tone="success"
+                        />
+                    </span>
                 ) : (
                     <FioriStatus label="ยังไม่ sync" tone="neutral" />
                 ),
@@ -1218,28 +1176,20 @@ export default function LazadaProductsMapping({ products, stats, filters, lazada
             align: 'right',
             minWidth: 180,
             render: (row) => (
-                <Stack direction="row" spacing={1} justifyContent="flex-end" alignItems="center">
-                    <Button
-                        size="small"
-                        variant={row.category_mapped ? 'outlined' : 'contained'}
-                        onClick={() => openProduct(row)}
-                        sx={{
-                            ...(row.category_mapped ? fioriDefaultSx : fioriEmphasizedSx),
-                            fontSize: '0.8125rem',
-                            px: 1.5,
-                            py: 0.5,
-                        }}
-                    >
+                <HStack gap="0.5rem" justify="flex-end">
+                    <Button design={row.category_mapped ? 'Default' : 'Emphasized'} onClick={() => openProduct(row)}>
                         {row.category_mapped ? 'แก้ไขการแมพ' : 'เริ่มแมพ'}
                     </Button>
                     {/* เปิด quick-view sidebar (ดูรายละเอียด attribute/สถานะ sync แบบ
                     เร็วๆ) — คนละปุ่มกับด้านบนที่พาไปหน้า Object Page เต็มหน้า */}
-                    <Tooltip title="ดูรายละเอียดสินค้านี้">
-                        <IconButton size="small" onClick={() => openDetail(row.id)} sx={fioriIconButtonSx}>
-                            <KeyboardArrowRightIcon fontSize="small" />
-                        </IconButton>
-                    </Tooltip>
-                </Stack>
+                    <Button
+                        design="Transparent"
+                        icon="slim-arrow-right"
+                        tooltip="ดูรายละเอียดสินค้านี้"
+                        accessibleName="ดูรายละเอียดสินค้านี้"
+                        onClick={() => openDetail(row.id)}
+                    />
+                </HStack>
             ),
         },
     ];
@@ -1248,17 +1198,11 @@ export default function LazadaProductsMapping({ products, stats, filters, lazada
     const lastPage = products.last_page ?? 1;
 
     // Check mandatory attributes status for active product
-    const unmappedMandatoryCount = lazadaAttributes
-        ? lazadaAttributes.filter((a) => a.mandatory && !a.mapped).length
-        : 0;
+    const unmappedMandatoryCount = lazadaAttributes ? lazadaAttributes.filter((a) => a.mandatory && !a.mapped).length : 0;
     const mandatoryAttributesCount = lazadaAttributes ? lazadaAttributes.filter((a) => a.mandatory).length : 0;
     // เมื่อติ๊ก "แสดงเฉพาะที่บังคับ" — กรองรายการที่ render จริงในตาราง (ไม่กระทบ
     // unmappedMandatoryCount/mandatoryAttributesCount ด้านบน ซึ่งต้องนับจากทั้งหมดเสมอ)
-    const visibleLazadaAttributes = lazadaAttributes
-        ? showMandatoryOnly
-            ? lazadaAttributes.filter((a) => a.mandatory)
-            : lazadaAttributes
-        : null;
+    const visibleLazadaAttributes = lazadaAttributes ? (showMandatoryOnly ? lazadaAttributes.filter((a) => a.mandatory) : lazadaAttributes) : null;
 
     // ──────────────────────────────────────────────────────────────────────
     // Object Page — เปิดตอนเลือกสินค้าจากตาราง (แทน Drawer เดิม) เต็มหน้า
@@ -1269,122 +1213,97 @@ export default function LazadaProductsMapping({ products, stats, filters, lazada
         return (
             <AppLayout breadcrumbs={breadcrumbs}>
                 <Head title={`Lazada Mapping | ${activeProduct.sku}`} />
-                <Box sx={{ bgcolor: FIORI.pageBg, height: '100%', minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+                <div className={styles.objectPage}>
                     {/* Object Page header — ไม่ scroll ไปกับเนื้อหา */}
-                    <Box sx={{ px: { xs: 2, md: 4 }, py: 2.5, bgcolor: FIORI.surface, borderBottom: `1px solid ${FIORI.border}` }}>
-                        <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" alignItems={{ xs: 'flex-start', md: 'center' }} spacing={2}>
-                            <Box>
-                                <Button
-                                    size="small"
-                                    startIcon={<ArrowBackIcon fontSize="small" />}
-                                    onClick={() => setActiveProduct(null)}
-                                    sx={{ ...fioriGhostSx, mb: 1, px: 0.5 }}
-                                >
-                                    กลับไปหน้ารายการ
-                                </Button>
-                                <Stack direction="row" spacing={0.5} alignItems="center">
-                                    <Typography variant="h6" fontWeight={700} sx={{ color: FIORI.textPrimary }}>
-                                        {activeProduct.name}
-                                    </Typography>
-                                    {canEditProducts && (
-                                        <Tooltip title="แก้ไขสินค้า">
-                                            <IconButton
-                                                size="small"
-                                                sx={fioriIconButtonSx}
-                                                onClick={() => router.visit(`/catalog/products/${activeProduct.id}/edit?platform=lazada`)}
-                                            >
-                                                <EditIcon fontSize="inherit" />
-                                            </IconButton>
-                                        </Tooltip>
-                                    )}
-                                </Stack>
-                                <Typography variant="caption" sx={{ fontFamily: 'monospace', color: FIORI.textSecondary }}>
-                                    SKU: {activeProduct.sku}
-                                </Typography>
-                                {/* Object Status facets — สถานะ mapping ของสินค้านี้ ณ ตอนนี้ */}
-                                <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap sx={{ mt: 1.25 }}>
-                                    <FioriStatus
-                                        label={`PIM: ${activeProduct.master_category?.path || activeProduct.master_category?.name || 'ไม่มีหมวดหมู่'}`}
-                                        tone={activeProduct.master_category ? 'neutral' : 'warning'}
+                    <div className={styles.objectHeader}>
+                        <div>
+                            <Button design="Transparent" icon="nav-back" onClick={() => setActiveProduct(null)} style={{ marginBottom: '0.5rem' }}>
+                                กลับไปหน้ารายการ
+                            </Button>
+                            <HStack gap="0.25rem">
+                                <Title level="H5" size="H5" wrappingType="Normal">
+                                    {activeProduct.name}
+                                </Title>
+                                {canEditProducts && (
+                                    <Button
+                                        design="Transparent"
+                                        icon="edit"
+                                        tooltip="แก้ไขสินค้า"
+                                        accessibleName="แก้ไขสินค้า"
+                                        onClick={() => router.visit(`/catalog/products/${activeProduct.id}/edit?platform=lazada`)}
                                     />
+                                )}
+                            </HStack>
+                            <Caption mono>SKU: {activeProduct.sku}</Caption>
+                            {/* Object Status facets — สถานะ mapping ของสินค้านี้ ณ ตอนนี้ */}
+                            <HStack gap="0.5rem" wrap style={{ marginTop: '0.625rem' }}>
+                                <FioriStatus
+                                    label={`PIM: ${activeProduct.master_category?.path || activeProduct.master_category?.name || 'ไม่มีหมวดหมู่'}`}
+                                    tone={activeProduct.master_category ? 'neutral' : 'warning'}
+                                />
+                                <FioriStatus
+                                    label={
+                                        activeProduct.lazada_category
+                                            ? `Lazada: ${activeProduct.lazada_category.path || activeProduct.lazada_category.name}`
+                                            : 'ยังไม่ได้แมป Category'
+                                    }
+                                    tone={activeProduct.category_mapped ? 'success' : 'warning'}
+                                />
+                                {activeProduct.attribute_stats && (
                                     <FioriStatus
-                                        label={
-                                            activeProduct.lazada_category
-                                                ? `Lazada: ${activeProduct.lazada_category.path || activeProduct.lazada_category.name}`
-                                                : 'ยังไม่ได้แมป Category'
-                                        }
-                                        tone={activeProduct.category_mapped ? 'success' : 'warning'}
+                                        label={`Attributes ${activeProduct.attribute_stats.mapped}/${activeProduct.attribute_stats.total}`}
+                                        tone={activeProduct.attribute_stats.mapped === activeProduct.attribute_stats.total ? 'success' : 'warning'}
                                     />
-                                    {activeProduct.attribute_stats && (
-                                        <FioriStatus
-                                            label={`Attributes ${activeProduct.attribute_stats.mapped}/${activeProduct.attribute_stats.total}`}
-                                            tone={activeProduct.attribute_stats.mapped === activeProduct.attribute_stats.total ? 'success' : 'warning'}
-                                        />
-                                    )}
-                                </Stack>
-                            </Box>
-                        </Stack>
-                    </Box>
+                                )}
+                            </HStack>
+                        </div>
+                    </div>
 
                     {/* Scrollable Body — พื้นที่เดียวในหน้านี้ที่ scroll ได้ */}
-                    <Box ref={scrollBodyRef} sx={{ flex: 1, minHeight: 0, overflowY: 'auto', pb: 6 }}>
+                    <div ref={scrollBodyRef} className={styles.objectBody}>
                         {/* Anchor bar — sticky, ทำหน้าที่เป็น scroll-spy nav ไม่ใช่สลับ panel */}
-                        <Paper
-                            ref={anchorBarRef}
-                            variant="outlined"
-                            sx={{
-                                borderRadius: 0,
-                                bgcolor: FIORI.surface,
-                                borderColor: FIORI.border,
-                                position: 'sticky',
-                                top: 0,
-                                zIndex: 1,
-                                px: { xs: 2, md: 4 },
-                            }}
-                        >
-                            <Tabs value={sectionIndex} onChange={(_, v) => scrollToSection(v)} sx={fioriTabsSx}>
-                                <Tab label="1. Category Mapping" />
-                                <Tab label="2. Attribute Mapping" disabled={!activeProduct.category_mapped} />
-                                <Tab label="3. Payload Lazada" />
-                                <Tab label="4. History" disabled={!activeProduct.master_category} />
-                            </Tabs>
-                        </Paper>
+                        <div ref={anchorBarRef} className={styles.anchorBar}>
+                            <TabContainer collapsed onTabSelect={(e) => scrollToSection(e.detail.tabIndex)}>
+                                <Tab text="1. Category Mapping" selected={sectionIndex === 0} />
+                                <Tab text="2. Attribute Mapping" disabled={!activeProduct.category_mapped} selected={sectionIndex === 1} />
+                                <Tab text="3. Payload Lazada" selected={sectionIndex === 2} />
+                                <Tab text="4. History" disabled={!activeProduct.master_category} selected={sectionIndex === 3} />
+                            </TabContainer>
+                        </div>
 
-                        <Stack spacing={3} sx={{ px: { xs: 2, md: 4 }, pt: 3 }}>
+                        <div className={styles.objectSections}>
                             {/* Section 1 — Category Mapping */}
-                            <Paper
+                            <SectionCard
                                 ref={(el: HTMLDivElement | null) => {
                                     sectionRefs.current[0] = el;
                                 }}
-                                elevation={0}
-                                sx={{ ...(fioriCardSx as Record<string, unknown>), p: 3, scrollMarginTop: `${SECTION_SCROLL_MARGIN}px` }}
+                                scrollMarginTop={SECTION_SCROLL_MARGIN}
                             >
-                                <Stack spacing={2.5}>
-                                    <Stack direction="row" justifyContent="space-between" alignItems="flex-start" spacing={2}>
-                                        <Box>
-                                            <Typography variant="subtitle2" fontWeight={700} sx={{ color: FIORI.textPrimary }}>
-                                                เลือก Lazada Category ปลายทางสำหรับ Master Category นี้
-                                            </Typography>
-                                            <Typography variant="body2" sx={{ color: FIORI.textSecondary, mt: 0.5 }}>
-                                                การเปลี่ยน Category Mapping ตรงนี้ จะมีผลกับสินค้าทุกตัวที่อยู่ใน Master Category เดียวกันอัตโนมัติ
-                                            </Typography>
-                                        </Box>
+                                <VStack gap="1.25rem">
+                                    <HStack justify="space-between" align="flex-start" gap="1rem">
+                                        <SectionHeading
+                                            title="เลือก Lazada Category ปลายทางสำหรับ Master Category นี้"
+                                            description="การเปลี่ยน Category Mapping ตรงนี้ จะมีผลกับสินค้าทุกตัวที่อยู่ใน Master Category เดียวกันอัตโนมัติ"
+                                        />
                                         <Button
-                                            size="small"
-                                            variant="outlined"
+                                            icon="synchronize"
                                             disabled={syncingCategoryTree}
-                                            startIcon={syncingCategoryTree ? <CircularProgress size={14} /> : <SyncIcon fontSize="small" />}
+                                            loading={syncingCategoryTree}
+                                            loadingDelay={0}
                                             onClick={syncCategoryTree}
-                                            sx={{ ...fioriDefaultSx, whiteSpace: 'nowrap', flexShrink: 0 }}
+                                            style={{ whiteSpace: 'nowrap', flexShrink: 0 }}
                                         >
                                             Sync Categories จาก Lazada
                                         </Button>
-                                    </Stack>
+                                    </HStack>
 
                                     {categorySyncMessage && (
-                                        <Alert severity={categorySyncMessage.isError ? 'error' : 'success'} onClose={() => setCategorySyncMessage(null)}>
+                                        <FioriMessageStrip
+                                            severity={categorySyncMessage.isError ? 'error' : 'success'}
+                                            onClose={() => setCategorySyncMessage(null)}
+                                        >
                                             {categorySyncMessage.text}
-                                        </Alert>
+                                        </FioriMessageStrip>
                                     )}
 
                                     {/* สินค้ายังไม่มีหมวดหมู่ PIM เลย — ปุ่ม "บันทึก Category
@@ -1398,406 +1317,329 @@ export default function LazadaProductsMapping({ products, stats, filters, lazada
                                             onAssigned={(category) =>
                                                 setActiveProduct((prev) =>
                                                     prev
-                                                        ? { ...prev, master_category: { id: category.id, name: category.name, path: category.path, lazada_category_id: null } }
+                                                        ? {
+                                                              ...prev,
+                                                              master_category: {
+                                                                  id: category.id,
+                                                                  name: category.name,
+                                                                  path: category.path,
+                                                                  lazada_category_id: null,
+                                                              },
+                                                          }
                                                         : prev,
                                                 )
                                             }
                                         />
                                     )}
 
-                                    <Box sx={{ maxWidth: 420 }}>
+                                    <div style={{ maxWidth: 420 }}>
                                         <MarketplaceCategoryPicker
                                             platform="lazada"
                                             label="Lazada Category"
                                             value={selectedLazadaCatId}
                                             onChange={setSelectedLazadaCatId}
                                         />
-                                    </Box>
+                                    </div>
 
                                     {/* แนะนำหมวดหมู่จาก Lazada จริง (/product/category/suggestion/get)
                                     — เลือกจากรูป+ชื่อสินค้าตัวนี้ กดแล้วแค่ตั้งค่า
                                     selectedLazadaCatId เหมือน picker ด้านบน ยังต้อง
                                     กด "บันทึก Category Mapping" ต่อเองเหมือนเดิม */}
-                                    <Box>
+                                    <div>
                                         <Button
-                                            size="small"
-                                            variant="outlined"
+                                            icon="ai"
                                             disabled={loadingCategorySuggestions}
-                                            startIcon={loadingCategorySuggestions ? <CircularProgress size={14} /> : <AutoAwesomeIcon fontSize="small" />}
+                                            loading={loadingCategorySuggestions}
+                                            loadingDelay={0}
                                             onClick={loadCategorySuggestions}
-                                            sx={fioriDefaultSx}
                                         >
                                             {loadingCategorySuggestions ? 'กำลังค้นหา...' : 'แนะนำหมวดหมู่จาก Lazada'}
                                         </Button>
 
                                         {categorySuggestionError && (
-                                            <Alert severity="warning" sx={{ mt: 1 }} onClose={() => setCategorySuggestionError(null)}>
+                                            <FioriMessageStrip
+                                                severity="warning"
+                                                style={{ marginTop: '0.5rem' }}
+                                                onClose={() => setCategorySuggestionError(null)}
+                                            >
                                                 {categorySuggestionError}
-                                            </Alert>
+                                            </FioriMessageStrip>
                                         )}
 
-                                        {categorySuggestions && (
-                                            categorySuggestions.length === 0 ? (
-                                                <Typography variant="body2" sx={{ color: FIORI.textSecondary, mt: 1 }}>
+                                        {categorySuggestions &&
+                                            (categorySuggestions.length === 0 ? (
+                                                <Body style={{ color: TONE_TEXT.neutral, marginTop: '0.5rem' }}>
                                                     Lazada ไม่มีคำแนะนำให้สำหรับสินค้านี้
-                                                </Typography>
+                                                </Body>
                                             ) : (
-                                                <Stack direction="row" flexWrap="wrap" gap={1} sx={{ mt: 1 }}>
+                                                <HStack wrap gap="0.5rem" style={{ marginTop: '0.5rem' }}>
                                                     {categorySuggestions.map((s) => (
-                                                        <Chip
+                                                        <Button
                                                             key={s.category_id}
-                                                            label={s.path || s.name || String(s.category_id)}
+                                                            design={selectedLazadaCatId === s.category_id ? 'Emphasized' : 'Default'}
                                                             onClick={() => setSelectedLazadaCatId(s.category_id)}
-                                                            sx={
-                                                                selectedLazadaCatId === s.category_id
-                                                                    ? { bgcolor: FIORI.brand, color: '#fff', fontWeight: 600 }
-                                                                    : { bgcolor: FIORI.brandBg, color: FIORI.brand }
-                                                            }
-                                                        />
+                                                        >
+                                                            {s.path || s.name || String(s.category_id)}
+                                                        </Button>
                                                     ))}
-                                                </Stack>
-                                            )
-                                        )}
-                                    </Box>
+                                                </HStack>
+                                            ))}
+                                    </div>
 
-                                    <Stack direction="row" spacing={1.5}>
+                                    <HStack gap="0.75rem">
                                         <Button
-                                            variant="contained"
+                                            design="Emphasized"
+                                            icon="accept"
                                             disabled={!selectedLazadaCatId || savingCatMap || clearingCatMap}
+                                            loading={savingCatMap}
+                                            loadingDelay={0}
                                             onClick={saveCategoryMapping}
-                                            startIcon={savingCatMap ? <CircularProgress size={16} color="inherit" /> : <CheckCircleIcon fontSize="small" />}
-                                            sx={{ ...fioriEmphasizedSx, px: 2.5, py: 1 }}
                                         >
                                             บันทึก Category Mapping & ดำเนินการต่อ
                                         </Button>
 
                                         {activeProduct.category_mapped && (
                                             <Button
-                                                variant="outlined"
-                                                color="error"
+                                                design="Negative"
+                                                icon="delete"
                                                 disabled={savingCatMap || clearingCatMap}
+                                                loading={clearingCatMap}
+                                                loadingDelay={0}
                                                 onClick={clearCategoryMapping}
-                                                startIcon={clearingCatMap ? <CircularProgress size={16} color="inherit" /> : <DeleteOutlineIcon fontSize="small" />}
-                                                sx={fioriDefaultSx}
                                             >
                                                 ล้าง Category Mapping
                                             </Button>
                                         )}
-                                    </Stack>
-                                </Stack>
-                            </Paper>
+                                    </HStack>
+                                </VStack>
+                            </SectionCard>
 
                             {/* Section 2 — Attribute Mapping (locked จนกว่าจะแมป Category ก่อน) */}
-                            <Paper
+                            <SectionCard
                                 ref={(el: HTMLDivElement | null) => {
                                     sectionRefs.current[1] = el;
                                 }}
-                                elevation={0}
-                                sx={{ ...(fioriCardSx as Record<string, unknown>), p: 3, scrollMarginTop: `${SECTION_SCROLL_MARGIN}px` }}
+                                scrollMarginTop={SECTION_SCROLL_MARGIN}
                             >
                                 {!activeProduct.category_mapped || !activeProduct.lazada_category ? (
-                                    <Stack alignItems="center" spacing={1} sx={{ py: 4, color: FIORI.textSecondary }}>
-                                        <LockOutlinedIcon fontSize="small" />
-                                        <Typography variant="body2">กรุณาบันทึก Category Mapping (Section 1) ก่อน ถึงจะแมป Attributes ได้</Typography>
-                                    </Stack>
+                                    <LockedNotice>กรุณาบันทึก Category Mapping (Section 1) ก่อน ถึงจะแมป Attributes ได้</LockedNotice>
                                 ) : (
-                                    <Stack spacing={3}>
-                                        <Stack direction="row" justifyContent="space-between" alignItems="center">
-                                            <Box>
-                                                <Typography variant="subtitle2" fontWeight={700} sx={{ color: FIORI.textPrimary }}>
+                                    <VStack gap="1.5rem">
+                                        <HStack justify="space-between" wrap gap="1rem">
+                                            <div>
+                                                <Title level="H6" size="H6" wrappingType="Normal" style={{ display: 'block' }}>
                                                     {activeProduct.lazada_category.path || activeProduct.lazada_category.name}
-                                                </Typography>
-                                                <Typography variant="caption" sx={{ color: FIORI.textSecondary, fontFamily: 'monospace' }}>
-                                                    lz:{activeProduct.lazada_category.id}
-                                                </Typography>
-                                            </Box>
-                                            <Stack direction="row" spacing={1}>
-                                                <Tooltip
+                                                </Title>
+                                                <Caption mono>lz:{activeProduct.lazada_category.id}</Caption>
+                                            </div>
+                                            <HStack gap="0.5rem" wrap>
+                                                <span
                                                     title={
                                                         !syncingFamily && (lazadaAttributes ?? []).length === 0
                                                             ? 'ยังไม่มีข้อมูล Lazada Attributes ในระบบ กด "Sync Attributes" ก่อน'
-                                                            : ''
+                                                            : undefined
                                                     }
                                                 >
-                                                    <span>
-                                                        <Button
-                                                            size="small"
-                                                            variant="outlined"
-                                                            disabled={syncingFamily || (lazadaAttributes ?? []).length === 0}
-                                                            startIcon={syncingFamily ? <CircularProgress size={14} /> : <CollectionsBookmarkIcon fontSize="small" />}
-                                                            onClick={syncAttributeFamily}
-                                                            sx={fioriDefaultSx}
-                                                        >
-                                                            สร้าง/อัปเดต Attribute Family
-                                                        </Button>
-                                                    </span>
-                                                </Tooltip>
+                                                    <Button
+                                                        icon="collections-management"
+                                                        disabled={syncingFamily || (lazadaAttributes ?? []).length === 0}
+                                                        loading={syncingFamily}
+                                                        loadingDelay={0}
+                                                        onClick={syncAttributeFamily}
+                                                    >
+                                                        สร้าง/อัปเดต Attribute Family
+                                                    </Button>
+                                                </span>
                                                 <Button
-                                                    size="small"
-                                                    variant="outlined"
+                                                    icon="synchronize"
                                                     disabled={syncingAttributes}
-                                                    startIcon={syncingAttributes ? <CircularProgress size={14} /> : <SyncIcon fontSize="small" />}
+                                                    loading={syncingAttributes}
+                                                    loadingDelay={0}
                                                     onClick={syncAttributes}
-                                                    sx={fioriDefaultSx}
                                                 >
                                                     Sync Attributes
                                                 </Button>
                                                 {(lazadaAttributes ?? []).some((a) => a.mapped) && (
                                                     <Button
-                                                        size="small"
-                                                        variant="outlined"
-                                                        color="error"
+                                                        design="Negative"
+                                                        icon="delete"
                                                         disabled={clearingAttributeMappings}
-                                                        startIcon={
-                                                            clearingAttributeMappings ? (
-                                                                <CircularProgress size={14} color="inherit" />
-                                                            ) : (
-                                                                <DeleteOutlineIcon fontSize="small" />
-                                                            )
-                                                        }
+                                                        loading={clearingAttributeMappings}
+                                                        loadingDelay={0}
                                                         onClick={clearAllAttributeMappings}
-                                                        sx={fioriDefaultSx}
                                                     >
                                                         ล้าง Attribute Mapping
                                                     </Button>
                                                 )}
-                                            </Stack>
-                                        </Stack>
+                                            </HStack>
+                                        </HStack>
 
                                         {familySyncResult && (
-                                            <Alert severity="success" onClose={() => setFamilySyncResult(null)}>
-                                                สร้าง/อัปเดต Attribute Family &quot;{familySyncResult.name}&quot; แล้ว ({familySyncResult.count} attributes
-                                                {familySyncResult.newlyCreatedCount > 0 && `, สร้างใหม่ ${familySyncResult.newlyCreatedCount} attribute`}) —{' '}
-                                                <Link href={familySyncResult.editUrl} target="_blank" rel="noopener noreferrer">
+                                            <FioriMessageStrip severity="success" onClose={() => setFamilySyncResult(null)}>
+                                                สร้าง/อัปเดต Attribute Family &quot;{familySyncResult.name}&quot; แล้ว ({familySyncResult.count}{' '}
+                                                attributes
+                                                {familySyncResult.newlyCreatedCount > 0 &&
+                                                    `, สร้างใหม่ ${familySyncResult.newlyCreatedCount} attribute`}
+                                                ) —{' '}
+                                                <Link href={familySyncResult.editUrl} target="_blank">
                                                     เปิดหน้าตรวจสอบ
                                                 </Link>
-                                            </Alert>
+                                            </FioriMessageStrip>
                                         )}
                                         {familySyncError && (
-                                            <Alert severity="error" onClose={() => setFamilySyncError(null)}>
+                                            <FioriMessageStrip severity="error" onClose={() => setFamilySyncError(null)}>
                                                 {familySyncError}
-                                            </Alert>
+                                            </FioriMessageStrip>
                                         )}
                                         {clearAttributeMappingsError && (
-                                            <Alert severity="error" onClose={() => setClearAttributeMappingsError(null)}>
+                                            <FioriMessageStrip severity="error" onClose={() => setClearAttributeMappingsError(null)}>
                                                 {clearAttributeMappingsError}
-                                            </Alert>
+                                            </FioriMessageStrip>
                                         )}
 
                                         {unmappedMandatoryCount > 0 && (
-                                            <Alert severity="error" icon={<WarningAmberIcon />}>
-                                                มี {unmappedMandatoryCount} attribute ที่ Lazada บังคับ (Required) แต่ยังไม่ได้แมป — สินค้าในหมวดหมู่นี้จะ sync ไม่ผ่าน
-                                            </Alert>
+                                            <FioriMessageStrip severity="error">
+                                                มี {unmappedMandatoryCount} attribute ที่ Lazada บังคับ (Required) แต่ยังไม่ได้แมป —
+                                                สินค้าในหมวดหมู่นี้จะ sync ไม่ผ่าน
+                                            </FioriMessageStrip>
                                         )}
 
                                         {lazadaAttributes && lazadaAttributes.length > 0 && (
-                                            <FormControlLabel
-                                                control={
-                                                    <Checkbox
-                                                        size="small"
-                                                        checked={showMandatoryOnly}
-                                                        onChange={(e) => setShowMandatoryOnly(e.target.checked)}
-                                                    />
-                                                }
-                                                label={
-                                                    <Typography variant="body2" sx={{ color: FIORI.textPrimary }}>
-                                                        แสดงเฉพาะที่ Lazada บังคับ (Required) ({mandatoryAttributesCount})
-                                                    </Typography>
-                                                }
-                                                sx={{ ml: 0 }}
+                                            <CheckBox
+                                                checked={showMandatoryOnly}
+                                                onChange={(e) => setShowMandatoryOnly(e.target.checked)}
+                                                text={`แสดงเฉพาะที่ Lazada บังคับ (Required) (${mandatoryAttributesCount})`}
+                                                style={{ alignSelf: 'flex-start' }}
                                             />
                                         )}
 
                                         {loadingAttributes ? (
-                                            <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
-                                                <CircularProgress size={24} sx={{ color: FIORI.brand }} />
-                                            </Box>
+                                            <CenteredSpinner />
                                         ) : visibleLazadaAttributes && visibleLazadaAttributes.length > 0 ? (
-                                            <Box component="table" sx={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8125rem' }}>
-                                                <Box component="thead" sx={{ bgcolor: FIORI.headerBg }}>
-                                                    <Box component="tr">
-                                                        <Box
-                                                            component="th"
-                                                            sx={{
-                                                                p: 1.5,
-                                                                textAlign: 'left',
-                                                                fontWeight: 600,
-                                                                color: FIORI.textPrimary,
-                                                                borderBottom: `1px solid ${FIORI.border}`,
-                                                            }}
-                                                        >
-                                                            Lazada Attribute
-                                                        </Box>
-                                                        <Box
-                                                            component="th"
-                                                            sx={{
-                                                                p: 1.5,
-                                                                textAlign: 'left',
-                                                                fontWeight: 600,
-                                                                color: FIORI.textPrimary,
-                                                                borderBottom: `1px solid ${FIORI.border}`,
-                                                            }}
-                                                        >
-                                                            PIM Attribute (ต้นทาง)
-                                                        </Box>
-                                                    </Box>
-                                                </Box>
-                                                <Box component="tbody">
-                                                    {visibleLazadaAttributes.map((attr) => {
-                                                        const isMappable = attr.input_type && MAPPABLE_LAZADA_INPUT_TYPES.includes(attr.input_type);
+                                            <MappingTable headers={['Lazada Attribute', 'PIM Attribute (ต้นทาง)']}>
+                                                {visibleLazadaAttributes.map((attr) => {
+                                                    const isMappable = attr.input_type && MAPPABLE_LAZADA_INPUT_TYPES.includes(attr.input_type);
 
-                                                        return (
-                                                            <Box
-                                                                component="tr"
-                                                                key={attr.name}
-                                                                sx={{
-                                                                    borderTop: `1px solid ${FIORI.border}`,
-                                                                    '&:hover': { bgcolor: FIORI.hover },
-                                                                    transition: 'background-color 0.1s ease',
-                                                                }}
-                                                            >
-                                                                <Box component="td" sx={{ p: 1.5, verticalAlign: 'middle' }}>
-                                                                    <Typography fontWeight={600} variant="body2" sx={{ color: FIORI.textPrimary, fontSize: '0.8125rem' }}>
-                                                                        {attr.label} {attr.mandatory && <span style={{ color: FIORI.error as unknown as string }}>*</span>}
-                                                                    </Typography>
-                                                                    <Typography variant="caption" sx={{ color: FIORI.textSecondary }}>
-                                                                        {attr.name} ({attr.input_type ?? 'text'})
-                                                                    </Typography>
-                                                                </Box>
-                                                                <Box component="td" sx={{ p: 1.5, verticalAlign: 'middle' }}>
-                                                                    {!isMappable ? (
-                                                                        <FioriStatus label="ไม่รองรับการแมปอัตโนมัติ" tone="neutral" />
-                                                                    ) : (
-                                                                        <Stack spacing={1}>
-                                                                            <Stack direction="row" alignItems="center" spacing={1}>
-                                                                                <Box sx={{ flex: 1, minWidth: 200 }}>
-                                                                                    <PimAttributePicker
-                                                                                        value={attr.mapped}
-                                                                                        disabled={savingAttributeName === attr.name}
-                                                                                        typeFilter={attr.input_type === 'img' ? ['image', 'file'] : undefined}
-                                                                                        onChange={(val) => {
-                                                                                            if (val) {
-                                                                                                assignAttribute(attr.name, val);
-                                                                                            } else if (attr.mapped) {
-                                                                                                clearAttribute(attr.name, attr.mapped.id);
-                                                                                            }
-                                                                                        }}
-                                                                                        placeholder="เลือก PIM attribute..."
-                                                                                    />
-                                                                                </Box>
-                                                                                {savingAttributeName === attr.name && <CircularProgress size={14} sx={{ color: FIORI.brand }} />}
-                                                                            </Stack>
-                                                                            {attr.input_type && SELECT_LAZADA_INPUT_TYPES.includes(attr.input_type) && attr.mapped && (
+                                                    return (
+                                                        <tr key={attr.name}>
+                                                            <td>
+                                                                <Body style={{ fontWeight: 600, fontSize: '0.8125rem' }}>
+                                                                    {attr.label} {attr.mandatory && <span style={{ color: TONE_TEXT.error }}>*</span>}
+                                                                </Body>
+                                                                <Caption>
+                                                                    {attr.name} ({attr.input_type ?? 'text'})
+                                                                </Caption>
+                                                            </td>
+                                                            <td>
+                                                                {!isMappable ? (
+                                                                    <FioriStatus label="ไม่รองรับการแมปอัตโนมัติ" tone="neutral" />
+                                                                ) : (
+                                                                    <VStack gap="0.5rem">
+                                                                        <HStack gap="0.5rem">
+                                                                            <div style={{ flex: 1, minWidth: 200 }}>
+                                                                                <PimAttributePicker
+                                                                                    value={attr.mapped}
+                                                                                    disabled={savingAttributeName === attr.name}
+                                                                                    typeFilter={
+                                                                                        attr.input_type === 'img' ? ['image', 'file'] : undefined
+                                                                                    }
+                                                                                    onChange={(val) => {
+                                                                                        if (val) {
+                                                                                            assignAttribute(attr.name, val);
+                                                                                        } else if (attr.mapped) {
+                                                                                            clearAttribute(attr.name, attr.mapped.id);
+                                                                                        }
+                                                                                    }}
+                                                                                    placeholder="เลือก PIM attribute..."
+                                                                                />
+                                                                            </div>
+                                                                            {savingAttributeName === attr.name && <Spinner />}
+                                                                        </HStack>
+                                                                        {attr.input_type &&
+                                                                            SELECT_LAZADA_INPUT_TYPES.includes(attr.input_type) &&
+                                                                            attr.mapped && (
                                                                                 <Button
-                                                                                    size="small"
-                                                                                    variant="outlined"
                                                                                     onClick={() => setOptionMappingRow(attr)}
-                                                                                    sx={{ ...fioriDefaultSx, alignSelf: 'flex-start', fontSize: '0.75rem', px: 1.25, py: 0.25 }}
+                                                                                    style={{ alignSelf: 'flex-start' }}
                                                                                 >
-                                                                                    จับคู่ตัวเลือก ({attr.option_mappings.length}/{attr.options.length})
+                                                                                    จับคู่ตัวเลือก ({attr.option_mappings.length}/
+                                                                                    {attr.options.length})
                                                                                 </Button>
                                                                             )}
-                                                                        </Stack>
-                                                                    )}
-                                                                </Box>
-                                                            </Box>
-                                                        );
-                                                    })}
-                                                </Box>
-                                            </Box>
+                                                                    </VStack>
+                                                                )}
+                                                            </td>
+                                                        </tr>
+                                                    );
+                                                })}
+                                            </MappingTable>
                                         ) : lazadaAttributes && lazadaAttributes.length > 0 ? (
-                                            <Typography variant="body2" sx={{ color: FIORI.textSecondary }} align="center" py={3}>
+                                            <Body style={{ color: TONE_TEXT.neutral, textAlign: 'center', padding: '1.5rem 0' }}>
                                                 ไม่มี attribute ที่ Lazada บังคับ (Required) เลยในหมวดหมู่นี้
-                                            </Typography>
+                                            </Body>
                                         ) : (
-                                            <Typography variant="body2" sx={{ color: FIORI.textSecondary }} align="center" py={3}>
+                                            <Body style={{ color: TONE_TEXT.neutral, textAlign: 'center', padding: '1.5rem 0' }}>
                                                 ยังไม่มีข้อมูล Attributes ในระบบ กรุณากด "Sync Attributes"
-                                            </Typography>
+                                            </Body>
                                         )}
-                                    </Stack>
+                                    </VStack>
                                 )}
-                            </Paper>
+                            </SectionCard>
 
                             {/* Section 3 — Payload Lazada: ฟิลด์ payload ตายตัวของ Lazada เอง
                                 (name/price/qty/weight/length/width/height/video) ไม่ผูกกับ
                                 หมวดหมู่ไหนเลย ต่างจาก section 2 ที่เป็น category attribute —
                                 เลยไม่ต้อง lock ไว้จนกว่าจะแมป Category ก่อนเหมือน section 2 */}
-                            <Paper
+                            <SectionCard
                                 ref={(el: HTMLDivElement | null) => {
                                     sectionRefs.current[2] = el;
                                 }}
-                                elevation={0}
-                                sx={{ ...(fioriCardSx as Record<string, unknown>), p: 3, scrollMarginTop: `${SECTION_SCROLL_MARGIN}px` }}
+                                scrollMarginTop={SECTION_SCROLL_MARGIN}
                             >
-                                <Stack spacing={2.5}>
-                                    <Box>
-                                        <Typography variant="subtitle2" fontWeight={700} sx={{ color: FIORI.textPrimary }}>
-                                            แมป PIM Attribute เข้ากับฟิลด์ payload ของ Lazada
-                                        </Typography>
-                                        <Typography variant="body2" sx={{ color: FIORI.textSecondary, mt: 0.5 }}>
-                                            ฟิลด์ตายตัวของ Lazada เอง (ไม่ใช่ attribute เฉพาะหมวดหมู่แบบ section 2) — ใช้ร่วมกันทุกสินค้า
-                                            เปลี่ยนตรงนี้มีผลกับสินค้าทุกตัวในระบบ
-                                        </Typography>
-                                    </Box>
+                                <VStack gap="1.25rem">
+                                    <SectionHeading
+                                        title="แมป PIM Attribute เข้ากับฟิลด์ payload ของ Lazada"
+                                        description="ฟิลด์ตายตัวของ Lazada เอง (ไม่ใช่ attribute เฉพาะหมวดหมู่แบบ section 2) — ใช้ร่วมกันทุกสินค้า เปลี่ยนตรงนี้มีผลกับสินค้าทุกตัวในระบบ"
+                                    />
 
                                     {loadingPayloadFields ? (
-                                        <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
-                                            <CircularProgress size={24} sx={{ color: FIORI.brand }} />
-                                        </Box>
+                                        <CenteredSpinner />
                                     ) : (
-                                        <Box component="table" sx={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8125rem' }}>
-                                            <Box component="thead" sx={{ bgcolor: FIORI.headerBg }}>
-                                                <Box component="tr">
-                                                    <Box component="th" sx={{ p: 1.5, textAlign: 'left', fontWeight: 600, color: FIORI.textPrimary, borderBottom: `1px solid ${FIORI.border}` }}>
-                                                        Lazada Payload Field
-                                                    </Box>
-                                                    <Box component="th" sx={{ p: 1.5, textAlign: 'left', fontWeight: 600, color: FIORI.textPrimary, borderBottom: `1px solid ${FIORI.border}` }}>
-                                                        PIM Attribute (ต้นทาง)
-                                                    </Box>
-                                                </Box>
-                                            </Box>
-                                            <Box component="tbody">
-                                                {(payloadFields ?? []).map((f) => (
-                                                    <Box
-                                                        component="tr"
-                                                        key={f.target_field}
-                                                        sx={{ borderTop: `1px solid ${FIORI.border}`, '&:hover': { bgcolor: FIORI.hover }, transition: 'background-color 0.1s ease' }}
-                                                    >
-                                                        <Box component="td" sx={{ p: 1.5, verticalAlign: 'middle' }}>
-                                                            <Typography fontWeight={600} variant="body2" sx={{ color: FIORI.textPrimary, fontSize: '0.8125rem' }}>
-                                                                {PAYLOAD_FIELD_LABELS[f.target_field]}
-                                                            </Typography>
-                                                            <Typography variant="caption" sx={{ color: FIORI.textSecondary }}>
-                                                                {f.target_field}
-                                                            </Typography>
-                                                        </Box>
-                                                        <Box component="td" sx={{ p: 1.5, verticalAlign: 'middle' }}>
-                                                            <Stack direction="row" alignItems="center" spacing={1}>
-                                                                <Box sx={{ flex: 1, minWidth: 200 }}>
-                                                                    <PimAttributePicker
-                                                                        value={f.mapped}
-                                                                        disabled={savingPayloadField === f.target_field}
-                                                                        typeFilter={f.target_field === 'video' ? ['video'] : undefined}
-                                                                        onChange={(val) => {
-                                                                            if (val) {
-                                                                                assignPayloadField(f.target_field, val, f.mapped?.id ?? null);
-                                                                            } else if (f.mapped) {
-                                                                                clearPayloadField(f.target_field, f.mapped.id);
-                                                                            }
-                                                                        }}
-                                                                        placeholder="เลือก PIM attribute..."
-                                                                    />
-                                                                </Box>
-                                                                {savingPayloadField === f.target_field && <CircularProgress size={14} sx={{ color: FIORI.brand }} />}
-                                                            </Stack>
-                                                        </Box>
-                                                    </Box>
-                                                ))}
-                                            </Box>
-                                        </Box>
+                                        <MappingTable headers={['Lazada Payload Field', 'PIM Attribute (ต้นทาง)']}>
+                                            {(payloadFields ?? []).map((f) => (
+                                                <tr key={f.target_field}>
+                                                    <td>
+                                                        <Body style={{ fontWeight: 600, fontSize: '0.8125rem' }}>
+                                                            {PAYLOAD_FIELD_LABELS[f.target_field]}
+                                                        </Body>
+                                                        <Caption>{f.target_field}</Caption>
+                                                    </td>
+                                                    <td>
+                                                        <HStack gap="0.5rem">
+                                                            <div style={{ flex: 1, minWidth: 200 }}>
+                                                                <PimAttributePicker
+                                                                    value={f.mapped}
+                                                                    disabled={savingPayloadField === f.target_field}
+                                                                    typeFilter={f.target_field === 'video' ? ['video'] : undefined}
+                                                                    onChange={(val) => {
+                                                                        if (val) {
+                                                                            assignPayloadField(f.target_field, val, f.mapped?.id ?? null);
+                                                                        } else if (f.mapped) {
+                                                                            clearPayloadField(f.target_field, f.mapped.id);
+                                                                        }
+                                                                    }}
+                                                                    placeholder="เลือก PIM attribute..."
+                                                                />
+                                                            </div>
+                                                            {savingPayloadField === f.target_field && <Spinner />}
+                                                        </HStack>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </MappingTable>
                                     )}
-                                </Stack>
-                            </Paper>
+                                </VStack>
+                            </SectionCard>
 
                             {/* Section 4 — History: audit trail รวมของทุกขั้นตอนการแมพ Lazada
                                 ของ master category นี้ (จับคู่ category, จับคู่ attribute,
@@ -1806,39 +1648,30 @@ export default function LazadaProductsMapping({ products, stats, filters, lazada
                                 ขอบเขต/ที่มาของแต่ละแหล่งข้อมูล, ใช้ TimelinePanel เดียวกับที่
                                 หน้า edit อื่นๆ ในระบบใช้เป็น History tab อยู่แล้ว ไม่ต้องสร้าง
                                 timeline UI ใหม่ */}
-                            <Paper
+                            <SectionCard
                                 ref={(el: HTMLDivElement | null) => {
                                     sectionRefs.current[3] = el;
                                 }}
-                                elevation={0}
-                                sx={{ ...(fioriCardSx as Record<string, unknown>), p: 3, scrollMarginTop: `${SECTION_SCROLL_MARGIN}px` }}
+                                scrollMarginTop={SECTION_SCROLL_MARGIN}
                             >
-                                <Stack spacing={2.5}>
-                                    <Box>
-                                        <Typography variant="subtitle2" fontWeight={700} sx={{ color: FIORI.textPrimary }}>
-                                            เส้นทางการแมพ Lazada ของ Master Category นี้
-                                        </Typography>
-                                        <Typography variant="body2" sx={{ color: FIORI.textSecondary, mt: 0.5 }}>
-                                            รวมทุกการเปลี่ยนแปลงของ Category Mapping (Section 1), Attribute Mapping (Section 2) —
-                                            รวมถึงตัวเลือกที่จับคู่ไว้ และการสร้าง/sync Attribute Family ที่เกี่ยวข้อง เรียงใหม่สุดก่อน
-                                        </Typography>
-                                    </Box>
+                                <VStack gap="1.25rem">
+                                    <SectionHeading
+                                        title="เส้นทางการแมพ Lazada ของ Master Category นี้"
+                                        description="รวมทุกการเปลี่ยนแปลงของ Category Mapping (Section 1), Attribute Mapping (Section 2) — รวมถึงตัวเลือกที่จับคู่ไว้ และการสร้าง/sync Attribute Family ที่เกี่ยวข้อง เรียงใหม่สุดก่อน"
+                                    />
 
                                     {!activeProduct.master_category ? (
-                                        <Stack alignItems="center" spacing={1} sx={{ py: 4, color: FIORI.textSecondary }}>
-                                            <LockOutlinedIcon fontSize="small" />
-                                            <Typography variant="body2">สินค้านี้ยังไม่มี Master Category — ไม่มีประวัติให้แสดง</Typography>
-                                        </Stack>
+                                        <LockedNotice>สินค้านี้ยังไม่มี Master Category — ไม่มีประวัติให้แสดง</LockedNotice>
                                     ) : (
                                         <TimelinePanel
                                             timelineUrl={`/catalog/attributes/lazada-mapping/timeline?category_id=${activeProduct.master_category.id}`}
                                         />
                                     )}
-                                </Stack>
-                            </Paper>
-                        </Stack>
-                    </Box>
-                </Box>
+                                </VStack>
+                            </SectionCard>
+                        </div>
+                    </div>
+                </div>
 
                 {optionMappingRow && optionMappingRow.mapped && (
                     <LazadaAttributeOptionMappingDialog
@@ -1866,209 +1699,75 @@ export default function LazadaProductsMapping({ products, stats, filters, lazada
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="แมปสินค้า Lazada" />
-            <Box sx={{ p: { xs: 2, md: 4 }, bgcolor: FIORI.pageBg, minHeight: '100%' }}>
+            <div className={styles.page}>
                 {/* ──── Page Header ──── */}
-                <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 3 }}>
-                    <Box>
-                        <Typography variant="h5" fontWeight={600} sx={{ color: FIORI.textPrimary }}>
-                            สินค้า ({products.total})
-                        </Typography>
-                        <Typography variant="body2" sx={{ color: FIORI.textSecondary, mt: 0.25 }}>
-                            จัดการการแมปหมวดหมู่และ Attributes ของ Lazada ตั้งแต่ระดับสินค้า
-                        </Typography>
-                    </Box>
-                    <Button
-                        size="small"
-                        startIcon={<ArrowBackIcon fontSize="small" />}
-                        onClick={() => router.visit('/catalog/marketplace/lazada')}
-                        sx={fioriGhostSx}
-                    >
-                        Lazada Hub
-                    </Button>
-                </Stack>
+                <PageHeader
+                    title={`สินค้า (${products.total})`}
+                    subtitle="จัดการการแมปหมวดหมู่และ Attributes ของ Lazada ตั้งแต่ระดับสินค้า"
+                    actions={
+                        <Button design="Transparent" icon="nav-back" onClick={() => router.visit('/catalog/marketplace/lazada')}>
+                            Lazada Hub
+                        </Button>
+                    }
+                />
 
                 {/* ──── Stat KPI Tiles ──── */}
-                <Stack
-                    direction={{ xs: 'column', sm: 'row' }}
-                    spacing={0}
-                    sx={{
-                        mb: 3,
-                        borderRadius: '8px',
-                        border: `1px solid ${FIORI.border}`,
-                        overflow: 'hidden',
-                        bgcolor: FIORI.border,
-                        gap: '1px',
-                    }}
-                >
-                    {[
-                        { label: 'สินค้าทั้งหมด', value: stats.total, tone: undefined, filterValue: 'all' as ProductFilter },
-                        { label: 'แมป Category แล้ว', value: stats.mapped, tone: 'success' as const, filterValue: 'mapped' as ProductFilter },
-                        { label: 'ยังไม่ได้แมป Category', value: stats.unmapped, tone: 'warning' as const, filterValue: 'unmapped' as ProductFilter },
-                    ].map((kpi) => (
-                        <Box
-                            key={kpi.label}
-                            onClick={() => applyFilter(kpi.filterValue)}
-                            sx={{
-                                flex: 1,
-                                p: 2,
-                                cursor: 'pointer',
-                                transition: 'background-color 0.1s ease',
-                                ...(filter === kpi.filterValue ? { bgcolor: FIORI.brandBg } : { bgcolor: FIORI.surface, '&:hover': { bgcolor: FIORI.hover } }),
-                            }}
-                        >
-                            <Typography
-                                variant="caption"
-                                sx={{
-                                    color: FIORI.textSecondary,
-                                    fontWeight: 600,
-                                    textTransform: 'uppercase',
-                                    fontSize: '0.6875rem',
-                                    letterSpacing: '0.04em',
-                                }}
-                            >
-                                {kpi.label}
-                            </Typography>
-                            <Typography
-                                variant="h5"
-                                fontWeight={700}
-                                sx={{
-                                    color: kpi.tone ? FIORI[kpi.tone] : FIORI.textPrimary,
-                                    mt: 0.5,
-                                }}
-                            >
-                                {kpi.value}
-                            </Typography>
-                        </Box>
-                    ))}
-                </Stack>
+                <KpiTiles<ProductFilter>
+                    tiles={[
+                        { label: 'สินค้าทั้งหมด', value: stats.total, filterValue: 'all' },
+                        { label: 'แมป Category แล้ว', value: stats.mapped, tone: 'success', filterValue: 'mapped' },
+                        { label: 'ยังไม่ได้แมป Category', value: stats.unmapped, tone: 'warning', filterValue: 'unmapped' },
+                    ]}
+                    active={filter}
+                    onSelect={applyFilter}
+                />
 
                 {/* ──── Table Card (Toolbar + Data + Pagination) ──── */}
-                <Paper elevation={0} sx={fioriCardSx}>
+                <div className={styles.card}>
                     {/* Toolbar */}
-                    <Stack
-                        direction={{ xs: 'column', md: 'row' }}
-                        justifyContent="space-between"
-                        alignItems="center"
-                        spacing={2}
-                        sx={{ p: 2 }}
-                    >
-                        <Stack direction="row" alignItems="center" spacing={2} sx={{ width: { xs: '100%', md: 'auto' } }}>
-                            <TextField
-                                size="small"
-                                placeholder="ค้นหาตามชื่อสินค้า หรือ SKU..."
-                                value={search}
-                                onChange={(e) => setSearch(e.target.value)}
-                                InputProps={{
-                                    endAdornment: (
-                                        <InputAdornment position="end">
-                                            <SearchIcon sx={{ color: FIORI.textSecondary, fontSize: 20 }} />
-                                        </InputAdornment>
-                                    ),
-                                }}
-                                sx={{ ...fioriSearchFieldSx, minWidth: 260 }}
-                            />
-                            <ToggleButtonGroup
-                                size="small"
-                                exclusive
-                                value={filter}
-                                onChange={(_, val) => val && applyFilter(val)}
-                                sx={{
-                                    '& .MuiToggleButton-root': {
-                                        textTransform: 'none',
-                                        fontWeight: 500,
-                                        fontSize: '0.8125rem',
-                                        px: 1.5,
-                                        py: 0.5,
-                                        color: FIORI.textSecondary,
-                                        borderColor: FIORI.borderStrong,
-                                        transition: 'background-color 0.1s ease, color 0.1s ease',
-                                        '&:hover': { backgroundColor: FIORI.hover, color: FIORI.textPrimary },
-                                        '&.Mui-selected': {
-                                            backgroundColor: FIORI.brandBg,
-                                            color: FIORI.brand,
-                                            borderColor: FIORI.brand,
-                                            fontWeight: 700,
-                                            zIndex: 1,
-                                            '&:hover': { backgroundColor: FIORI.brandBg, color: FIORI.brand },
-                                        },
-                                    },
+                    <div className={styles.toolbar}>
+                        <div className={styles.toolbarStart}>
+                            <SearchField value={search} onChange={setSearch} placeholder="ค้นหาตามชื่อสินค้า หรือ SKU..." />
+                            <SegmentedButton
+                                accessibleName="Filter"
+                                onSelectionChange={(e) => {
+                                    const val = (e.detail.selectedItems[0] as HTMLElement | undefined)?.dataset.filter as ProductFilter | undefined;
+                                    if (val) applyFilter(val);
                                 }}
                             >
-                                <ToggleButton value="all">ทั้งหมด ({stats.total})</ToggleButton>
-                                <ToggleButton value="mapped">แมปแล้ว ({stats.mapped})</ToggleButton>
-                                <ToggleButton value="unmapped">ยังไม่ได้แมป ({stats.unmapped})</ToggleButton>
-                            </ToggleButtonGroup>
-                        </Stack>
+                                <SegmentedButtonItem data-filter="all" selected={filter === 'all'}>
+                                    ทั้งหมด ({stats.total})
+                                </SegmentedButtonItem>
+                                <SegmentedButtonItem data-filter="mapped" selected={filter === 'mapped'}>
+                                    แมปแล้ว ({stats.mapped})
+                                </SegmentedButtonItem>
+                                <SegmentedButtonItem data-filter="unmapped" selected={filter === 'unmapped'}>
+                                    ยังไม่ได้แมป ({stats.unmapped})
+                                </SegmentedButtonItem>
+                            </SegmentedButton>
+                        </div>
 
                         {/* Pagination controls — same pattern as products/index.tsx */}
-                        <Stack direction="row" alignItems="center" spacing={1.5} useFlexGap flexWrap="wrap" sx={{ width: { xs: '100%', md: 'auto' }, justifyContent: { xs: 'space-between', md: 'flex-end' } }}>
-                            <Select
-                                value={perPage}
-                                onChange={(e) => handlePerPageChange(Number(e.target.value))}
-                                size="small"
-                                sx={{
-                                    bgcolor: FIORI.surface,
-                                    borderRadius: '8px',
-                                    minWidth: 60,
-                                    height: 34,
-                                    '& .MuiOutlinedInput-notchedOutline': { borderColor: FIORI.border },
-                                }}
-                            >
-                                <MenuItem value={10}>10</MenuItem>
-                                <MenuItem value={25}>25</MenuItem>
-                                <MenuItem value={50}>50</MenuItem>
-                                <MenuItem value={100}>100</MenuItem>
-                            </Select>
-
-                            <Typography variant="body2" sx={{ color: FIORI.textSecondary }}>
-                                {tGrid('perPage') || 'ต่อหน้า'}
-                            </Typography>
-
-                            <Paper
-                                variant="outlined"
-                                sx={{ px: 1.5, py: 0.5, bgcolor: FIORI.surface, borderRadius: '8px', borderColor: FIORI.border, display: 'flex', alignItems: 'center' }}
-                            >
-                                <Typography variant="body2" sx={{ color: FIORI.textPrimary }}>{currentPage}</Typography>
-                            </Paper>
-
-                            <Typography variant="body2" sx={{ color: FIORI.textSecondary }}>
-                                / {lastPage}
-                            </Typography>
-
-                            <Stack direction="row" spacing={0.2}>
-                                <IconButton size="small" sx={fioriIconButtonSx} disabled={currentPage <= 1} onClick={() => goToPage(1)}>
-                                    <FirstPageIcon fontSize="small" />
-                                </IconButton>
-                                <IconButton size="small" sx={fioriIconButtonSx} disabled={currentPage <= 1} onClick={() => goToPage(currentPage - 1)}>
-                                    <ChevronLeftIcon fontSize="small" />
-                                </IconButton>
-                                <IconButton size="small" sx={fioriIconButtonSx} disabled={currentPage >= lastPage} onClick={() => goToPage(currentPage + 1)}>
-                                    <ChevronRightIcon fontSize="small" />
-                                </IconButton>
-                                <IconButton size="small" sx={fioriIconButtonSx} disabled={currentPage >= lastPage} onClick={() => goToPage(lastPage)}>
-                                    <LastPageIcon fontSize="small" />
-                                </IconButton>
-                            </Stack>
-                        </Stack>
-                    </Stack>
+                        <Pager
+                            currentPage={currentPage}
+                            lastPage={lastPage}
+                            perPage={perPage}
+                            perPageLabel={tGrid('perPage') || 'ต่อหน้า'}
+                            onPerPageChange={handlePerPageChange}
+                            onGoToPage={goToPage}
+                        />
+                    </div>
 
                     {selectedRows.length > 0 && (
-                        <Stack
-                            direction="row"
-                            alignItems="center"
-                            justifyContent="space-between"
-                            sx={{ px: 2, py: 1, bgcolor: FIORI.brandBg, borderTop: `1px solid ${FIORI.border}`, borderBottom: `1px solid ${FIORI.border}` }}
-                        >
-                            <Typography variant="body2" sx={{ color: FIORI.brand, fontWeight: 600 }}>
-                                เลือกอยู่ {selectedRows.length} รายการ
-                            </Typography>
-                            <Button size="small" variant="contained" startIcon={<PublishIcon fontSize="small" />} onClick={() => setBulkPushDialogOpen(true)} sx={fioriEmphasizedSx}>
+                        <div className={styles.selectionBar}>
+                            <span>เลือกอยู่ {selectedRows.length} รายการ</span>
+                            <Button design="Emphasized" icon="upload" onClick={() => setBulkPushDialogOpen(true)}>
                                 Push ที่เลือก
                             </Button>
-                        </Stack>
+                        </div>
                     )}
 
-                    <Divider sx={{ borderColor: FIORI.border }} />
+                    <div className={styles.divider} />
 
                     {/* Data Table */}
                     <FioriResponsiveTable
@@ -2076,356 +1775,231 @@ export default function LazadaProductsMapping({ products, stats, filters, lazada
                         columns={columns}
                         rows={products.data}
                         getRowKey={(row: ProductRow) => row.id}
-                        rowSx={(row) => fioriTableRowSx(selectedRows.includes(row.id))}
+                        rowClassName={(row: ProductRow) => (selectedRows.includes(row.id) ? styles.selectedRow : undefined)}
                         emptyMessage="ไม่พบสินค้าที่ตรงตามเงื่อนไข"
                     />
 
                     {/* Footer info */}
-                    <Box
-                        sx={{
-                            display: 'flex',
-                            justifyContent: 'flex-end',
-                            alignItems: 'center',
-                            px: 2,
-                            py: 1,
-                            borderTop: `1px solid ${FIORI.border}`,
-                        }}
-                    >
-                        <Typography variant="caption" sx={{ color: FIORI.textSecondary }}>
-                            {tGrid('totalCount', { count: products.total })}
-                        </Typography>
-                    </Box>
-                </Paper>
-            </Box>
+                    <div className={styles.footer}>
+                        <Caption>{tGrid('totalCount', { count: products.total })}</Caption>
+                    </div>
+                </div>
+            </div>
 
             {/* ──────────────────────────────────────────────────────────────
                 Quick-view sidebar — เปิดจากปุ่มลูกศรในตาราง (openDetail()) คนละ
                 อย่างกับ Object Page เต็มหน้าด้านบน (activeProduct) ตัวนี้แค่
                 สรุปเร็วๆ ว่า field ไหนของ Lazada ยังขาดอยู่บ้าง + ประวัติ sync
+                (เดิมเป็น MUI Drawer ด้านขวา — UI5 ไม่มี Drawer เลยเป็น Dialog
+                เต็มจอบนมือถือ / กว้าง 640px บนจอใหญ่)
                 ────────────────────────────────────────────────────────────── */}
-            <Drawer anchor="right" open={detailProductId !== null} onClose={closeDetail} PaperProps={{ sx: { width: { xs: '100%', sm: 640 } } }}>
+            <Dialog
+                open={detailProductId !== null}
+                onClose={closeDetail}
+                stretch={isNarrow}
+                className={styles.sidePanel}
+                style={isNarrow ? undefined : { width: 640, maxWidth: 'calc(100vw - 2rem)' }}
+                accessibleName={detailData?.name ?? 'Product detail'}
+            >
                 {detailProductId !== null && (
-                    <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', bgcolor: FIORI.pageBg }}>
+                    <div className={styles.sidePanelInner} style={{ height: isNarrow ? '100%' : '85vh' }}>
                         {/* Header */}
-                        <Box sx={{ p: 2, bgcolor: FIORI.surface, borderBottom: `1px solid ${FIORI.border}` }}>
-                            <Stack direction="row" spacing={1.5} alignItems="flex-start">
-                                <Box
-                                    sx={{
-                                        width: 48,
-                                        height: 48,
-                                        borderRadius: 1,
-                                        bgcolor: FIORI.headerBg,
-                                        border: `1px solid ${FIORI.border}`,
-                                        flexShrink: 0,
-                                    }}
-                                />
-                                <Box sx={{ flex: 1, minWidth: 0 }}>
-                                    <Stack direction="row" spacing={0.5} alignItems="center">
-                                        <Typography variant="subtitle1" fontWeight={700} sx={{ color: FIORI.textPrimary, lineHeight: 1.3 }}>
+                        <div className={styles.sidePanelHeader}>
+                            <HStack gap="0.75rem" align="flex-start">
+                                <div className={styles.thumb} style={{ width: 48, height: 48, flexShrink: 0 }} />
+                                <div style={{ flex: 1, minWidth: 0 }}>
+                                    <HStack gap="0.25rem">
+                                        <Title level="H5" size="H5" wrappingType="Normal">
                                             {detailData?.name ?? '...'}
-                                        </Typography>
+                                        </Title>
                                         {canEditProducts && (
-                                            <Tooltip title="แก้ไขสินค้า">
-                                                <IconButton
-                                                    size="small"
-                                                    sx={fioriIconButtonSx}
-                                                    onClick={() => router.visit(`/catalog/products/${detailProductId}/edit?platform=lazada`)}
-                                                >
-                                                    <EditIcon fontSize="inherit" />
-                                                </IconButton>
-                                            </Tooltip>
+                                            <Button
+                                                design="Transparent"
+                                                icon="edit"
+                                                tooltip="แก้ไขสินค้า"
+                                                accessibleName="แก้ไขสินค้า"
+                                                onClick={() => router.visit(`/catalog/products/${detailProductId}/edit?platform=lazada`)}
+                                            />
                                         )}
-                                    </Stack>
-                                    <Typography variant="caption" sx={{ color: FIORI.textSecondary }}>
+                                    </HStack>
+                                    <Caption>
                                         {detailData?.sku}
                                         {detailData && detailData.variants_count > 0 ? ` · ${detailData.variants_count} variants` : ''}
-                                    </Typography>
-                                </Box>
-                                <IconButton size="small" onClick={closeDetail}>
-                                    <CloseIcon fontSize="small" />
-                                </IconButton>
-                            </Stack>
+                                    </Caption>
+                                </div>
+                                <Button design="Transparent" icon="decline" accessibleName="ปิด" onClick={closeDetail} />
+                            </HStack>
 
                             {detailData && (
-                                <Stack direction="row" spacing={3} sx={{ mt: 1.5 }}>
-                                    <Box>
-                                        <Typography variant="caption" sx={{ color: FIORI.textSecondary, display: 'block' }}>
-                                            สถานะ
-                                        </Typography>
-                                        <FioriStatus label={detailData.enabled ? 'ขายอยู่' : 'ปิดขาย'} tone={detailData.enabled ? 'success' : 'neutral'} />
-                                    </Box>
-                                    <Box sx={{ minWidth: 0 }}>
-                                        <Typography variant="caption" sx={{ color: FIORI.textSecondary, display: 'block' }}>
-                                            Lazada category
-                                        </Typography>
-                                        <Typography variant="body2" fontWeight={600} sx={{ color: FIORI.brand }}>
+                                <HStack gap="1.5rem" align="flex-start" style={{ marginTop: '0.75rem' }}>
+                                    <div>
+                                        <Caption block>สถานะ</Caption>
+                                        <FioriStatus
+                                            label={detailData.enabled ? 'ขายอยู่' : 'ปิดขาย'}
+                                            tone={detailData.enabled ? 'success' : 'neutral'}
+                                        />
+                                    </div>
+                                    <div style={{ minWidth: 0 }}>
+                                        <Caption block>Lazada category</Caption>
+                                        <Body style={{ fontWeight: 600, color: TONE_TEXT.brand }}>
                                             {detailData.lazada_category_path ?? '— ยังไม่ได้ map —'}
-                                        </Typography>
-                                    </Box>
-                                </Stack>
+                                        </Body>
+                                    </div>
+                                </HStack>
                             )}
-                        </Box>
+                        </div>
 
                         {/* Tabs */}
-                        <Tabs value={detailTab} onChange={(_, v) => setDetailTab(v)} sx={fioriTabsSx}>
-                            <Tab label="Attribute" />
-                            <Tab label="ข้อมูลสินค้า (Platform)" />
-                            <Tab label="ร้านค้า" />
-                            <Tab label="ประวัติ Sync" />
-                        </Tabs>
+                        <TabContainer collapsed onTabSelect={(e) => setDetailTab(e.detail.tabIndex)}>
+                            <Tab text="Attribute" selected={detailTab === 0} />
+                            <Tab text="ข้อมูลสินค้า (Platform)" selected={detailTab === 1} />
+                            <Tab text="ร้านค้า" selected={detailTab === 2} />
+                            <Tab text="ประวัติ Sync" selected={detailTab === 3} />
+                        </TabContainer>
 
                         {/* Body */}
-                        <Box sx={{ flex: 1, overflowY: 'auto', p: 2 }}>
+                        <div className={styles.sidePanelBody}>
                             {loadingDetail ? (
-                                <Stack alignItems="center" sx={{ py: 4 }}>
-                                    <CircularProgress size={24} />
-                                </Stack>
+                                <CenteredSpinner />
                             ) : !detailData ? (
-                                <Typography variant="body2" sx={{ color: FIORI.textSecondary }}>
-                                    โหลดข้อมูลไม่สำเร็จ
-                                </Typography>
+                                <Body style={{ color: TONE_TEXT.neutral }}>โหลดข้อมูลไม่สำเร็จ</Body>
                             ) : detailTab === 0 ? (
-                                <Stack divider={<Divider sx={{ borderColor: FIORI.border }} />} spacing={0}>
-                                    {detailData.attributes.map((attr, idx) => (
-                                        <Stack
-                                            key={idx}
-                                            direction="row"
-                                            justifyContent="space-between"
-                                            alignItems="flex-start"
-                                            spacing={2}
-                                            sx={{ py: 1 }}
-                                        >
-                                            <Box sx={{ flexShrink: 0 }}>
-                                                <Typography variant="body2" sx={{ color: FIORI.textPrimary }}>
-                                                    {attr.label}{' '}
-                                                    {attr.mandatory && (
-                                                        <Typography component="span" variant="caption" sx={{ color: FIORI.warning, fontWeight: 700 }}>
-                                                            จำเป็น
-                                                        </Typography>
-                                                    )}
-                                                </Typography>
-                                                {attr.type && (
-                                                    <Typography variant="caption" sx={{ color: FIORI.textSecondary, display: 'block' }}>
-                                                        {attr.type}
-                                                    </Typography>
-                                                )}
-                                            </Box>
-                                            <Typography
-                                                variant="body2"
-                                                sx={{
-                                                    color: attr.value ? FIORI.textPrimary : FIORI.error,
-                                                    fontWeight: attr.value ? 400 : 600,
-                                                    textAlign: 'right',
-                                                }}
-                                            >
-                                                {attr.value ?? '— ยังไม่ได้กรอก —'}
-                                            </Typography>
-                                        </Stack>
-                                    ))}
+                                <>
+                                    <ValueRows rows={detailData.attributes} showRequired />
                                     {detailData.attributes.length === 0 && (
-                                        <Typography variant="body2" sx={{ color: FIORI.textSecondary, py: 2 }}>
+                                        <Body style={{ color: TONE_TEXT.neutral, padding: '1rem 0' }}>
                                             ยังไม่ได้ map หมวดหมู่ Lazada ให้สินค้านี้ เลยยังไม่รู้ว่ามี field อะไรบ้าง
-                                        </Typography>
+                                        </Body>
                                     )}
-                                </Stack>
+                                </>
                             ) : detailTab === 1 ? (
                                 <>
-                                    <Stack divider={<Divider sx={{ borderColor: FIORI.border }} />} spacing={0}>
-                                        {detailData.platform_fields.map((field, idx) => (
-                                            <Stack
-                                                key={idx}
-                                                direction="row"
-                                                justifyContent="space-between"
-                                                alignItems="flex-start"
-                                                spacing={2}
-                                                sx={{ py: 1 }}
-                                            >
-                                                <Box sx={{ flexShrink: 0 }}>
-                                                    <Typography variant="body2" sx={{ color: FIORI.textPrimary }}>
-                                                        {field.label}
-                                                    </Typography>
-                                                    {field.type && (
-                                                        <Typography variant="caption" sx={{ color: FIORI.textSecondary, display: 'block' }}>
-                                                            {field.type}
-                                                        </Typography>
-                                                    )}
-                                                </Box>
-                                                <Typography
-                                                    variant="body2"
-                                                    sx={{
-                                                        color: field.value ? FIORI.textPrimary : FIORI.error,
-                                                        fontWeight: field.value ? 400 : 600,
-                                                        textAlign: 'right',
-                                                    }}
-                                                >
-                                                    {field.value ?? '— ยังไม่ได้กรอก —'}
-                                                </Typography>
-                                            </Stack>
-                                        ))}
-                                    </Stack>
+                                    <ValueRows rows={detailData.platform_fields} />
 
-                                    <Typography variant="caption" sx={{ color: FIORI.textSecondary, display: 'block', mt: 2, mb: 1 }}>
+                                    <Caption block style={{ marginTop: '1rem', marginBottom: '0.5rem' }}>
                                         รูปสินค้า ({detailData.platform_images.length})
-                                    </Typography>
+                                    </Caption>
                                     {detailData.platform_images.length === 0 ? (
-                                        <Typography variant="body2" sx={{ color: FIORI.error }}>
-                                            — ยังไม่มีรูปสินค้าให้ส่งไป Lazada —
-                                        </Typography>
+                                        <Body style={{ color: TONE_TEXT.error }}>— ยังไม่มีรูปสินค้าให้ส่งไป Lazada —</Body>
                                     ) : (
-                                        <Stack direction="row" flexWrap="wrap" gap={1}>
-                                            {detailData.platform_images.map((url, idx) => (
-                                                <Box
-                                                    key={idx}
-                                                    component="img"
-                                                    src={url}
-                                                    alt={`รูปสินค้า ${idx + 1}`}
-                                                    onError={(e) => {
-                                                        (e.target as HTMLImageElement).style.visibility = 'hidden';
-                                                    }}
-                                                    sx={{
-                                                        width: 72,
-                                                        height: 72,
-                                                        borderRadius: 1,
-                                                        objectFit: 'cover',
-                                                        border: `1px solid ${FIORI.border}`,
-                                                        bgcolor: FIORI.headerBg,
-                                                    }}
-                                                />
-                                            ))}
-                                        </Stack>
+                                        <ImageThumbs urls={detailData.platform_images} size={72} alt={(idx) => `รูปสินค้า ${idx + 1}`} />
                                     )}
                                 </>
                             ) : detailTab === 2 ? (
-                                <Stack spacing={1}>
+                                <VStack gap="0.5rem">
                                     {detailData.lazada_shops.map((shop) => (
-                                        <Box
+                                        <div
                                             key={shop.id}
-                                            sx={{
-                                                p: 1.5,
-                                                border: `1px solid ${FIORI.border}`,
-                                                borderRadius: 1,
-                                                bgcolor: FIORI.surface,
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                justifyContent: 'space-between',
-                                                gap: 1,
-                                            }}
+                                            className={styles.listCard}
+                                            style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}
                                         >
-                                            <Stack direction="row" alignItems="center" spacing={1} sx={{ minWidth: 0 }}>
-                                                <Checkbox
-                                                    size="small"
+                                            <HStack gap="0.5rem" style={{ minWidth: 0 }}>
+                                                <CheckBox
+                                                    accessibleName={shop.name}
                                                     checked={shop.published}
                                                     disabled={togglingShopId === shop.id}
                                                     onChange={() => toggleShopPublished(shop.id, !shop.published)}
                                                 />
-                                                <Typography variant="body2" sx={{ color: FIORI.textPrimary }} noWrap>
+                                                <Body style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                                                     {shop.name}
-                                                </Typography>
+                                                </Body>
                                                 {shop.is_live && <FioriStatus label="Live" tone="success" />}
-                                            </Stack>
-                                            <Stack direction="row" spacing={0.5} sx={{ flexShrink: 0 }}>
+                                            </HStack>
+                                            <HStack gap="0.25rem" style={{ flexShrink: 0 }}>
                                                 {shop.published && (
-                                                    <Tooltip title={`Push to ${shop.name}`}>
-                                                        <span>
-                                                            <IconButton
-                                                                size="small"
-                                                                disabled={actingShopId === shop.id}
-                                                                onClick={() => openShopActionConfirm(shop.id, shop.name, 'push')}
-                                                            >
-                                                                {actingShopId === shop.id ? (
-                                                                    <CircularProgress size={16} />
-                                                                ) : (
-                                                                    <PublishIcon fontSize="small" />
-                                                                )}
-                                                            </IconButton>
-                                                        </span>
-                                                    </Tooltip>
+                                                    <Button
+                                                        design="Transparent"
+                                                        icon="upload"
+                                                        tooltip={`Push to ${shop.name}`}
+                                                        accessibleName={`Push to ${shop.name}`}
+                                                        disabled={actingShopId === shop.id}
+                                                        loading={actingShopId === shop.id}
+                                                        loadingDelay={0}
+                                                        onClick={() => openShopActionConfirm(shop.id, shop.name, 'push')}
+                                                    />
                                                 )}
                                                 {shop.published && shop.is_live && (
-                                                    <Tooltip title={`Deactivate on ${shop.name}`}>
-                                                        <span>
-                                                            <IconButton
-                                                                size="small"
-                                                                disabled={actingShopId === shop.id}
-                                                                onClick={() => openShopActionConfirm(shop.id, shop.name, 'deactivate')}
-                                                            >
-                                                                <UnpublishedIcon fontSize="small" />
-                                                            </IconButton>
-                                                        </span>
-                                                    </Tooltip>
+                                                    <Button
+                                                        design="Transparent"
+                                                        icon="hide"
+                                                        tooltip={`Deactivate on ${shop.name}`}
+                                                        accessibleName={`Deactivate on ${shop.name}`}
+                                                        disabled={actingShopId === shop.id}
+                                                        onClick={() => openShopActionConfirm(shop.id, shop.name, 'deactivate')}
+                                                    />
                                                 )}
-                                            </Stack>
-                                        </Box>
+                                            </HStack>
+                                        </div>
                                     ))}
                                     {detailData.lazada_shops.length === 0 && (
-                                        <Typography variant="body2" sx={{ color: FIORI.textSecondary }}>
-                                            ยังไม่มีร้าน Lazada เชื่อมต่อไว้ในระบบเลย
-                                        </Typography>
+                                        <Body style={{ color: TONE_TEXT.neutral }}>ยังไม่มีร้าน Lazada เชื่อมต่อไว้ในระบบเลย</Body>
                                     )}
-                                </Stack>
+                                </VStack>
                             ) : (
-                                <Stack spacing={1.5}>
+                                <VStack gap="0.75rem">
                                     {detailData.sync_history.length === 0 && (
-                                        <Typography variant="body2" sx={{ color: FIORI.textSecondary }}>
-                                            ยังไม่เคย sync สินค้านี้ไป Lazada เลย
-                                        </Typography>
+                                        <Body style={{ color: TONE_TEXT.neutral }}>ยังไม่เคย sync สินค้านี้ไป Lazada เลย</Body>
                                     )}
                                     {detailData.sync_history.map((h, idx) => (
-                                        <Box key={idx} sx={{ p: 1.5, border: `1px solid ${FIORI.border}`, borderRadius: 1, bgcolor: FIORI.surface }}>
-                                            <Stack direction="row" justifyContent="space-between" alignItems="center" spacing={1}>
-                                                <Typography variant="body2" fontWeight={600} sx={{ color: FIORI.textPrimary }}>
+                                        <div key={idx} className={styles.listCard}>
+                                            <HStack justify="space-between" gap="0.5rem">
+                                                <Body style={{ fontWeight: 600 }}>
                                                     {SYNC_ACTION_LABEL_TH[h.action] ?? h.action}
                                                     {h.shop_name ? ` — ${h.shop_name}` : ''}
-                                                </Typography>
+                                                </Body>
                                                 <FioriStatus
                                                     label={SYNC_STATUS_LABEL_TH[h.status] ?? h.status}
                                                     tone={h.status === 'completed' ? 'success' : h.status === 'failed' ? 'error' : 'neutral'}
                                                 />
-                                            </Stack>
+                                            </HStack>
                                             {h.message && (
-                                                <Typography variant="caption" sx={{ color: FIORI.textSecondary, display: 'block', mt: 0.5 }}>
+                                                <Caption block style={{ marginTop: '0.25rem' }}>
                                                     {h.message}
-                                                </Typography>
+                                                </Caption>
                                             )}
-                                            <Typography variant="caption" sx={{ color: FIORI.textSecondary, display: 'block', mt: 0.5 }}>
+                                            <Caption block style={{ marginTop: '0.25rem' }}>
                                                 {new Date(h.created_at).toLocaleString()}
-                                            </Typography>
-                                        </Box>
+                                            </Caption>
+                                        </div>
                                     ))}
-                                </Stack>
+                                </VStack>
                             )}
 
                             {detailPushResult && (
-                                <Alert severity={detailPushResult.severity} sx={{ mt: 2 }} onClose={() => setDetailPushResult(null)}>
+                                <FioriMessageStrip
+                                    severity={detailPushResult.severity}
+                                    style={{ marginTop: '1rem' }}
+                                    onClose={() => setDetailPushResult(null)}
+                                >
                                     {detailPushResult.message}
-                                </Alert>
+                                </FioriMessageStrip>
                             )}
-                        </Box>
+                        </div>
 
                         {/* Footer — ปุ่ม push/deactivate ย้ายไปอยู่ในแท็บ "ร้านค้า" แล้ว
                         (รองรับได้หลายร้านพร้อมกัน) footer นี้เหลือแค่ทางลัดไปแก้
                         ข้อมูลเต็มรูปแบบ/ปิด sidebar เท่านั้น */}
-                        <Stack
-                            direction="row"
-                            spacing={1}
-                            justifyContent="space-between"
-                            alignItems="center"
-                            sx={{ p: 2, bgcolor: FIORI.surface, borderTop: `1px solid ${FIORI.border}` }}
-                        >
-                            {canEditProducts ? (
-                                <Button size="small" onClick={() => router.visit(`/catalog/products/${detailProductId}/edit?platform=lazada`)} sx={fioriGhostSx}>
-                                    แก้ไข
+                        <Bar
+                            design="Footer"
+                            startContent={
+                                canEditProducts ? (
+                                    <Button
+                                        design="Transparent"
+                                        onClick={() => router.visit(`/catalog/products/${detailProductId}/edit?platform=lazada`)}
+                                    >
+                                        แก้ไข
+                                    </Button>
+                                ) : undefined
+                            }
+                            endContent={
+                                <Button design="Transparent" onClick={closeDetail}>
+                                    ปิด
                                 </Button>
-                            ) : (
-                                <Box />
-                            )}
-                            <Button size="small" onClick={closeDetail} sx={fioriGhostSx}>
-                                ปิด
-                            </Button>
-                        </Stack>
-                    </Box>
+                            }
+                        />
+                    </div>
                 )}
-            </Drawer>
+            </Dialog>
 
             {/* Push = เปิดเป็นหน้า "ตรวจสอบข้อมูลก่อนส่ง" เต็มรูปแบบ (เหมือนหน้า view
             product ย่อยๆ) เพราะกดครั้งเดียวมีผลจริงกับ listing บน Lazada เลย — ใช้
@@ -2435,172 +2009,109 @@ export default function LazadaProductsMapping({ products, stats, filters, lazada
             <Dialog
                 open={shopActionConfirm !== null}
                 onClose={() => setShopActionConfirm(null)}
-                fullWidth
-                maxWidth={shopActionConfirm?.action === 'push' ? 'sm' : 'xs'}
+                style={{ width: shopActionConfirm?.action === 'push' ? 'min(600px, calc(100vw - 2rem))' : 'min(444px, calc(100vw - 2rem))' }}
+                header={
+                    <div style={{ width: '100%', padding: '0.5rem 0' }}>
+                        <Title level="H5" size="H5" wrappingType="Normal">
+                            {shopActionConfirm?.action === 'push' ? 'ตรวจสอบข้อมูลก่อนส่งไป Lazada' : 'ปิดการขายบน Lazada?'}
+                        </Title>
+                        {detailData && (
+                            <Body style={{ color: TONE_TEXT.neutral, marginTop: '0.125rem' }}>
+                                {detailData.name} · {detailData.sku} · ร้าน &quot;{shopActionConfirm?.shopName}&quot;
+                            </Body>
+                        )}
+                    </div>
+                }
+                footer={
+                    <Bar
+                        design="Footer"
+                        endContent={
+                            <>
+                                <Button design="Transparent" onClick={() => setShopActionConfirm(null)}>
+                                    ยกเลิก
+                                </Button>
+                                <Button design="Emphasized" onClick={confirmShopAction}>
+                                    {shopActionConfirm?.action === 'push' ? 'ยืนยันส่ง' : 'ปิดการขาย'}
+                                </Button>
+                            </>
+                        }
+                    />
+                }
             >
-                <DialogTitle>
-                    {shopActionConfirm?.action === 'push' ? 'ตรวจสอบข้อมูลก่อนส่งไป Lazada' : 'ปิดการขายบน Lazada?'}
-                    {detailData && (
-                        <Typography variant="body2" sx={{ color: FIORI.textSecondary, fontWeight: 400, mt: 0.25 }}>
-                            {detailData.name} · {detailData.sku} · ร้าน &quot;{shopActionConfirm?.shopName}&quot;
-                        </Typography>
-                    )}
-                </DialogTitle>
-                <DialogContent dividers>
-                    {shopActionConfirm?.action === 'deactivate' && (
-                        <DialogContentText>
-                            การดำเนินการนี้จะปิดการขาย (ไม่ลบ) ประกาศขายบน Lazada สำหรับร้าน &quot;{shopActionConfirm?.shopName}&quot;
-                        </DialogContentText>
-                    )}
+                {shopActionConfirm?.action === 'deactivate' && (
+                    <Body style={{ color: TONE_TEXT.neutral }}>
+                        การดำเนินการนี้จะปิดการขาย (ไม่ลบ) ประกาศขายบน Lazada สำหรับร้าน &quot;{shopActionConfirm?.shopName}&quot;
+                    </Body>
+                )}
 
-                    {shopStatusCheck && shopActionConfirm && shopStatusCheck.shopId === shopActionConfirm.shopId && (
-                        <Box sx={{ mb: shopActionConfirm.action === 'push' ? 2 : 0 }}>
-                            {shopStatusCheck.loading ? (
-                                <Stack direction="row" spacing={1} alignItems="center">
-                                    <CircularProgress size={14} />
-                                    <Typography variant="body2" sx={{ color: FIORI.textSecondary }}>
-                                        กำลังตรวจสอบสถานะบน Lazada...
-                                    </Typography>
-                                </Stack>
-                            ) : shopStatusCheck.error ? (
-                                <Alert severity="warning">ตรวจสอบสถานะไม่สำเร็จ: {shopStatusCheck.error}</Alert>
-                            ) : shopStatusCheck.never_pushed ? (
-                                <Alert severity="info">ยังไม่เคยส่งมาก่อน — การดำเนินการนี้จะสร้างประกาศขายใหม่</Alert>
-                            ) : shopStatusCheck.is_live ? (
-                                <Alert severity="success">กำลังขายอยู่บน Lazada แล้ว — การดำเนินการนี้จะอัปเดตของเดิม</Alert>
-                            ) : (
-                                <Alert severity="info">มีประกาศขายอยู่แล้วแต่ไม่ active (สถานะ: {shopStatusCheck.status ?? 'ไม่ทราบ'})</Alert>
-                            )}
-                        </Box>
-                    )}
+                {shopStatusCheck && shopActionConfirm && shopStatusCheck.shopId === shopActionConfirm.shopId && (
+                    <div
+                        style={{
+                            marginBottom: shopActionConfirm.action === 'push' ? '1rem' : 0,
+                            marginTop: shopActionConfirm.action === 'deactivate' ? '1rem' : 0,
+                        }}
+                    >
+                        {shopStatusCheck.loading ? (
+                            <HStack gap="0.5rem">
+                                <Spinner />
+                                <Body style={{ color: TONE_TEXT.neutral }}>กำลังตรวจสอบสถานะบน Lazada...</Body>
+                            </HStack>
+                        ) : shopStatusCheck.error ? (
+                            <FioriMessageStrip severity="warning">ตรวจสอบสถานะไม่สำเร็จ: {shopStatusCheck.error}</FioriMessageStrip>
+                        ) : shopStatusCheck.never_pushed ? (
+                            <FioriMessageStrip severity="information">ยังไม่เคยส่งมาก่อน — การดำเนินการนี้จะสร้างประกาศขายใหม่</FioriMessageStrip>
+                        ) : shopStatusCheck.is_live ? (
+                            <FioriMessageStrip severity="success">กำลังขายอยู่บน Lazada แล้ว — การดำเนินการนี้จะอัปเดตของเดิม</FioriMessageStrip>
+                        ) : (
+                            <FioriMessageStrip severity="information">
+                                มีประกาศขายอยู่แล้วแต่ไม่ active (สถานะ: {shopStatusCheck.status ?? 'ไม่ทราบ'})
+                            </FioriMessageStrip>
+                        )}
+                    </div>
+                )}
 
-                    {shopActionConfirm?.action === 'push' &&
-                        detailData &&
-                        (() => {
-                            const missing = detailData.attributes.filter((a) => a.mandatory && !a.value);
+                {shopActionConfirm?.action === 'push' &&
+                    detailData &&
+                    (() => {
+                        const missing = detailData.attributes.filter((a) => a.mandatory && !a.value);
 
-                            return (
-                                <>
-                                    {missing.length > 0 ? (
-                                        <Alert severity="error" sx={{ mb: 2 }}>
-                                            <Typography variant="body2" fontWeight={600}>
-                                                ยังกรอกข้อมูลที่ Lazada บังคับไม่ครบ {missing.length} รายการ: {missing.map((a) => a.label).join(', ')}
-                                            </Typography>
-                                            <Typography variant="caption" sx={{ display: 'block', mt: 0.5 }}>
-                                                ยังกด &quot;ยืนยันส่ง&quot; ต่อได้ แต่ Lazada อาจปฏิเสธถ้าข้อมูลไม่ครบจริง
-                                            </Typography>
-                                        </Alert>
-                                    ) : (
-                                        <Alert severity="success" sx={{ mb: 2 }}>ข้อมูลที่ Lazada บังคับครบถ้วนแล้ว</Alert>
-                                    )}
+                        return (
+                            <>
+                                {missing.length > 0 ? (
+                                    <FioriMessageStrip severity="error" style={{ marginBottom: '1rem' }}>
+                                        <div style={{ fontWeight: 600 }}>
+                                            ยังกรอกข้อมูลที่ Lazada บังคับไม่ครบ {missing.length} รายการ: {missing.map((a) => a.label).join(', ')}
+                                        </div>
+                                        <div style={{ fontSize: 'var(--sapFontSmallSize)', marginTop: '0.25rem' }}>
+                                            ยังกด &quot;ยืนยันส่ง&quot; ต่อได้ แต่ Lazada อาจปฏิเสธถ้าข้อมูลไม่ครบจริง
+                                        </div>
+                                    </FioriMessageStrip>
+                                ) : (
+                                    <FioriMessageStrip severity="success" style={{ marginBottom: '1rem' }}>
+                                        ข้อมูลที่ Lazada บังคับครบถ้วนแล้ว
+                                    </FioriMessageStrip>
+                                )}
 
-                                    <Typography variant="subtitle2" fontWeight={700} sx={{ color: FIORI.textPrimary, mb: 1 }}>
-                                        ข้อมูลสินค้า (Platform)
-                                    </Typography>
-                                    <Stack divider={<Divider sx={{ borderColor: FIORI.border }} />} spacing={0} sx={{ mb: 2 }}>
-                                        {detailData.platform_fields.map((field, idx) => (
-                                            <Stack key={idx} direction="row" justifyContent="space-between" alignItems="flex-start" spacing={2} sx={{ py: 0.75 }}>
-                                                <Box sx={{ flexShrink: 0 }}>
-                                                    <Typography variant="body2" sx={{ color: FIORI.textPrimary }}>
-                                                        {field.label}
-                                                    </Typography>
-                                                    {field.type && (
-                                                        <Typography variant="caption" sx={{ color: FIORI.textSecondary, display: 'block' }}>
-                                                            {field.type}
-                                                        </Typography>
-                                                    )}
-                                                </Box>
-                                                <Typography
-                                                    variant="body2"
-                                                    sx={{
-                                                        color: field.value ? FIORI.textPrimary : FIORI.error,
-                                                        fontWeight: field.value ? 400 : 600,
-                                                        textAlign: 'right',
-                                                    }}
-                                                >
-                                                    {field.value ?? '— ยังไม่ได้กรอก —'}
-                                                </Typography>
-                                            </Stack>
-                                        ))}
-                                    </Stack>
+                                <SectionHeading title="ข้อมูลสินค้า (Platform)" />
+                                <ValueRows rows={detailData.platform_fields} rowPadding="0.375rem 0" style={{ margin: '0.5rem 0 1rem' }} />
 
-                                    <Typography variant="subtitle2" fontWeight={700} sx={{ color: FIORI.textPrimary, mb: 1 }}>
-                                        รูปสินค้า ({detailData.platform_images.length})
-                                    </Typography>
-                                    {detailData.platform_images.length === 0 ? (
-                                        <Typography variant="body2" sx={{ color: FIORI.error, mb: 2 }}>
-                                            — ยังไม่มีรูปสินค้าให้ส่งไป Lazada —
-                                        </Typography>
-                                    ) : (
-                                        <Stack direction="row" flexWrap="wrap" gap={1} sx={{ mb: 2 }}>
-                                            {detailData.platform_images.map((url, idx) => (
-                                                <Box
-                                                    key={idx}
-                                                    component="img"
-                                                    src={url}
-                                                    alt={`รูปสินค้า ${idx + 1}`}
-                                                    onError={(e) => {
-                                                        (e.target as HTMLImageElement).style.visibility = 'hidden';
-                                                    }}
-                                                    sx={{
-                                                        width: 64,
-                                                        height: 64,
-                                                        borderRadius: 1,
-                                                        objectFit: 'cover',
-                                                        border: `1px solid ${FIORI.border}`,
-                                                        bgcolor: FIORI.headerBg,
-                                                    }}
-                                                />
-                                            ))}
-                                        </Stack>
-                                    )}
+                                <SectionHeading title={`รูปสินค้า (${detailData.platform_images.length})`} />
+                                {detailData.platform_images.length === 0 ? (
+                                    <Body style={{ color: TONE_TEXT.error, margin: '0.5rem 0 1rem' }}>— ยังไม่มีรูปสินค้าให้ส่งไป Lazada —</Body>
+                                ) : (
+                                    <ImageThumbs
+                                        urls={detailData.platform_images}
+                                        size={64}
+                                        alt={(idx) => `รูปสินค้า ${idx + 1}`}
+                                        style={{ margin: '0.5rem 0 1rem' }}
+                                    />
+                                )}
 
-                                    <Typography variant="subtitle2" fontWeight={700} sx={{ color: FIORI.textPrimary, mb: 1 }}>
-                                        Attribute
-                                    </Typography>
-                                    <Stack divider={<Divider sx={{ borderColor: FIORI.border }} />} spacing={0}>
-                                        {detailData.attributes.map((attr, idx) => (
-                                            <Stack key={idx} direction="row" justifyContent="space-between" alignItems="flex-start" spacing={2} sx={{ py: 0.75 }}>
-                                                <Box sx={{ flexShrink: 0 }}>
-                                                    <Typography variant="body2" sx={{ color: FIORI.textPrimary }}>
-                                                        {attr.label}{' '}
-                                                        {attr.mandatory && (
-                                                            <Typography component="span" variant="caption" sx={{ color: FIORI.warning, fontWeight: 700 }}>
-                                                                จำเป็น
-                                                            </Typography>
-                                                        )}
-                                                    </Typography>
-                                                    {attr.type && (
-                                                        <Typography variant="caption" sx={{ color: FIORI.textSecondary, display: 'block' }}>
-                                                            {attr.type}
-                                                        </Typography>
-                                                    )}
-                                                </Box>
-                                                <Typography
-                                                    variant="body2"
-                                                    sx={{
-                                                        color: attr.value ? FIORI.textPrimary : FIORI.error,
-                                                        fontWeight: attr.value ? 400 : 600,
-                                                        textAlign: 'right',
-                                                    }}
-                                                >
-                                                    {attr.value ?? '— ยังไม่ได้กรอก —'}
-                                                </Typography>
-                                            </Stack>
-                                        ))}
-                                    </Stack>
-                                </>
-                            );
-                        })()}
-                </DialogContent>
-                <DialogActions>
-                    <Button onClick={() => setShopActionConfirm(null)} sx={fioriGhostSx}>
-                        ยกเลิก
-                    </Button>
-                    <Button onClick={confirmShopAction} variant="contained" sx={fioriEmphasizedSx}>
-                        {shopActionConfirm?.action === 'push' ? 'ยืนยันส่ง' : 'ปิดการขาย'}
-                    </Button>
-                </DialogActions>
+                                <SectionHeading title="Attribute" />
+                                <ValueRows rows={detailData.attributes} showRequired rowPadding="0.375rem 0" style={{ marginTop: '0.5rem' }} />
+                            </>
+                        );
+                    })()}
             </Dialog>
 
             <FioriMessageBox
@@ -2614,22 +2125,22 @@ export default function LazadaProductsMapping({ products, stats, filters, lazada
                 confirmLoading={bulkPushing}
                 confirmDisabled={!bulkPushShopId}
             >
-                เลือกร้าน Lazada ที่จะ push สินค้าทั้ง {selectedRows.length} รายการไปด้วยกัน — สินค้าที่ยังไม่ได้ publish ไว้กับร้านนี้จะถูก publish ให้อัตโนมัติก่อน push
+                เลือกร้าน Lazada ที่จะ push สินค้าทั้ง {selectedRows.length} รายการไปด้วยกัน — สินค้าที่ยังไม่ได้ publish ไว้กับร้านนี้จะถูก publish
+                ให้อัตโนมัติก่อน push
                 <Select
-                    fullWidth
-                    size="small"
-                    displayEmpty
-                    value={bulkPushShopId}
-                    onChange={(e) => setBulkPushShopId(e.target.value === '' ? '' : Number(e.target.value))}
-                    sx={{ mt: 2 }}
+                    value={bulkPushShopId === '' ? '' : String(bulkPushShopId)}
+                    onChange={(e) => {
+                        const v = e.detail.selectedOption.value ?? '';
+                        setBulkPushShopId(v === '' ? '' : Number(v));
+                    }}
+                    style={{ width: '100%', marginTop: '1rem' }}
+                    accessibleName="เลือกร้าน..."
                 >
-                    <MenuItem value="" disabled>
-                        เลือกร้าน...
-                    </MenuItem>
+                    <Option value="">เลือกร้าน...</Option>
                     {lazadaShops.map((shop) => (
-                        <MenuItem key={shop.id} value={shop.id}>
+                        <Option key={shop.id} value={String(shop.id)}>
                             {shop.name}
-                        </MenuItem>
+                        </Option>
                     ))}
                 </Select>
             </FioriMessageBox>

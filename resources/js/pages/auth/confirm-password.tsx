@@ -1,9 +1,12 @@
 import { Head, useForm } from '@inertiajs/react';
-import { Box, Button, CircularProgress, Stack, TextField } from '@mui/material';
+import { Button, FlexBox, Label } from '@ui5/webcomponents-react';
 import { FormEventHandler } from 'react';
 
+import InputError from '@/components/input-error';
 import AuthLayout from '@/layouts/auth-layout';
-import { fioriEmphasizedSx } from '@/lib/fiori-style';
+import field from './credential-field.module.css';
+
+const cx = (...names: Array<string | false | undefined>) => names.filter(Boolean).join(' ');
 
 export default function ConfirmPassword() {
     const { data, setData, post, processing, errors, reset } = useForm({
@@ -25,37 +28,32 @@ export default function ConfirmPassword() {
         >
             <Head title="Confirm password" />
 
-            <Box component="form" onSubmit={submit}>
-                <Stack spacing={3}>
-                    <TextField
-                        id="password"
-                        name="password"
-                        label="Password"
-                        type="password"
-                        placeholder="Password"
-                        autoComplete="current-password"
-                        value={data.password}
-                        autoFocus
-                        fullWidth
-                        onChange={(e) => setData('password', e.target.value)}
-                        error={Boolean(errors.password)}
-                        helperText={errors.password}
-                    />
+            <form onSubmit={submit}>
+                <FlexBox direction="Column" style={{ gap: '1.5rem' }}>
+                    <FlexBox direction="Column" style={{ gap: '0.25rem' }}>
+                        <Label for="password" showColon={false}>
+                            Password
+                        </Label>
+                        <input
+                            id="password"
+                            name="password"
+                            autoComplete="current-password"
+                            type="password"
+                            placeholder="Password"
+                            value={data.password}
+                            autoFocus
+                            aria-invalid={Boolean(errors.password)}
+                            className={cx(field.input, errors.password && field.invalid)}
+                            onChange={(e) => setData('password', e.target.value)}
+                        />
+                        <InputError message={errors.password} />
+                    </FlexBox>
 
-                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                        <Button
-                            type="submit"
-                            variant="contained"
-                            fullWidth
-                            disabled={processing}
-                            startIcon={processing ? <CircularProgress size={16} color="inherit" /> : undefined}
-                            sx={{ ...fioriEmphasizedSx, py: 1.25 }}
-                        >
-                            Confirm password
-                        </Button>
-                    </Box>
-                </Stack>
-            </Box>
+                    <Button type="Submit" design="Emphasized" disabled={processing} loading={processing} loadingDelay={0} style={{ width: '100%' }}>
+                        Confirm password
+                    </Button>
+                </FlexBox>
+            </form>
         </AuthLayout>
     );
 }

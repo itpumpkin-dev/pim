@@ -1,5 +1,7 @@
-import { Autocomplete, TextField, type SxProps, type Theme } from '@mui/material';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type CSSProperties } from 'react';
+
+import { AsyncSearchComboBox } from '@/components/catalog/async-search-combo-box';
+import type { Ui5ValueState } from '@/components/fiori-form';
 
 export interface WooCommerceCategoryOption {
     id: number;
@@ -16,12 +18,18 @@ export function WooCommerceCategoryPicker({
     value,
     onChange,
     placeholder,
-    sx,
+    valueState,
+    style,
+    className,
 }: {
     value: WooCommerceCategoryOption | null;
     onChange: (next: WooCommerceCategoryOption | null) => void;
     placeholder?: string;
-    sx?: SxProps<Theme>;
+    valueState?: Ui5ValueState;
+    style?: CSSProperties;
+    className?: string;
+    /** @deprecated legacy MUI prop — ignored; kept only so unconverted callers still compile */
+    sx?: unknown;
 }) {
     const [query, setQuery] = useState('');
     const [results, setResults] = useState<WooCommerceCategoryOption[]>([]);
@@ -43,18 +51,18 @@ export function WooCommerceCategoryPicker({
     }, [query]);
 
     return (
-        <Autocomplete
-            size="small"
-            options={results}
-            loading={loading}
-            filterOptions={(options) => options}
-            getOptionLabel={(opt) => opt.name}
-            isOptionEqualToValue={(opt, val) => opt.id === val.id}
+        <AsyncSearchComboBox
             value={value}
-            onChange={(_, val) => onChange(val)}
-            inputValue={query}
-            onInputChange={(_, val) => setQuery(val)}
-            renderInput={(params) => <TextField {...params} placeholder={placeholder} sx={sx} />}
+            onChange={onChange}
+            results={results}
+            loading={loading}
+            getKey={(opt) => opt.id}
+            getLabel={(opt) => opt.name}
+            onQueryChange={setQuery}
+            placeholder={placeholder}
+            valueState={valueState}
+            style={style}
+            className={className}
         />
     );
 }

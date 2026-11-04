@@ -1,0 +1,103 @@
+/* SAP Fiori Form layout for FioriFormGroup / FioriField (see fiori-form.tsx). */
+
+.group {
+    background: var(--sapGroup_ContentBackground);
+    border: 1px solid var(--sapGroup_ContentBorderColor);
+    border-radius: var(--sapElement_BorderCornerRadius, 0.5rem);
+    overflow: hidden;
+}
+
+.groupHeader {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.875rem 1.5rem;
+    border-bottom: 1px solid var(--sapGroup_ContentBorderColor);
+}
+
+.groupHeaderText {
+    min-width: 0;
+}
+
+.groupDescription {
+    display: block;
+    margin-top: 0.125rem;
+    color: var(--sapContent_LabelColor);
+    font-size: var(--sapFontSize);
+}
+
+.groupActions {
+    flex-shrink: 0;
+}
+
+.groupBody {
+    display: flex;
+    flex-direction: column;
+    row-gap: 0.875rem;
+    padding: 1.5rem;
+}
+
+/* Field: label stacked above the control on narrow screens (Fiori "S" size),
+   label in its own right-aligned column on wide screens (≥ 900px). */
+.field {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    column-gap: 1.5rem;
+    row-gap: 0.25rem;
+    align-items: start;
+}
+
+.label {
+    color: var(--sapContent_LabelColor);
+    line-height: 1.4;
+}
+
+.control {
+    min-width: 0;
+    max-width: var(--fiori-field-max-width, 400px);
+}
+
+.controlFull {
+    max-width: 100%;
+}
+
+/* UI5 inputs default to a fixed width — let them fill the control column. */
+.control > :is(ui5-input, ui5-textarea, ui5-select, ui5-combobox, ui5-multi-combobox, ui5-multi-input, ui5-date-picker, ui5-step-input) {
+    width: 100%;
+}
+
+.message {
+    display: block;
+    margin-top: 0.25rem;
+    font-size: var(--sapFontSmallSize);
+    color: var(--sapContent_LabelColor);
+}
+
+.messageError {
+    color: var(--sapNegativeTextColor);
+}
+
+.messageWarning {
+    color: var(--sapCriticalTextColor);
+}
+
+.messageSuccess {
+    color: var(--sapPositiveTextColor);
+}
+
+.messageInformation {
+    color: var(--sapInformativeTextColor);
+}
+
+@media (min-width: 900px) {
+    .field {
+        grid-template-columns: var(--fiori-label-width, 200px) minmax(0, 1fr);
+    }
+
+    .label {
+        padding-top: 0.4375rem;
+        text-align: right;
+        justify-self: end;
+    }
+}

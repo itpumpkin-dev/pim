@@ -1,9 +1,9 @@
 import AppLayout from '@/layouts/app-layout';
-import { Head, Link } from '@inertiajs/react';
-import ArrowBackIcon from '@mui/icons-material/ArrowBack';
-import DashboardIcon from '@mui/icons-material/Dashboard';
-import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
-import { Box, Button, Card, CardContent, Stack, Typography } from '@mui/material';
+import { Head, router } from '@inertiajs/react';
+import '@ui5/webcomponents-icons/dist/home.js';
+import '@ui5/webcomponents-icons/dist/locked.js';
+import '@ui5/webcomponents-icons/dist/nav-back.js';
+import { Button, FlexBox, Icon, Text, Title } from '@ui5/webcomponents-react';
 import { useTranslation } from 'react-i18next';
 
 /**
@@ -17,48 +17,69 @@ export default function Forbidden({ message }: { message: string }) {
     return (
         <AppLayout breadcrumbs={[{ title: t('forbiddenTitle'), href: '' }]}>
             <Head title={t('forbiddenTitle')} />
-            <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh', p: 2 }}>
-                <Card variant="outlined" sx={{ maxWidth: 480, width: '100%', textAlign: 'center' }}>
-                    <CardContent sx={{ p: 4 }}>
-                        <Box
-                            sx={{
-                                mx: 'auto',
-                                mb: 2,
-                                width: 64,
-                                height: 64,
-                                borderRadius: '50%',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                bgcolor: 'error.light',
-                                color: 'error.contrastText',
-                            }}
-                        >
-                            <LockOutlinedIcon fontSize="large" />
-                        </Box>
-                        <Typography variant="overline" color="text.secondary">
-                            403
-                        </Typography>
-                        <Typography variant="h5" fontWeight={600} gutterBottom>
-                            {t('forbiddenTitle')}
-                        </Typography>
-                        <Typography color="text.secondary" sx={{ mb: 1 }}>
-                            {message}
-                        </Typography>
-                        <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-                            {t('forbiddenHint')}
-                        </Typography>
-                        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} justifyContent="center">
-                            <Button variant="outlined" startIcon={<ArrowBackIcon />} onClick={() => window.history.back()}>
-                                {t('forbiddenGoBack')}
-                            </Button>
-                            <Button variant="contained" startIcon={<DashboardIcon />} component={Link} href="/dashboard">
-                                {t('forbiddenGoDashboard')}
-                            </Button>
-                        </Stack>
-                    </CardContent>
-                </Card>
-            </Box>
+            <FlexBox justifyContent="Center" alignItems="Center" style={{ minHeight: '60vh', padding: '1rem' }}>
+                <div
+                    style={{
+                        maxWidth: 480,
+                        width: '100%',
+                        textAlign: 'center',
+                        padding: '2rem',
+                        boxSizing: 'border-box',
+                        background: 'var(--sapGroup_ContentBackground)',
+                        border: '1px solid var(--sapGroup_ContentBorderColor)',
+                        borderRadius: 'var(--sapElement_BorderCornerRadius)',
+                    }}
+                >
+                    <div
+                        style={{
+                            margin: '0 auto 1rem',
+                            width: 64,
+                            height: 64,
+                            borderRadius: '50%',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            background: 'var(--sapErrorBackground)',
+                            color: 'var(--sapNegativeColor)',
+                        }}
+                    >
+                        <Icon name="locked" style={{ width: '2rem', height: '2rem', color: 'inherit' }} />
+                    </div>
+                    <Text
+                        style={{
+                            display: 'block',
+                            fontSize: 'var(--sapFontSmallSize)',
+                            letterSpacing: '0.08em',
+                            textTransform: 'uppercase',
+                            color: 'var(--sapContent_LabelColor)',
+                        }}
+                    >
+                        403
+                    </Text>
+                    <Title level="H2" size="H4" wrappingType="Normal" style={{ marginBottom: '0.5rem' }}>
+                        {t('forbiddenTitle')}
+                    </Title>
+                    <Text style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--sapContent_LabelColor)' }}>{message}</Text>
+                    <Text
+                        style={{
+                            display: 'block',
+                            marginBottom: '1.5rem',
+                            fontSize: 'var(--sapFontSmallSize)',
+                            color: 'var(--sapContent_LabelColor)',
+                        }}
+                    >
+                        {t('forbiddenHint')}
+                    </Text>
+                    <FlexBox justifyContent="Center" wrap="Wrap" style={{ gap: '0.75rem' }}>
+                        <Button icon="nav-back" onClick={() => window.history.back()}>
+                            {t('forbiddenGoBack')}
+                        </Button>
+                        <Button design="Emphasized" icon="home" onClick={() => router.visit('/dashboard')}>
+                            {t('forbiddenGoDashboard')}
+                        </Button>
+                    </FlexBox>
+                </div>
+            </FlexBox>
         </AppLayout>
     );
 }

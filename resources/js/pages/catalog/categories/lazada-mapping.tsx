@@ -1,39 +1,34 @@
 import { CategoryPicker, type CategoryOption } from '@/components/catalog/category-picker';
+import {
+    LeafStatusTag,
+    MandatoryTag,
+    MappingChip,
+    MappingEmptyPrompt,
+    MappingFilterToggle,
+    MappingLoading,
+    MappingPage,
+    MappingPageHeader,
+    MappingPager,
+    MappingPickerCell,
+    MappingSearchInput,
+    MappingSectionHeader,
+    MappingStatTiles,
+    MappingSyncButton,
+    MappingToolbar,
+    MappingToolbarGroup,
+    cx,
+    mappingStyles,
+} from '@/components/catalog/marketplace-mapping-ui';
 import { PimAttributePicker, type PimAttributeOption } from '@/components/catalog/pim-attribute-picker';
 import { PimBrandPicker, type PimBrandOption } from '@/components/catalog/pim-brand-picker';
 import { FioriResponsiveTable, type FioriResponsiveColumn } from '@/components/fiori-responsive-table';
 import AppLayout from '@/layouts/app-layout';
 import { xsrfToken } from '@/lib/csrf';
-import { FIORI, fioriSearchFieldSx, fioriToggleButtonGroupSx } from '@/lib/fiori-style';
-import { mappedChipSx, pendingChipSx, pendingRowSx, solidActionSx } from '@/lib/ui-style';
 import { type BreadcrumbItem, type SharedData } from '@/types';
 import { Head, router, usePage } from '@inertiajs/react';
-import ArrowBackIcon from '@mui/icons-material/ArrowBack';
-import CancelIcon from '@mui/icons-material/Cancel';
-import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
-import ChevronRightIcon from '@mui/icons-material/ChevronRight';
-import CloseIcon from '@mui/icons-material/Close';
-import FirstPageIcon from '@mui/icons-material/FirstPage';
-import LastPageIcon from '@mui/icons-material/LastPage';
-import SearchIcon from '@mui/icons-material/Search';
-import SyncIcon from '@mui/icons-material/Sync';
-import {
-    Box,
-    Button,
-    Chip,
-    CircularProgress,
-    Divider,
-    IconButton,
-    InputAdornment,
-    MenuItem,
-    Paper,
-    Select,
-    Stack,
-    TextField,
-    ToggleButton,
-    ToggleButtonGroup,
-    Typography,
-} from '@mui/material';
+import '@ui5/webcomponents-icons/dist/add.js';
+import '@ui5/webcomponents-icons/dist/sys-cancel.js';
+import { Button } from '@ui5/webcomponents-react';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -101,7 +96,6 @@ interface PendingAssignment {
 export default function LazadaCategoryMapping({ categories, stats, lastSyncedAt, filters }: Props) {
     const { t } = useTranslation('catalog');
     const { t: tNav } = useTranslation('nav');
-    const { t: tGrid } = useTranslation('grid');
 
     const { auth } = usePage<SharedData>().props;
     const permissions = auth.permissions || [];
@@ -473,45 +467,27 @@ export default function LazadaCategoryMapping({ categories, stats, lastSyncedAt,
             priority: 'high',
             align: 'right',
             width: 100,
-            render: (row) => (
-                <Typography variant="body2" sx={{ fontFamily: 'monospace', color: FIORI.textSecondary }}>
-                    {row.id}
-                </Typography>
-            ),
+            render: (row) => <span className={mappingStyles.mono}>{row.id}</span>,
         },
         {
             key: 'name',
             header: t('nameColumn'),
             priority: 'always',
             minWidth: 220,
-            render: (row) => <Typography fontWeight={600}>{row.name}</Typography>,
+            render: (row) => <span className={mappingStyles.primary}>{row.name}</span>,
         },
         {
             key: 'path',
             header: t('pathColumn'),
             priority: 'medium',
             minWidth: 260,
-            render: (row) => (
-                <Typography variant="caption" color="text.disabled" sx={{ fontStyle: 'italic' }}>
-                    {row.path}
-                </Typography>
-            ),
+            render: (row) => <span className={mappingStyles.muted}>{row.path}</span>,
         },
         {
             key: 'status',
             header: t('status'),
             priority: 'medium',
-            render: (row) => (
-                <Chip
-                    label={row.leaf ? t('leafLabel') : t('parentLabel')}
-                    size="small"
-                    sx={{
-                        bgcolor: row.leaf ? FIORI.successBg : FIORI.neutralBg,
-                        color: row.leaf ? FIORI.success : FIORI.textSecondary,
-                        fontWeight: 600,
-                    }}
-                />
-            ),
+            render: (row) => <LeafStatusTag leaf={row.leaf} label={row.leaf ? t('leafLabel') : t('parentLabel')} />,
         },
         {
             key: 'mapping',
@@ -520,11 +496,7 @@ export default function LazadaCategoryMapping({ categories, stats, lastSyncedAt,
             minWidth: 320,
             render: (row) => {
                 if (!row.leaf) {
-                    return (
-                        <Typography variant="body2" color="text.disabled" sx={{ fontStyle: 'italic' }}>
-                            {t('notMappableParent')}
-                        </Typography>
-                    );
+                    return <span className={mappingStyles.mutedBody}>{t('notMappableParent')}</span>;
                 }
 
                 const existingIds = new Set(row.mapped_categories.map((c) => c.id));
@@ -536,29 +508,12 @@ export default function LazadaCategoryMapping({ categories, stats, lastSyncedAt,
                     const staged = pending[pc.id];
                     if (staged === undefined) {
                         return (
-                            <Chip
-                                key={pc.id}
-                                label={pc.name}
-                                size="small"
-                                onDelete={() => stageClear(pc.id)}
-                                deleteIcon={<CloseIcon fontSize="small" />}
-                                sx={mappedChipSx}
-                            />
+                            <MappingChip key={pc.id} label={pc.name} variant="mapped" onDelete={() => stageClear(pc.id)} deleteLabel={t('delete')} />
                         );
                     }
 
                     const label = staged && staged.lazadaId === row.id ? `${t('willMapTo')}: ${pc.name}` : `${t('willClearMapping')}: ${pc.name}`;
-                    return (
-                        <Chip
-                            key={pc.id}
-                            label={label}
-                            size="small"
-                            variant="outlined"
-                            onDelete={() => undoPending(pc.id)}
-                            deleteIcon={<CloseIcon fontSize="small" />}
-                            sx={pendingChipSx}
-                        />
-                    );
+                    return <MappingChip key={pc.id} label={label} variant="pending" onDelete={() => undoPending(pc.id)} deleteLabel={t('cancel')} />;
                 });
 
                 // PIM category ที่ยังไม่อยู่ในลิสต์นี้ แต่ถูกเตรียมไว้ (จากแถวของมันเองที่
@@ -569,42 +524,40 @@ export default function LazadaCategoryMapping({ categories, stats, lastSyncedAt,
                         return assignment !== null && assignment.lazadaId === row.id && !existingIds.has(Number(pimId));
                     })
                     .map(([pimId, assignment]) => (
-                        <Chip
+                        <MappingChip
                             key={pimId}
                             label={`${t('willMapTo')}: ${assignment.pimName}`}
-                            size="small"
-                            variant="outlined"
+                            variant="pending"
                             onDelete={() => undoPending(Number(pimId))}
-                            deleteIcon={<CloseIcon fontSize="small" />}
-                            sx={pendingChipSx}
+                            deleteLabel={t('cancel')}
                         />
                     ));
 
                 const hasChips = existingChips.length > 0 || newlyAssigned.length > 0;
 
                 return (
-                    <Box>
+                    <div>
                         {hasChips && (
-                            <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap sx={{ mb: 1 }}>
+                            <div className={mappingStyles.chipRow}>
                                 {existingChips}
                                 {newlyAssigned}
-                            </Stack>
+                            </div>
                         )}
 
                         {assigningFor === row.id ? (
-                            <Box sx={{ maxWidth: 360 }}>
+                            <div style={{ maxWidth: 360 }}>
                                 <CategoryPicker
                                     value={null}
                                     onChange={(val) => val && stageAssign(row, val)}
                                     placeholder={t('searchPimCategoryPlaceholder')}
                                 />
-                            </Box>
+                            </div>
                         ) : (
-                            <Button size="small" onClick={() => setAssigningFor(row.id)} sx={{ textTransform: 'none', px: 0 }}>
+                            <Button design="Transparent" icon="add" onClick={() => setAssigningFor(row.id)}>
                                 {t('assignPimCategory')}
                             </Button>
                         )}
-                    </Box>
+                    </div>
                 );
             },
         },
@@ -617,18 +570,14 @@ export default function LazadaCategoryMapping({ categories, stats, lastSyncedAt,
             priority: 'high',
             align: 'right',
             width: 120,
-            render: (brand) => (
-                <Typography variant="body2" sx={{ fontFamily: 'monospace', color: FIORI.textSecondary }}>
-                    {brand.id}
-                </Typography>
-            ),
+            render: (brand) => <span className={mappingStyles.mono}>{brand.id}</span>,
         },
         {
             key: 'name',
             header: t('nameColumn'),
             priority: 'always',
             minWidth: 200,
-            render: (brand) => <Typography fontWeight={600}>{brand.name}</Typography>,
+            render: (brand) => <span className={mappingStyles.primary}>{brand.name}</span>,
         },
         {
             key: 'mapping',
@@ -636,23 +585,20 @@ export default function LazadaCategoryMapping({ categories, stats, lastSyncedAt,
             priority: 'high',
             minWidth: 260,
             render: (brand) => (
-                <Stack direction="row" alignItems="center" spacing={1}>
-                    <Box sx={{ flex: 1, minWidth: 200 }}>
-                        <PimBrandPicker
-                            value={brand.mapped}
-                            disabled={savingLazadaBrandId === brand.id}
-                            onChange={(val) => {
-                                if (val) {
-                                    assignLazadaBrand(brand.id, val);
-                                } else if (brand.mapped) {
-                                    clearLazadaBrand(brand.id, brand.mapped.id);
-                                }
-                            }}
-                            placeholder={t('searchPimBrandPlaceholder')}
-                        />
-                    </Box>
-                    {savingLazadaBrandId === brand.id && <CircularProgress size={14} />}
-                </Stack>
+                <MappingPickerCell saving={savingLazadaBrandId === brand.id}>
+                    <PimBrandPicker
+                        value={brand.mapped}
+                        disabled={savingLazadaBrandId === brand.id}
+                        onChange={(val) => {
+                            if (val) {
+                                assignLazadaBrand(brand.id, val);
+                            } else if (brand.mapped) {
+                                clearLazadaBrand(brand.id, brand.mapped.id);
+                            }
+                        }}
+                        placeholder={t('searchPimBrandPlaceholder')}
+                    />
+                </MappingPickerCell>
             ),
         },
     ];
@@ -664,23 +610,17 @@ export default function LazadaCategoryMapping({ categories, stats, lastSyncedAt,
             priority: 'always',
             minWidth: 200,
             render: (attribute) => (
-                <Stack spacing={0.25} alignItems="flex-start">
-                    <Typography fontWeight={600}>{attribute.label}</Typography>
-                    {attribute.mandatory && (
-                        <Chip label={t('mandatoryLabel')} size="small" sx={{ bgcolor: FIORI.warningBg, color: FIORI.warning, fontWeight: 600 }} />
-                    )}
-                </Stack>
+                <div className={mappingStyles.stack}>
+                    <span className={mappingStyles.primary}>{attribute.label}</span>
+                    {attribute.mandatory && <MandatoryTag label={t('mandatoryLabel')} />}
+                </div>
             ),
         },
         {
             key: 'type',
             header: t('typeColumn'),
             priority: 'medium',
-            render: (attribute) => (
-                <Typography variant="caption" color="text.secondary">
-                    {attribute.input_type ?? '-'}
-                </Typography>
-            ),
+            render: (attribute) => <span className={mappingStyles.caption}>{attribute.input_type ?? '-'}</span>,
         },
         {
             key: 'mapping',
@@ -689,31 +629,24 @@ export default function LazadaCategoryMapping({ categories, stats, lastSyncedAt,
             minWidth: 260,
             render: (attribute) => {
                 if (!attribute.input_type || !MAPPABLE_LAZADA_INPUT_TYPES.includes(attribute.input_type)) {
-                    return (
-                        <Typography variant="body2" color="text.disabled" sx={{ fontStyle: 'italic' }}>
-                            {t('notMappableLazadaAttribute')}
-                        </Typography>
-                    );
+                    return <span className={mappingStyles.mutedBody}>{t('notMappableLazadaAttribute')}</span>;
                 }
 
                 return (
-                    <Stack direction="row" alignItems="center" spacing={1}>
-                        <Box sx={{ flex: 1, minWidth: 200 }}>
-                            <PimAttributePicker
-                                value={attribute.mapped}
-                                disabled={savingLazadaAttributeName === attribute.name}
-                                onChange={(val) => {
-                                    if (val) {
-                                        assignLazadaAttribute(attribute.name, val);
-                                    } else if (attribute.mapped) {
-                                        clearLazadaAttribute(attribute.name, attribute.mapped.id);
-                                    }
-                                }}
-                                placeholder={t('searchPimAttributePlaceholder')}
-                            />
-                        </Box>
-                        {savingLazadaAttributeName === attribute.name && <CircularProgress size={14} />}
-                    </Stack>
+                    <MappingPickerCell saving={savingLazadaAttributeName === attribute.name}>
+                        <PimAttributePicker
+                            value={attribute.mapped}
+                            disabled={savingLazadaAttributeName === attribute.name}
+                            onChange={(val) => {
+                                if (val) {
+                                    assignLazadaAttribute(attribute.name, val);
+                                } else if (attribute.mapped) {
+                                    clearLazadaAttribute(attribute.name, attribute.mapped.id);
+                                }
+                            }}
+                            placeholder={t('searchPimAttributePlaceholder')}
+                        />
+                    </MappingPickerCell>
                 );
             },
         },
@@ -729,334 +662,148 @@ export default function LazadaCategoryMapping({ categories, stats, lastSyncedAt,
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={t('lazadaMappingTitle')} />
-            <Box sx={{ p: 4 }}>
-                <Stack direction="row" justifyContent="space-between" alignItems="flex-start" sx={{ mb: 3 }}>
-                    <Box>
-                        <Button
-                            size="small"
-                            startIcon={<ArrowBackIcon fontSize="small" />}
-                            onClick={() => router.visit('/catalog/marketplace/lazada')}
-                            sx={{ textTransform: 'none', mb: 1, color: 'text.secondary' }}
-                        >
-                            Lazada
-                        </Button>
-                        <Typography variant="h4" fontWeight={700}>
-                            {t('lazadaMappingTitle')}
-                        </Typography>
-                        <Divider sx={{ my: 2 }} />
-                        <Typography color="text.secondary">
+            <MappingPage>
+                <MappingPageHeader
+                    backLabel="Lazada"
+                    onBack={() => router.visit('/catalog/marketplace/lazada')}
+                    title={t('lazadaMappingTitle')}
+                    subtitle={
+                        <>
                             {t('leafCategoriesMapped', { mapped: stats.mapped, total: stats.leaf })}
                             {lastSyncedAt ? ` · ${t('lastSyncedAt', { datetime: new Date(lastSyncedAt).toLocaleString() })}` : ''}
-                        </Typography>
-                    </Box>
-
-                    <Stack direction="row" spacing={1.5}>
-                        <Button
-                            variant="outlined"
-                            disabled={syncingCategories}
-                            startIcon={syncingCategories ? <CircularProgress size={16} /> : <SyncIcon fontSize="small" />}
-                            onClick={runCategorySync}
-                            sx={{ textTransform: 'none' }}
-                        >
-                            {syncingCategories ? t('syncingLazada') : t('syncCategories')}
-                        </Button>
-                        <Button
-                            variant="contained"
-                            disabled={pendingCount === 0 || saving}
-                            onClick={saveChanges}
-                            startIcon={saving ? <CircularProgress size={16} color="inherit" /> : undefined}
-                            sx={solidActionSx}
-                        >
-                            {t('saveChanges')}
-                            {pendingCount > 0 ? ` (${pendingCount})` : ''}
-                        </Button>
-                    </Stack>
-                </Stack>
-
-                <Box
-                    sx={{
-                        display: 'grid',
-                        gridTemplateColumns: { xs: 'repeat(2, 1fr)', sm: 'repeat(4, 1fr)' },
-                        gap: '1px',
-                        bgcolor: FIORI.border,
-                        border: `1px solid ${FIORI.border}`,
-                        borderRadius: '10px',
-                        overflow: 'hidden',
-                        mb: 3,
-                    }}
-                >
-                    {statTiles.map((tile) => (
-                        <Box key={tile.label} sx={{ bgcolor: FIORI.surface, p: 2 }}>
-                            <Typography
-                                variant="caption"
-                                sx={{
-                                    color: FIORI.textSecondary,
-                                    fontWeight: 600,
-                                    textTransform: 'uppercase',
-                                    letterSpacing: '0.06em',
-                                    display: 'block',
-                                }}
+                        </>
+                    }
+                    actions={
+                        <>
+                            <MappingSyncButton busy={syncingCategories} onClick={runCategorySync}>
+                                {syncingCategories ? t('syncingLazada') : t('syncCategories')}
+                            </MappingSyncButton>
+                            <Button
+                                design="Emphasized"
+                                disabled={pendingCount === 0 || saving}
+                                loading={saving}
+                                loadingDelay={0}
+                                onClick={saveChanges}
                             >
-                                {tile.label}
-                            </Typography>
-                            <Typography
-                                sx={{
-                                    fontSize: 26,
-                                    fontWeight: 700,
-                                    fontVariantNumeric: 'tabular-nums',
-                                    color: tile.accent ? FIORI.brand : FIORI.textPrimary,
-                                    mt: 0.25,
-                                }}
-                            >
-                                {tile.value.toLocaleString()}
-                            </Typography>
-                        </Box>
-                    ))}
-                </Box>
+                                {t('saveChanges')}
+                                {pendingCount > 0 ? ` (${pendingCount})` : ''}
+                            </Button>
+                        </>
+                    }
+                />
 
-                <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" alignItems="center" spacing={2} sx={{ mb: 3 }}>
-                    <TextField
-                        value={search}
-                        onChange={(event) => setSearch(event.target.value)}
-                        placeholder={t('searchCategories')}
-                        size="small"
-                        sx={{ ...fioriSearchFieldSx, minWidth: 280 }}
-                        InputProps={{
-                            startAdornment: (
-                                <InputAdornment position="start">
-                                    <SearchIcon sx={{ color: FIORI.textSecondary, fontSize: 20 }} />
-                                </InputAdornment>
-                            ),
-                        }}
-                    />
+                <MappingStatTiles tiles={statTiles} />
 
-                    <Stack direction="row" alignItems="center" spacing={1.5}>
-                        <ToggleButtonGroup
+                <MappingToolbar>
+                    <MappingSearchInput value={search} onChange={setSearch} placeholder={t('searchCategories')} />
+
+                    <MappingToolbarGroup>
+                        <MappingFilterToggle<LazadaFilter>
                             value={filter}
-                            exclusive
-                            size="small"
-                            onChange={(_event, value: LazadaFilter | null) => value && applyFilter(value)} sx={fioriToggleButtonGroupSx}
-                        >
-                            <ToggleButton value="all">{t('statusAll')}</ToggleButton>
-                            <ToggleButton value="leaf">{t('leafOnly')}</ToggleButton>
-                            <ToggleButton value="parent">{t('parentOnly')}</ToggleButton>
-                            <ToggleButton value="flagged">{t('flaggedOnly')}</ToggleButton>
-                        </ToggleButtonGroup>
-
-                        <Select
-                            value={perPage}
-                            onChange={(e) => handlePerPageChange(Number(e.target.value))}
-                            size="small"
-                            sx={{ minWidth: 60, height: 36 }}
-                        >
-                            <MenuItem value={10}>10</MenuItem>
-                            <MenuItem value={25}>25</MenuItem>
-                            <MenuItem value={50}>50</MenuItem>
-                            <MenuItem value={100}>100</MenuItem>
-                        </Select>
-                        <Typography variant="body2" color="text.secondary">
-                            {tGrid('perPage')}
-                        </Typography>
-
-                        <Paper variant="outlined" sx={{ px: 1.5, py: 0.5, display: 'flex', alignItems: 'center' }}>
-                            <Typography variant="body2">{currentPage}</Typography>
-                        </Paper>
-                        <Typography variant="body2" color="text.secondary">
-                            {tGrid('pageOf', { lastPage })}
-                        </Typography>
-
-                        <Stack direction="row" spacing={0.2}>
-                            <IconButton size="small" disabled={currentPage <= 1} onClick={() => goToPage(1)}>
-                                <FirstPageIcon fontSize="small" />
-                            </IconButton>
-                            <IconButton size="small" disabled={currentPage <= 1} onClick={() => goToPage(currentPage - 1)}>
-                                <ChevronLeftIcon fontSize="small" />
-                            </IconButton>
-                            <IconButton size="small" disabled={currentPage >= lastPage} onClick={() => goToPage(currentPage + 1)}>
-                                <ChevronRightIcon fontSize="small" />
-                            </IconButton>
-                            <IconButton size="small" disabled={currentPage >= lastPage} onClick={() => goToPage(lastPage)}>
-                                <LastPageIcon fontSize="small" />
-                            </IconButton>
-                        </Stack>
-                    </Stack>
-                </Stack>
+                            onChange={applyFilter}
+                            options={[
+                                { value: 'all', label: t('statusAll') },
+                                { value: 'leaf', label: t('leafOnly') },
+                                { value: 'parent', label: t('parentOnly') },
+                                { value: 'flagged', label: t('flaggedOnly') },
+                            ]}
+                        />
+                        <MappingPager
+                            perPage={perPage}
+                            onPerPageChange={handlePerPageChange}
+                            currentPage={currentPage}
+                            lastPage={lastPage}
+                            onGoToPage={goToPage}
+                        />
+                    </MappingToolbarGroup>
+                </MappingToolbar>
 
                 <FioriResponsiveTable
                     columns={columns}
                     rows={categories.data}
-                    getRowKey={(row) => row.id}
-                    onRowClick={(row) => row.leaf && setSelectedCategory(row)}
-                    rowSx={(row) => ({
-                        ...pendingRowSx(rowHasPendingChange(row)),
-                        ...(row.id === selectedCategory?.id ? { bgcolor: FIORI.selected } : {}),
-                        ...(row.leaf ? {} : { cursor: 'default' }),
-                    })}
+                    getRowKey={(row: LazadaRow) => row.id}
+                    onRowClick={(row: LazadaRow) => row.leaf && setSelectedCategory(row)}
+                    rowClassName={(row: LazadaRow) =>
+                        cx(
+                            rowHasPendingChange(row) && mappingStyles.pendingRow,
+                            row.id === selectedCategory?.id && mappingStyles.selectedRow,
+                            !row.leaf && mappingStyles.notClickable,
+                        )
+                    }
                     emptyMessage={t('noCategoriesFound')}
                 />
 
                 {canEditBrands && (
                     <>
-                        <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mt: 5, mb: 2 }}>
-                            <Typography variant="h6" fontWeight={700}>
-                                {t('lazadaBrandsSectionTitle')}
-                            </Typography>
+                        <MappingSectionHeader
+                            title={t('lazadaBrandsSectionTitle')}
+                            message={lazadaBrandSyncMessage}
+                            actions={
+                                <>
+                                    <MappingSyncButton busy={lazadaBrandSyncing} onClick={triggerLazadaBrandSync}>
+                                        {lazadaBrandSyncing ? t('syncingBrands') : t('syncBrands')}
+                                    </MappingSyncButton>
+                                    {lazadaBrandSyncing && activeLazadaBrandJobTrackerId && (
+                                        <Button design="Negative" icon="sys-cancel" onClick={cancelLazadaBrandSync}>
+                                            {t('cancel')}
+                                        </Button>
+                                    )}
+                                </>
+                            }
+                        />
 
-                            <Stack direction="row" spacing={1.5} alignItems="center">
-                                {lazadaBrandSyncMessage && (
-                                    <Typography variant="caption" color="text.secondary">
-                                        {lazadaBrandSyncMessage}
-                                    </Typography>
-                                )}
-                                <Button
-                                    size="small"
-                                    variant="outlined"
-                                    disabled={lazadaBrandSyncing}
-                                    startIcon={lazadaBrandSyncing ? <CircularProgress size={14} /> : <SyncIcon fontSize="small" />}
-                                    onClick={triggerLazadaBrandSync}
-                                    sx={{ textTransform: 'none' }}
-                                >
-                                    {lazadaBrandSyncing ? t('syncingBrands') : t('syncBrands')}
-                                </Button>
-                                {lazadaBrandSyncing && activeLazadaBrandJobTrackerId && (
-                                    <Button
-                                        size="small"
-                                        variant="outlined"
-                                        color="error"
-                                        startIcon={<CancelIcon fontSize="small" />}
-                                        onClick={cancelLazadaBrandSync}
-                                        sx={{ textTransform: 'none' }}
-                                    >
-                                        {t('cancel')}
-                                    </Button>
-                                )}
-                            </Stack>
-                        </Stack>
-
-                        <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" alignItems="center" spacing={2} sx={{ mb: 2 }}>
-                            <TextField
-                                value={lazadaBrandSearch}
-                                onChange={(event) => setLazadaBrandSearch(event.target.value)}
-                                placeholder={t('searchBrands')}
-                                size="small"
-                                sx={{ ...fioriSearchFieldSx, minWidth: 280 }}
-                                InputProps={{
-                                    startAdornment: (
-                                        <InputAdornment position="start">
-                                            <SearchIcon sx={{ color: FIORI.textSecondary, fontSize: 20 }} />
-                                        </InputAdornment>
-                                    ),
-                                }}
+                        <MappingToolbar compact>
+                            <MappingSearchInput value={lazadaBrandSearch} onChange={setLazadaBrandSearch} placeholder={t('searchBrands')} />
+                            <MappingPager
+                                loading={loadingLazadaBrands}
+                                perPage={lazadaBrandPerPage}
+                                onPerPageChange={handleLazadaBrandPerPageChange}
+                                currentPage={lazadaBrands?.current_page ?? 1}
+                                lastPage={lazadaBrands?.last_page ?? 1}
+                                onGoToPage={goToLazadaBrandPage}
                             />
-
-                            <Stack direction="row" alignItems="center" spacing={1.5}>
-                                {loadingLazadaBrands && <CircularProgress size={18} />}
-
-                                <Select
-                                    value={lazadaBrandPerPage}
-                                    onChange={(e) => handleLazadaBrandPerPageChange(Number(e.target.value))}
-                                    size="small"
-                                    sx={{ minWidth: 60, height: 36 }}
-                                >
-                                    <MenuItem value={10}>10</MenuItem>
-                                    <MenuItem value={25}>25</MenuItem>
-                                    <MenuItem value={50}>50</MenuItem>
-                                    <MenuItem value={100}>100</MenuItem>
-                                </Select>
-                                <Typography variant="body2" color="text.secondary">
-                                    {tGrid('perPage')}
-                                </Typography>
-
-                                <Paper variant="outlined" sx={{ px: 1.5, py: 0.5, display: 'flex', alignItems: 'center' }}>
-                                    <Typography variant="body2">{lazadaBrands?.current_page ?? 1}</Typography>
-                                </Paper>
-                                <Typography variant="body2" color="text.secondary">
-                                    {tGrid('pageOf', { lastPage: lazadaBrands?.last_page ?? 1 })}
-                                </Typography>
-
-                                <Stack direction="row" spacing={0.2}>
-                                    <IconButton size="small" disabled={(lazadaBrands?.current_page ?? 1) <= 1} onClick={() => goToLazadaBrandPage(1)}>
-                                        <FirstPageIcon fontSize="small" />
-                                    </IconButton>
-                                    <IconButton
-                                        size="small"
-                                        disabled={(lazadaBrands?.current_page ?? 1) <= 1}
-                                        onClick={() => goToLazadaBrandPage((lazadaBrands?.current_page ?? 1) - 1)}
-                                    >
-                                        <ChevronLeftIcon fontSize="small" />
-                                    </IconButton>
-                                    <IconButton
-                                        size="small"
-                                        disabled={(lazadaBrands?.current_page ?? 1) >= (lazadaBrands?.last_page ?? 1)}
-                                        onClick={() => goToLazadaBrandPage((lazadaBrands?.current_page ?? 1) + 1)}
-                                    >
-                                        <ChevronRightIcon fontSize="small" />
-                                    </IconButton>
-                                    <IconButton
-                                        size="small"
-                                        disabled={(lazadaBrands?.current_page ?? 1) >= (lazadaBrands?.last_page ?? 1)}
-                                        onClick={() => goToLazadaBrandPage(lazadaBrands?.last_page ?? 1)}
-                                    >
-                                        <LastPageIcon fontSize="small" />
-                                    </IconButton>
-                                </Stack>
-                            </Stack>
-                        </Stack>
+                        </MappingToolbar>
 
                         <FioriResponsiveTable
                             columns={lazadaBrandColumns}
                             rows={lazadaBrands?.data ?? []}
-                            getRowKey={(brand) => brand.id}
-                            emptyMessage={loadingLazadaBrands ? <CircularProgress size={20} /> : t('noBrandsFound')}
+                            getRowKey={(brand: LazadaBrandRow) => brand.id}
+                            emptyMessage={loadingLazadaBrands ? <MappingLoading /> : t('noBrandsFound')}
                         />
                     </>
                 )}
 
                 {canEditAttributes && (
                     <>
-                        <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mt: 5, mb: 2 }}>
-                            <Typography variant="h6" fontWeight={700}>
-                                {selectedCategory
+                        <MappingSectionHeader
+                            title={
+                                selectedCategory
                                     ? t('lazadaAttributesForCategory', { name: selectedCategory.name })
-                                    : t('lazadaAttributesSectionTitle')}
-                            </Typography>
-
-                            {selectedCategory && (
-                                <Stack direction="row" spacing={1.5} alignItems="center">
-                                    {lazadaAttributeSyncMessage && (
-                                        <Typography variant="caption" color="text.secondary">
-                                            {lazadaAttributeSyncMessage}
-                                        </Typography>
-                                    )}
-                                    <Button
-                                        size="small"
-                                        variant="outlined"
-                                        disabled={lazadaAttributeSyncing}
-                                        startIcon={lazadaAttributeSyncing ? <CircularProgress size={14} /> : <SyncIcon fontSize="small" />}
-                                        onClick={triggerLazadaAttributeSync}
-                                        sx={{ textTransform: 'none' }}
-                                    >
+                                    : t('lazadaAttributesSectionTitle')
+                            }
+                            message={selectedCategory ? lazadaAttributeSyncMessage : undefined}
+                            actions={
+                                selectedCategory && (
+                                    <MappingSyncButton busy={lazadaAttributeSyncing} onClick={triggerLazadaAttributeSync}>
                                         {lazadaAttributeSyncing ? t('syncingAttributes') : t('syncAttributesForCategory')}
-                                    </Button>
-                                </Stack>
-                            )}
-                        </Stack>
+                                    </MappingSyncButton>
+                                )
+                            }
+                        />
 
                         {!selectedCategory ? (
-                            <Paper variant="outlined" sx={{ p: 4, textAlign: 'center', borderRadius: 2 }}>
-                                <Typography color="text.secondary">{t('selectCategoryPrompt')}</Typography>
-                            </Paper>
+                            <MappingEmptyPrompt>{t('selectCategoryPrompt')}</MappingEmptyPrompt>
                         ) : (
                             <FioriResponsiveTable
                                 columns={lazadaAttributeColumns}
                                 rows={lazadaAttributes ?? []}
-                                getRowKey={(attribute) => attribute.name}
-                                emptyMessage={loadingLazadaAttributes ? <CircularProgress size={20} /> : t('noAttributesInCategory')}
+                                getRowKey={(attribute: LazadaAttributeRow) => attribute.name}
+                                emptyMessage={loadingLazadaAttributes ? <MappingLoading /> : t('noAttributesInCategory')}
                             />
                         )}
                     </>
                 )}
-            </Box>
+            </MappingPage>
         </AppLayout>
     );
 }

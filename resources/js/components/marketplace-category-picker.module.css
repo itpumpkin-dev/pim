@@ -1,0 +1,73 @@
+.trigger {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    padding: 0.25rem 0.25rem 0.25rem 0.75rem;
+    min-height: 2.25rem;
+    box-sizing: border-box;
+    border: 1px solid var(--sapField_BorderColor);
+    border-radius: var(--sapField_BorderCornerRadius, var(--sapElement_BorderCornerRadius));
+    background: var(--sapField_Background);
+    cursor: pointer;
+}
+
+.trigger:hover {
+    border-color: var(--sapField_Hover_BorderColor, var(--sapBrandColor));
+}
+
+.triggerDisabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+    background: var(--sapField_ReadOnly_Background, var(--sapBackgroundColor));
+}
+
+.triggerDisabled:hover {
+    border-color: var(--sapField_BorderColor);
+}
+
+.column {
+    width: 220px;
+    flex-shrink: 0;
+    overflow-y: auto;
+    border-right: 1px solid var(--sapGroup_ContentBorderColor);
+}
+
+.column:last-child {
+    border-right: none;
+}
+
+.node {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    cursor: pointer;
+    color: var(--sapTextColor);
+    font-size: var(--sapFontSize);
+}
+
+.node:hover {
+    background: var(--sapList_Hover_Background);
+}
+
+.nodeSelected,
+.nodeSelected:hover {
+    background: var(--sapList_SelectionBackgroundColor);
+    color: var(--sapBrandColor);
+    font-weight: 700;
+}
+
+.searchResult {
+    padding: 0.5rem 1rem;
+    cursor: pointer;
+}
+
+.searchResult:hover {
+    background: var(--sapList_Hover_Background);
+}
+
+.dialog::part(content) {
+    padding: 0;
+}

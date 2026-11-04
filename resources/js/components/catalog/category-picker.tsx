@@ -1,4 +1,4 @@
-import { Autocomplete, TextField, Typography } from '@mui/material';
+import { ComboBox, ComboBoxItem } from '@ui5/webcomponents-react';
 import { useEffect, useState } from 'react';
 
 export interface CategoryOption {
@@ -13,6 +13,9 @@ export interface CategoryOption {
  * ใช้รองรับ action "กำหนด PIM category ให้กับ node ของ Shopee นี้" ในหน้า
  * categories/shopee-mapping.tsx ซึ่งตอนนี้การ map จะเริ่มจากแถวของ Shopee ก่อน
  * แล้วถามว่า "อันนี้ตรงกับ category ไหนของเรา" ไม่ใช่กลับกันแบบเดิม
+ *
+ * UI5 ComboBox ใช้ `filter="None"` เพราะการกรองทำที่ฝั่ง server แล้ว (ผลลัพธ์
+ * ที่ได้มาคือรายการที่ตรงกับ query อยู่แล้ว) — path แสดงเป็น additionalText
  */
 export function CategoryPicker({
     value,
@@ -23,9 +26,14 @@ export function CategoryPicker({
     onChange: (next: CategoryOption | null) => void;
     placeholder?: string;
 }) {
-    const [query, setQuery] = useState('');
+    const [query, setQuery] = useState(value?.name ?? '');
     const [results, setResults] = useState<CategoryOption[]>([]);
     const [loading, setLoading] = useState(false);
+
+    // ค่าที่เลือกถูกเปลี่ยนจากข้างนอก (เช่น reset หลังบันทึก) → sync ข้อความในช่องตาม
+    useEffect(() => {
+        setQuery(value?.name ?? '');
+    }, [value?.id, value?.name]);
 
     useEffect(() => {
         setLoading(true);
@@ -39,32 +47,39 @@ export function CategoryPicker({
         }, 300);
 
         return () => clearTimeout(timer);
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [query]);
 
+    // keep the selected option in the item list so the ComboBox can show it as selected
+    const items = value && !results.some((r) => r.id === value.id) ? [value, ...results] : results;
+
     return (
-        <Autocomplete
-            size="small"
-            options={results}
+        <ComboBox
+            style={{ width: '100%' }}
+            filter="None"
             loading={loading}
-            filterOptions={(options) => options}
-            getOptionLabel={(opt) => opt.name}
-            isOptionEqualToValue={(opt, val) => opt.id === val.id}
-            value={value}
-            onChange={(_, val) => onChange(val)}
-            inputValue={query}
-            onInputChange={(_, val) => setQuery(val)}
-            renderOption={(props, option) => (
-                <li {...props} key={option.id}>
-                    <div>
-                        <Typography variant="body2">{option.name}</Typography>
-                        <Typography variant="caption" color="text.secondary" sx={{ fontStyle: 'italic' }}>
-                            {option.path}
-                        </Typography>
-                    </div>
-                </li>
-            )}
-            renderInput={(params) => <TextField {...params} placeholder={placeholder} />}
-        />
+            placeholder={placeholder}
+            value={query}
+            selectedValue={value ? String(value.id) : undefined}
+            showClearIcon
+            onInput={(e) => {
+                const next = e.target.value ?? '';
+                setQuery(next);
+                if (next === '' && value) onChange(null);
+            }}
+            onSelectionChange={(e) => {
+                const item = e.detail.item;
+                if (!item) {
+                    onChange(null);
+                    return;
+                }
+                const option = items.find((o) => String(o.id) === item.value) ?? null;
+                onChange(option);
+                if (option) setQuery(option.name);
+            }}
+        >
+            {items.map((option) => (
+                <ComboBoxItem key={option.id} value={String(option.id)} text={option.name} additionalText={option.path} />
+            ))}
+        </ComboBox>
     );
 }

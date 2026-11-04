@@ -2,16 +2,18 @@ import '../css/app.css';
 import './lib/i18n';
 
 import { createInertiaApp } from '@inertiajs/react';
-import { CssBaseline, ThemeProvider } from '@mui/material';
+import { setLanguage as setUi5Language } from '@ui5/webcomponents-base/dist/config/Language.js';
+import { setTheme as setUi5Theme } from '@ui5/webcomponents-base/dist/config/Theme.js';
+import { ThemeProvider as Ui5ThemeProvider } from '@ui5/webcomponents-react';
+import '@ui5/webcomponents-react/dist/Assets.js';
 import { resolvePageComponent } from 'laravel-vite-plugin/inertia-helpers';
-import { createElement, useEffect, useMemo, type ComponentType, type ReactNode } from 'react';
+import { createElement, useEffect, type ComponentType, type ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { route as routeFn } from 'ziggy-js';
 import { PermissionsChangedToast } from './components/permissions-changed-toast';
 import { AppearanceProvider, useResolvedAppearance } from './hooks/use-appearance';
-import { useSyncI18nLanguage } from './hooks/use-locale';
+import { useLocale, useSyncI18nLanguage } from './hooks/use-locale';
 // import { LocaleProvider } from './hooks/use-locale';
-import { getTheme } from './theme';
 
 declare global {
     const route: typeof routeFn;
@@ -27,26 +29,28 @@ interface PageLayout {
 // unlike a wrapper rendered around <App>, which sits outside Inertia's page-context provider.
 function ThemedPage({ children }: { children: ReactNode }) {
     const { resolved } = useResolvedAppearance();
-    // getTheme() runs createTheme() — a non-trivial build — and this component
-    // wraps every Inertia page, so recomputing it on each render (e.g. every
-    // page navigation) is pure waste. It only depends on the light/dark mode.
-    const theme = useMemo(() => getTheme(resolved), [resolved]);
     useSyncI18nLanguage();
+    const { locale } = useLocale();
 
-    // Drives the SAP Fiori CSS custom properties in app.css — every FIORI.*
-    // token in fiori-style.tsx/ui-style.ts is a var(--fiori-*) reference, so
-    // flipping this attribute is what makes the whole Fiori-themed UI
-    // respond to the app's existing light/dark appearance toggle.
+    // The app's light/dark appearance toggle drives the UI5 theme; the legacy
+    // --fiori-* tokens in app.css are mapped onto the theme's --sap* variables.
     useEffect(() => {
-        document.documentElement.setAttribute('data-fiori-mode', resolved);
+        setUi5Theme(resolved === 'dark' ? 'sap_horizon_dark' : 'sap_horizon');
     }, [resolved]);
 
+    // UI5's built-in texts (MessageBox buttons, "No data", date pickers) follow
+    // their own language config, separate from i18next.
+    useEffect(() => {
+        if (typeof locale === 'string' && locale) {
+            setUi5Language(locale);
+        }
+    }, [locale]);
+
     return (
-        <ThemeProvider theme={theme}>
-            <CssBaseline />
+        <Ui5ThemeProvider>
             <PermissionsChangedToast />
             {children}
-        </ThemeProvider>
+        </Ui5ThemeProvider>
     );
 }
 

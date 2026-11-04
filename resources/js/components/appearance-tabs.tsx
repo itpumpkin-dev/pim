@@ -1,40 +1,25 @@
+import { APPEARANCE_OPTIONS } from '@/components/appearance-dropdown';
 import { type Appearance, useAppearance } from '@/hooks/use-appearance';
-import { fioriToggleButtonGroupSx } from '@/lib/fiori-style';
-import DarkModeIcon from '@mui/icons-material/DarkMode';
-import LightModeIcon from '@mui/icons-material/LightMode';
-import SettingsBrightnessIcon from '@mui/icons-material/SettingsBrightness';
-import { ToggleButton, ToggleButtonGroup, type ToggleButtonGroupProps, type SxProps, type Theme } from '@mui/material';
+import { SegmentedButton, SegmentedButtonItem } from '@ui5/webcomponents-react';
+import { type CSSProperties } from 'react';
 
-type AppearanceTabsProps = Omit<ToggleButtonGroupProps, 'value' | 'onChange' | 'exclusive'>;
-
-export default function AppearanceToggleTab({ sx, ...props }: AppearanceTabsProps) {
+export default function AppearanceToggleTab({ style, className }: { style?: CSSProperties; className?: string }) {
     const { appearance, updateAppearance } = useAppearance();
 
     return (
-        <ToggleButtonGroup
-            value={appearance}
-            exclusive
-            size="small"
-            onChange={(_event, value: Appearance | null) => {
-                if (value) {
-                    updateAppearance(value);
-                }
+        <SegmentedButton
+            style={style}
+            className={className}
+            onSelectionChange={(e) => {
+                const mode = (e.detail.selectedItems[0] as HTMLElement | undefined)?.dataset.mode as Appearance | undefined;
+                if (mode) updateAppearance(mode);
             }}
-            sx={[fioriToggleButtonGroupSx, ...(Array.isArray(sx) ? sx : [sx])] as SxProps<Theme>}
-            {...props}
         >
-            <ToggleButton value="light">
-                <LightModeIcon fontSize="small" sx={{ mr: 1 }} />
-                Light
-            </ToggleButton>
-            <ToggleButton value="dark">
-                <DarkModeIcon fontSize="small" sx={{ mr: 1 }} />
-                Dark
-            </ToggleButton>
-            <ToggleButton value="system">
-                <SettingsBrightnessIcon fontSize="small" sx={{ mr: 1 }} />
-                System
-            </ToggleButton>
-        </ToggleButtonGroup>
+            {APPEARANCE_OPTIONS.map((o) => (
+                <SegmentedButtonItem key={o.mode} data-mode={o.mode} icon={o.icon} selected={appearance === o.mode}>
+                    {o.label}
+                </SegmentedButtonItem>
+            ))}
+        </SegmentedButton>
     );
 }

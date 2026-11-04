@@ -1,0 +1,94 @@
+.tile {
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.25rem;
+    border: 2px dashed var(--sapField_BorderColor);
+    border-radius: var(--sapElement_BorderCornerRadius, 0.25rem);
+    background: var(--sapGroup_ContentBackground);
+    cursor: pointer;
+    transition:
+        border-color 0.15s,
+        background-color 0.15s;
+}
+
+.tile:hover:not(.disabled) {
+    border-color: var(--sapBrandColor);
+}
+
+.tile:focus-visible {
+    outline: var(--sapContent_FocusWidth) var(--sapContent_FocusStyle) var(--sapContent_FocusColor);
+    outline-offset: 1px;
+}
+
+.error {
+    border-color: var(--sapNegativeColor);
+}
+
+.dragging {
+    border-color: var(--sapBrandColor);
+    background: var(--sapList_SelectionBackgroundColor);
+}
+
+.disabled {
+    cursor: default;
+    opacity: 0.6;
+}
+
+.icon {
+    width: 1.75rem;
+    height: 1.75rem;
+    color: var(--sapContent_IconColor);
+}
+
+.iconError {
+    color: var(--sapNegativeColor);
+}
+
+.label {
+    color: var(--sapLinkColor);
+    font-weight: 600;
+    font-size: var(--sapFontSmallSize);
+}
+
+.rows {
+    margin-top: 0.5rem;
+}
+
+.rowList {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.row {
+    max-width: 420px;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--sapGroup_ContentBorderColor);
+    border-radius: var(--sapElement_BorderCornerRadius, 0.25rem);
+}
+
+.rowHeader {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+}
+
+.rowName {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--sapTextColor);
+    font-size: var(--sapFontSize);
+}
+
+.errorText {
+    display: block;
+    color: var(--sapNegativeTextColor);
+    font-size: var(--sapFontSmallSize);
+}

@@ -1,8 +1,7 @@
-import { FIORI } from '@/lib/fiori-style';
-import CancelIcon from '@mui/icons-material/Cancel';
-import CheckCircleIcon from '@mui/icons-material/CheckCircle';
-import WarningIcon from '@mui/icons-material/Warning';
-import { Box, CircularProgress, Stack, Typography } from '@mui/material';
+import '@ui5/webcomponents-icons/dist/message-warning.js';
+import '@ui5/webcomponents-icons/dist/status-negative.js';
+import '@ui5/webcomponents-icons/dist/status-positive.js';
+import { BusyIndicator, Icon, Text, Title } from '@ui5/webcomponents-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import * as XLSX from 'xlsx';
@@ -173,108 +172,99 @@ export default function ImportPreflight({ file, fileFormat, fieldSeparator, sche
     if (!file) return null;
 
     const toneColor: Record<CheckTone, string> = {
-        pass: FIORI.success,
-        warn: FIORI.warning,
-        fail: FIORI.error,
+        pass: 'var(--sapPositiveColor)',
+        warn: 'var(--sapCriticalColor)',
+        fail: 'var(--sapNegativeColor)',
     };
-    const toneIcon: Record<CheckTone, typeof CheckCircleIcon> = {
-        pass: CheckCircleIcon,
-        warn: WarningIcon,
-        fail: CancelIcon,
+    const toneIcon: Record<CheckTone, string> = {
+        pass: 'status-positive',
+        warn: 'message-warning',
+        fail: 'status-negative',
     };
+    const secondary = { color: 'var(--sapContent_LabelColor)' };
+    const border = '1px solid var(--sapList_BorderColor)';
 
     return (
-        <Box sx={{ mt: 2 }}>
-            <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 1, color: FIORI.textPrimary }}>
+        <div style={{ marginTop: '1rem' }}>
+            <Title level="H6" size="H6" style={{ marginBottom: '0.5rem' }}>
                 {t('preflightTitle')}
-            </Typography>
+            </Title>
 
             {loading && (
-                <Stack direction="row" alignItems="center" spacing={1}>
-                    <CircularProgress size={16} />
-                    <Typography variant="body2" color="text.secondary">
-                        {t('previewLoading')}
-                    </Typography>
-                </Stack>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <BusyIndicator active delay={0} size="S" />
+                    <Text style={secondary}>{t('previewLoading')}</Text>
+                </div>
             )}
 
-            {!loading && error && (
-                <Typography variant="body2" color="error">
-                    {error}
-                </Typography>
-            )}
+            {!loading && error && <Text style={{ color: 'var(--sapNegativeTextColor, var(--sapNegativeColor))' }}>{error}</Text>}
 
-            {!loading && !error && rows.length === 0 && (
-                <Typography variant="body2" color="text.secondary">
-                    {t('previewEmpty')}
-                </Typography>
-            )}
+            {!loading && !error && rows.length === 0 && <Text style={secondary}>{t('previewEmpty')}</Text>}
 
             {!loading && !error && rows.length > 0 && (
-                <Stack spacing={2}>
-                    <Stack spacing={0.75}>
-                        {checks.map((item, idx) => {
-                            const Icon = toneIcon[item.tone];
-                            return (
-                                <Stack key={idx} direction="row" spacing={1} alignItems="flex-start">
-                                    <Icon sx={{ fontSize: 18, color: toneColor[item.tone], mt: '1px', flexShrink: 0 }} />
-                                    <Typography variant="body2" sx={{ color: FIORI.textPrimary }}>
-                                        {item.text}
-                                    </Typography>
-                                </Stack>
-                            );
-                        })}
-                    </Stack>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.375rem' }}>
+                        {checks.map((item, idx) => (
+                            <div key={idx} style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem' }}>
+                                <Icon
+                                    name={toneIcon[item.tone]}
+                                    style={{ width: 18, height: 18, color: toneColor[item.tone], marginTop: 1, flexShrink: 0 }}
+                                />
+                                <Text>{item.text}</Text>
+                            </div>
+                        ))}
+                    </div>
 
-                    <Box sx={{ overflowX: 'auto', border: `1px solid ${FIORI.border}`, borderRadius: '8px' }}>
-                        <Box component="table" sx={{ borderCollapse: 'collapse', width: '100%', fontSize: '0.8125rem' }}>
-                            <Box component="thead" sx={{ bgcolor: FIORI.headerBg }}>
-                                <Box component="tr">
+                    <div style={{ overflowX: 'auto', border, borderRadius: 'var(--sapElement_BorderCornerRadius)' }}>
+                        <table
+                            style={{
+                                borderCollapse: 'collapse',
+                                width: '100%',
+                                fontSize: '0.8125rem',
+                                fontFamily: 'var(--sapFontFamily)',
+                                color: 'var(--sapTextColor)',
+                            }}
+                        >
+                            <thead style={{ background: 'var(--sapList_HeaderBackground)' }}>
+                                <tr>
                                     {headers.map((header, idx) => (
-                                        <Box
-                                            component="th"
+                                        <th
                                             key={idx}
-                                            sx={{
+                                            style={{
                                                 textAlign: 'left',
                                                 whiteSpace: 'nowrap',
-                                                p: 1,
+                                                padding: '0.5rem',
                                                 fontWeight: 600,
-                                                color: headerCodeByIndex[idx] === null && header.trim() !== '' ? FIORI.warning : FIORI.textPrimary,
-                                                borderBottom: `1px solid ${FIORI.border}`,
+                                                color:
+                                                    headerCodeByIndex[idx] === null && header.trim() !== ''
+                                                        ? 'var(--sapCriticalTextColor, var(--sapCriticalColor))'
+                                                        : 'var(--sapList_HeaderTextColor, var(--sapTextColor))',
+                                                borderBottom: border,
                                             }}
                                         >
-                                            {header || ' '}
-                                        </Box>
+                                            {header || '\u00a0'}
+                                        </th>
                                     ))}
-                                </Box>
-                            </Box>
-                            <Box component="tbody">
+                                </tr>
+                            </thead>
+                            <tbody style={{ background: 'var(--sapList_Background)' }}>
                                 {dataRows.slice(0, PREVIEW_ROW_LIMIT).map((row, rIdx) => (
-                                    <Box component="tr" key={rIdx}>
+                                    <tr key={rIdx}>
                                         {headers.map((_, cIdx) => (
-                                            <Box
-                                                component="td"
-                                                key={cIdx}
-                                                sx={{
-                                                    whiteSpace: 'nowrap',
-                                                    p: 1,
-                                                    color: FIORI.textPrimary,
-                                                    borderBottom: `1px solid ${FIORI.border}`,
-                                                }}
-                                            >
+                                            <td key={cIdx} style={{ whiteSpace: 'nowrap', padding: '0.5rem', borderBottom: border }}>
                                                 {row[cIdx] ?? ''}
-                                            </Box>
+                                            </td>
                                         ))}
-                                    </Box>
+                                    </tr>
                                 ))}
-                            </Box>
-                        </Box>
-                    </Box>
-                    <Typography variant="caption" color="text.secondary">
+                            </tbody>
+                        </table>
+                    </div>
+                    <Text style={{ ...secondary, fontSize: 'var(--sapFontSmallSize)' }}>
                         {t('previewRowsNote', { count: Math.min(dataRows.length, PREVIEW_ROW_LIMIT) })}
-                    </Typography>
-                </Stack>
+                    </Text>
+                </div>
             )}
-        </Box>
+        </div>
     );
 }

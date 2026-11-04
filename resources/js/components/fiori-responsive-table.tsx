@@ -1,33 +1,35 @@
-import {
-    Box,
-    Paper,
-    Table,
-    TableBody,
-    TableCell,
-    TableContainer,
-    TableHead,
-    TableRow,
-    Typography,
-    useMediaQuery,
-    useTheme,
-    type SxProps,
-    type Theme,
-} from '@mui/material';
-import { Fragment, memo, type ReactNode } from 'react';
-import { FIORI, fioriCardSx } from '@/lib/fiori-style';
+import { Table, TableCell, TableHeaderCell, TableHeaderRow, TableRow, TableSelectionMulti, type TablePropTypes } from '@ui5/webcomponents-react';
+import { memo, useCallback, useMemo, type CSSProperties, type ReactNode } from 'react';
+
+import styles from './fiori-responsive-table.module.css';
 
 /**
  * Column pop-in priority, modeled on SAP Fiori's responsive table
  * (https://www.sap.com/design-system/fiori-design-web/ui-elements/responsive-table):
- * on a narrow viewport, lower-priority columns leave the table grid and
- * reflow as label/value pairs in a "pop-in" area beneath the row, instead of
- * the table gaining a horizontal scrollbar. `always` never pops — reserve it
- * for the column that identifies the row (and, if the row is directly
- * actionable, the control the user actually needs — see
- * AttributeMappingTable's "Map to" column) since it's the only thing
- * guaranteed visible on a phone.
+ * when the table is too narrow, lower-priority columns leave the table grid
+ * and reflow as label/value pairs in a "pop-in" area beneath the row, instead
+ * of the table gaining a horizontal scrollbar. Mapped onto the UI5 Table's
+ * `importance` (always=3 > high=2 > medium=1 > low=0); UI5 never pops in the
+ * single most important column, so `always` should be reserved for the column
+ * that identifies the row (and, if the row is directly actionable, the
+ * control the user actually needs).
  */
 export type FioriColumnPriority = 'always' | 'high' | 'medium' | 'low';
+
+const PRIORITY_IMPORTANCE: Record<FioriColumnPriority, number> = { always: 3, high: 2, medium: 1, low: 0 };
+
+/**
+ * Default column min-widths per priority. UI5's popin is width-driven (a
+ * column moves into the popin when the table can't fit every column's
+ * min-width), so lower tiers get a wider default min-width — they start
+ * popping in earlier, approximating the old breakpoint tiers (xs: always,
+ * sm: +high, md: +medium, lg: +low). An explicit `minWidth` wins.
+ */
+const PRIORITY_MIN_WIDTH: Record<FioriColumnPriority, string> = { always: '6rem', high: '8rem', medium: '10rem', low: '12rem' };
+
+const ALIGN: Record<'left' | 'right' | 'center', 'Left' | 'Right' | 'Center'> = { left: 'Left', right: 'Right', center: 'Center' };
+
+const toCssSize = (value: number | string | undefined) => (typeof value === 'number' ? `${value}px` : value);
 
 export interface FioriResponsiveColumn<Row> {
     key: string;
@@ -40,180 +42,166 @@ export interface FioriResponsiveColumn<Row> {
     minWidth?: number | string;
     /** Drop this column entirely (not even in the pop-in area) instead of collapsing it — e.g. a decorative/redundant column. */
     hideInPopin?: boolean;
+    /** Label used in the pop-in area. Defaults to `header` when that is a string; otherwise UI5 clones the header cell's DOM. */
+    popinText?: string;
 }
 
 export interface FioriResponsiveTableProps<Row> {
     columns: FioriResponsiveColumn<Row>[];
     rows: Row[];
     getRowKey: (row: Row) => string | number;
-    rowSx?: (row: Row) => SxProps<Theme>;
-    /** Makes the whole row (grid row + its pop-in area) clickable, e.g. to navigate to a detail page — mirrors a plain `<TableRow onClick>`. Adds a pointer cursor automatically. */
+    /** Extra class(es) on a row's `ui5-table-row` element (e.g. a highlight/pending tint from a CSS module). */
+    rowClassName?: (row: Row) => string | undefined;
+    /** @deprecated use `rowClassName` — inline style on the row's `ui5-table-row` element. */
+    rowStyle?: (row: Row) => CSSProperties | undefined;
+    /**
+     * Makes the whole row clickable (UI5 `interactive` row + `row-click`), e.g.
+     * to navigate to a detail page. UI5 only fires it when the row itself
+     * receives the click — clicks on focusable content inside a cell
+     * (buttons, links, inputs) do NOT trigger it, so cells no longer need
+     * `stopPropagation()`.
+     */
     onRowClick?: (row: Row) => void;
     emptyMessage?: ReactNode;
+    /** 'small' (default) renders in UI5 compact density, 'medium' in cozy density. */
     size?: 'small' | 'medium';
     /**
      * 'card' (default) wraps the table in its own bordered/rounded Fiori
-     * surface — for a table that's the whole card. 'plain' skips that (no
-     * Paper, no border/radius) for a table already nested inside another
-     * Fiori card alongside its own toolbar (e.g. attributes/index.tsx),
+     * surface — for a table that's the whole card. 'plain' skips that for a
+     * table already nested inside another card alongside its own toolbar,
      * where a second border would double up against the outer one.
      */
     variant?: 'card' | 'plain';
     /**
-     * Pins the header row in place while the table's own content scrolls
-     * past underneath. Off by default, matching every existing table's
-     * plain (non-sticky) header. Must be paired with `maxHeight` below —
-     * `position: sticky` only sticks against the *nearest* scrolling
-     * ancestor, and MUI's own `TableContainer` always sets its own
-     * `overflow-x: auto` regardless of variant. That makes TableContainer
-     * itself the nearest scrolling ancestor no matter what wraps it from
-     * the outside, so a wrapping `<Box maxHeight/overflowY:'auto'>` placed
-     * around this component (as this used to be documented) never actually
-     * receives the sticky positioning — the header just scrolls away with
-     * everything else the moment it's scrolled past. Setting `maxHeight`
-     * here instead makes THIS component's own TableContainer the bounded,
-     * actually-scrolling ancestor, which is what MUI's own sticky-header
-     * examples do too.
+     * Pins the header row in place while the rows scroll past underneath.
+     * Pair with `maxHeight` — the sticky header sticks against the nearest
+     * scrolling ancestor, and `maxHeight` makes this component's own wrapper
+     * that bounded, scrolling box.
      */
     stickyHeader?: boolean;
     /** Bounds the table's own height and makes it scroll internally — required for `stickyHeader` to actually stick (see above). */
     maxHeight?: number | string;
+    /** Shows UI5's busy state over the table (after UI5's own 1s delay). */
+    loading?: boolean;
+    /**
+     * Native Fiori multi-selection (UI5 `TableSelectionMulti`): adds the
+     * standard selection column with a select-all header checkbox and the
+     * theme's selected-row styling. Passing `onSelectionChange` turns it on;
+     * `selectedKeys` are `getRowKey` values (keys of rows not on the current
+     * page are kept as-is).
+     */
+    selectedKeys?: Array<string | number>;
+    onSelectionChange?: (keys: string[]) => void;
+    style?: CSSProperties;
+    className?: string;
 }
-
-/** Which priority tiers stay as real columns at the current breakpoint — narrower viewport keeps fewer tiers, mirroring Fiori's auto pop-in mode. */
-function useVisiblePriorities(): FioriColumnPriority[] {
-    const theme = useTheme();
-    const isXs = useMediaQuery(theme.breakpoints.down('sm'));
-    const isSm = useMediaQuery(theme.breakpoints.between('sm', 'md'));
-    const isMd = useMediaQuery(theme.breakpoints.between('md', 'lg'));
-
-    if (isXs) return ['always'];
-    if (isSm) return ['always', 'high'];
-    if (isMd) return ['always', 'high', 'medium'];
-    return ['always', 'high', 'medium', 'low'];
-}
-
-const headCellSx = {
-    fontWeight: 600,
-    color: FIORI.textPrimary,
-    borderBottom: `1px solid ${FIORI.border}`,
-    // ตั้ง background ตรงนี้ (ไม่ใช่แค่ที่ TableHead) ด้วย — ตอน stickyHeader
-    // เป็น true เซลล์จะลอยค้าง top:0 อยู่เหนือแถวข้อมูลที่เลื่อนผ่านด้านล่าง
-    // ถ้าไม่มี background ทึบเป็นของตัวเอง จะเห็นเนื้อหาทะลุออกมาด้านหลัง
-    backgroundColor: FIORI.headerBg,
-};
 
 /**
- * Fiori "Responsive Table": a normal grid on desktop, with lower-priority
- * columns reflowing into a label/value pop-in area beneath each row once the
- * viewport is too narrow to fit them — see `FioriColumnPriority`. Shared
- * across every catalog admin list/mapping table instead of each page
- * hand-rolling its own `<TableContainer>` breakpoint logic.
+ * Fiori "Responsive Table" on top of the UI5 Web Components `Table`
+ * (`overflowMode="Popin"`): a normal grid when there is room, with
+ * lower-priority columns reflowing into a label/value pop-in area beneath
+ * each row once the table is too narrow — see `FioriColumnPriority`.
  */
 function FioriResponsiveTableInner<Row>({
     columns,
     rows,
     getRowKey,
-    rowSx,
+    rowClassName,
+    rowStyle,
     onRowClick,
     emptyMessage,
     size = 'small',
     variant = 'card',
     stickyHeader = false,
     maxHeight,
+    loading = false,
+    selectedKeys,
+    onSelectionChange,
+    style,
+    className,
 }: FioriResponsiveTableProps<Row>) {
-    const visiblePriorities = useVisiblePriorities();
-    const visibleColumns = columns.filter((c) => visiblePriorities.includes(c.priority ?? 'always'));
-    const popinColumns = columns.filter((c) => !visiblePriorities.includes(c.priority ?? 'always') && !c.hideInPopin);
-    const hasPopin = popinColumns.length > 0;
-    const colSpan = visibleColumns.length || 1;
+    const rowsByKey = useMemo(() => new Map(rows.map((row) => [String(getRowKey(row)), row])), [rows, getRowKey]);
+
+    const handleRowClick = useCallback<NonNullable<TablePropTypes['onRowClick']>>(
+        (event) => {
+            if (!onRowClick) return;
+            const row = rowsByKey.get(event.detail.row.rowKey ?? '');
+            if (row !== undefined) onRowClick(row);
+        },
+        [onRowClick, rowsByKey],
+    );
 
     const table = (
-        <Table size={size} stickyHeader={stickyHeader}>
-            <TableHead sx={{ bgcolor: FIORI.headerBg }}>
-                <TableRow>
-                    {visibleColumns.map((column) => (
-                        <TableCell
-                            key={column.key}
-                            align={column.align}
-                            sx={{ ...headCellSx, width: column.width, minWidth: column.minWidth }}
-                        >
-                            {column.header}
-                        </TableCell>
-                    ))}
-                </TableRow>
-            </TableHead>
-            <TableBody>
-                {rows.map((row) => {
-                    const key = getRowKey(row);
-                    const rowStyle = [
-                        { '&:hover': { bgcolor: FIORI.hover } },
-                        onRowClick ? { cursor: 'pointer' } : {},
-                        rowSx?.(row) ?? {},
-                    ] as SxProps<Theme>;
-                    const handleRowClick = onRowClick ? () => onRowClick(row) : undefined;
-
-                    return (
-                        <Fragment key={key}>
-                            <TableRow sx={rowStyle} onClick={handleRowClick}>
-                                {visibleColumns.map((column) => (
-                                    <TableCell
-                                        key={column.key}
-                                        align={column.align}
-                                        sx={{ borderBottom: hasPopin ? 'none' : `1px solid ${FIORI.border}` }}
-                                    >
-                                        {column.render(row)}
-                                    </TableCell>
-                                ))}
-                            </TableRow>
-
-                            {hasPopin && (
-                                <TableRow sx={rowStyle} onClick={handleRowClick}>
-                                    <TableCell colSpan={colSpan} sx={{ pt: 0, pb: 1.25, borderBottom: `1px solid ${FIORI.border}` }}>
-                                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75 }}>
-                                            {popinColumns.map((column) => (
-                                                <Box key={column.key} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 2 }}>
-                                                    <Typography
-                                                        variant="caption"
-                                                        sx={{ color: FIORI.textSecondary, fontWeight: 600, flexShrink: 0, pt: '2px' }}
-                                                    >
-                                                        {column.header}
-                                                    </Typography>
-                                                    <Box sx={{ textAlign: 'right', minWidth: 0 }}>{column.render(row)}</Box>
-                                                </Box>
-                                            ))}
-                                        </Box>
-                                    </TableCell>
-                                </TableRow>
-                            )}
-                        </Fragment>
-                    );
-                })}
-
-                {rows.length === 0 && (
-                    <TableRow>
-                        <TableCell colSpan={colSpan} align="center" sx={{ py: 4 }}>
-                            <Typography color="text.secondary">{emptyMessage}</Typography>
-                        </TableCell>
+        <Table
+            className={styles.table}
+            overflowMode="Popin"
+            loading={loading}
+            features={
+                onSelectionChange ? (
+                    <TableSelectionMulti
+                        selected={(selectedKeys ?? []).map(String).join(' ')}
+                        onChange={(event) => onSelectionChange(Array.from(event.target.getSelectedAsSet()))}
+                    />
+                ) : undefined
+            }
+            onRowClick={onRowClick ? handleRowClick : undefined}
+            noData={<div className={styles.empty}>{emptyMessage}</div>}
+            headerRow={
+                <TableHeaderRow sticky={stickyHeader}>
+                    {columns.map((column) => {
+                        const priority = column.priority ?? 'always';
+                        return (
+                            <TableHeaderCell
+                                key={column.key}
+                                importance={PRIORITY_IMPORTANCE[priority]}
+                                horizontalAlign={column.align ? ALIGN[column.align] : undefined}
+                                width={toCssSize(column.width)}
+                                minWidth={toCssSize(column.minWidth) ?? PRIORITY_MIN_WIDTH[priority]}
+                                popinHidden={column.hideInPopin}
+                                popinText={column.popinText ?? (typeof column.header === 'string' ? column.header : undefined)}
+                            >
+                                {column.header}
+                            </TableHeaderCell>
+                        );
+                    })}
+                </TableHeaderRow>
+            }
+        >
+            {rows.map((row) => {
+                const key = String(getRowKey(row));
+                const extraClass = rowClassName?.(row);
+                return (
+                    <TableRow
+                        key={key}
+                        rowKey={key}
+                        interactive={Boolean(onRowClick)}
+                        className={[onRowClick ? styles.clickable : '', extraClass ?? ''].filter(Boolean).join(' ') || undefined}
+                        style={rowStyle?.(row)}
+                    >
+                        {columns.map((column) => (
+                            <TableCell key={column.key} horizontalAlign={column.align ? ALIGN[column.align] : undefined}>
+                                {column.render(row)}
+                            </TableCell>
+                        ))}
                     </TableRow>
-                )}
-            </TableBody>
+                );
+            })}
         </Table>
     );
 
-    const scrollSx = maxHeight ? { maxHeight, overflowY: 'auto' as const } : {};
-
-    if (variant === 'plain') {
-        return <TableContainer sx={scrollSx}>{table}</TableContainer>;
-    }
+    const wrapperClass = [
+        variant === 'card' ? styles.card : styles.plain,
+        maxHeight !== undefined ? styles.scroll : '',
+        size === 'small' ? 'ui5-content-density-compact' : '',
+        className ?? '',
+    ]
+        .filter(Boolean)
+        .join(' ');
 
     return (
-        // fioriCardSx เป็น SxProps<Theme> (type รวม function/array ไว้ด้วยเผื่อ
-        // เคสอื่นๆ) แต่ตัวจริงเป็น plain object เสมอ — cast ก่อน spread แทนที่จะ
-        // ยัดใส่ sx array ตรงๆ (แบบนั้น type ไม่ผ่านเพราะ nested SxProps array)
-        <TableContainer component={Paper} elevation={0} sx={{ ...(fioriCardSx as Record<string, unknown>), ...scrollSx }}>
+        <div className={wrapperClass} style={{ maxHeight: toCssSize(maxHeight), ...style }}>
             {table}
-        </TableContainer>
+        </div>
     );
 }
 

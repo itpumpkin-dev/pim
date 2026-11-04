@@ -1,34 +1,19 @@
-import AppLayout from '@/layouts/app-layout';
+import { FioriField, FioriFormErrorSummary, FioriFormGroup, FioriMessageStrip } from '@/components/fiori-form';
 import { useUnsavedChangesGuard } from '@/hooks/use-unsaved-changes-guard';
+import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
-import { Head, Link, useForm } from '@inertiajs/react';
-import ArrowBackIcon from '@mui/icons-material/ArrowBack';
-import CloudUploadIcon from '@mui/icons-material/CloudUpload';
-import DescriptionIcon from '@mui/icons-material/Description';
-import CloseIcon from '@mui/icons-material/Close';
-import PlayArrowIcon from '@mui/icons-material/PlayArrow';
-import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
-import {
-    Alert,
-    Box,
-    Button,
-    Checkbox,
-    CircularProgress,
-    Collapse,
-    FormControl,
-    FormControlLabel,
-    FormHelperText,
-    IconButton,
-    InputLabel,
-    MenuItem,
-    Paper,
-    Select,
-    Stack,
-    Typography,
-} from '@mui/material';
+import { Head, router, useForm } from '@inertiajs/react';
+import '@ui5/webcomponents-icons/dist/decline.js';
+import '@ui5/webcomponents-icons/dist/document.js';
+import '@ui5/webcomponents-icons/dist/nav-back.js';
+import '@ui5/webcomponents-icons/dist/play.js';
+import '@ui5/webcomponents-icons/dist/slim-arrow-down.js';
+import '@ui5/webcomponents-icons/dist/slim-arrow-up.js';
+import '@ui5/webcomponents-icons/dist/upload.js';
+import { Button, CheckBox, Icon, Option, Select, Title } from '@ui5/webcomponents-react';
 import { DragEvent, FormEvent, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FIORI, fioriCardSx, fioriDefaultSx, fioriEmphasizedSx, fioriGhostSx, fioriIconButtonSx } from '@/lib/fiori-style';
+import styles from '../import-export.module.css';
 
 interface AttributeFamilyOption {
     code: string;
@@ -83,56 +68,44 @@ function FileDropzone({
 
     if (file) {
         return (
-            <Paper
-                elevation={0}
-                sx={{ p: 1.5, display: 'flex', alignItems: 'center', gap: 1.5, border: `1px solid ${FIORI.success}`, borderRadius: '8px', bgcolor: FIORI.hover }}
-            >
-                <DescriptionIcon sx={{ color: FIORI.success }} />
-                <Box sx={{ flex: 1, minWidth: 0 }}>
-                    <Typography variant="body2" fontWeight={600} noWrap sx={{ color: FIORI.textPrimary }}>{file.name}</Typography>
-                    <Typography variant="caption" sx={{ color: FIORI.textSecondary }}>{formatFileSize(file.size)}</Typography>
-                </Box>
-                <IconButton size="small" sx={fioriIconButtonSx} onClick={() => onSelect(null)} aria-label="remove">
-                    <CloseIcon fontSize="small" />
-                </IconButton>
-            </Paper>
+            <div className={styles.selectedFile}>
+                <Icon name="document" style={{ width: '1.5rem', height: '1.5rem', color: 'var(--sapPositiveColor)', flexShrink: 0 }} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                    <span className={styles.ellipsis} style={{ fontWeight: 600, color: 'var(--sapTextColor)', fontSize: 'var(--sapFontSize)' }}>
+                        {file.name}
+                    </span>
+                    <span className={styles.smallText}>{formatFileSize(file.size)}</span>
+                </div>
+                <Button design="Transparent" icon="decline" accessibleName="remove" tooltip="remove" onClick={() => onSelect(null)} />
+            </div>
         );
     }
 
     return (
-        <Box>
-            <Box
-                component="label"
+        <div>
+            <label
+                className={[styles.dropzone, dragging ? styles.dropzoneActive : ''].filter(Boolean).join(' ')}
                 onDragOver={(e: DragEvent<HTMLElement>) => {
                     e.preventDefault();
                     setDragging(true);
                 }}
                 onDragLeave={() => setDragging(false)}
                 onDrop={handleDrop}
-                sx={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: 0.5,
-                    p: 3,
-                    border: '2px dashed',
-                    borderColor: dragging ? FIORI.brand : FIORI.border,
-                    borderRadius: '8px',
-                    bgcolor: dragging ? FIORI.selected : 'transparent',
-                    cursor: 'pointer',
-                    textAlign: 'center',
-                    transition: 'border-color 0.15s, background-color 0.15s',
-                    '&:hover': { borderColor: FIORI.brand },
-                }}
             >
-                <CloudUploadIcon sx={{ fontSize: 32, color: dragging ? FIORI.brand : FIORI.textSecondary }} />
-                <Typography variant="body2" fontWeight={600} sx={{ color: FIORI.textPrimary }}>{label}</Typography>
-                {hint && <Typography variant="caption" sx={{ color: FIORI.textSecondary }}>{hint}</Typography>}
+                <Icon
+                    name="upload"
+                    style={{ width: '2rem', height: '2rem', color: dragging ? 'var(--sapBrandColor)' : 'var(--sapContent_LabelColor)' }}
+                />
+                <span style={{ fontWeight: 600, color: 'var(--sapTextColor)', fontSize: 'var(--sapFontSize)' }}>{label}</span>
+                {hint && <span className={styles.smallText}>{hint}</span>}
                 <input type="file" hidden accept=".csv" onChange={(e) => onSelect(e.target.files?.[0] ?? null)} />
-            </Box>
-            {error && <FormHelperText error>{error}</FormHelperText>}
-        </Box>
+            </label>
+            {error && (
+                <span className={styles.smallText} style={{ display: 'block', marginTop: '0.25rem', color: 'var(--sapNegativeTextColor)' }}>
+                    {error}
+                </span>
+            )}
+        </div>
     );
 }
 
@@ -151,9 +124,9 @@ export default function WooConvertCreate({ families }: Props) {
         file: null as File | null,
         category_map: null as File | null,
         family_code: '',
-        emit_name: true,
-        emit_description: true,
-        strip_html: true,
+        emit_name: true as boolean,
+        emit_description: true as boolean,
+        strip_html: true as boolean,
     });
     const skipNavigationGuardRef = useUnsavedChangesGuard(isDirty);
 
@@ -170,8 +143,8 @@ export default function WooConvertCreate({ families }: Props) {
         setData('file', file);
     };
 
-    const submit = (e: FormEvent) => {
-        e.preventDefault();
+    const submit = (e?: FormEvent) => {
+        e?.preventDefault();
         skipNavigationGuardRef.current = true;
         post('/import-export/woo-convert', {
             onFinish: () => {
@@ -183,21 +156,22 @@ export default function WooConvertCreate({ families }: Props) {
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={t('wooConvertTitle')} />
-            <Box component="form" onSubmit={submit} sx={{ p: { xs: 2, md: 4 }, width: '100%', maxWidth: 720, mx: 'auto', bgcolor: FIORI.pageBg, minHeight: '100%' }}>
-                <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ sm: 'center' }} spacing={2} sx={{ mb: 3 }}>
-                    <Typography variant="h5" fontWeight={600} sx={{ color: FIORI.textPrimary }}>{t('wooConvertTitle')}</Typography>
-                    <Button component={Link} href="/import-export/woo-convert" variant="outlined" startIcon={<ArrowBackIcon />} sx={fioriDefaultSx}>
+            <form onSubmit={submit} className={styles.page} style={{ maxWidth: 720, marginInline: 'auto' }}>
+                <div className={styles.header}>
+                    <Title level="H3" size="H3" wrappingType="Normal">
+                        {t('wooConvertTitle')}
+                    </Title>
+                    <Button icon="nav-back" onClick={() => router.visit('/import-export/woo-convert')}>
                         {tCatalog('back')}
                     </Button>
-                </Stack>
+                </div>
 
-                <Alert severity="info" sx={{ mb: 3, whiteSpace: 'pre-line' }}>
+                <FioriMessageStrip severity="information" style={{ marginBottom: '1.5rem', whiteSpace: 'pre-line' }}>
                     {t('wooConvertIntro')}
-                </Alert>
+                </FioriMessageStrip>
 
-                <Stack spacing={2}>
-                    <Paper elevation={0} sx={{ ...fioriCardSx, p: 3 }}>
-                        <Typography variant="h6" fontWeight={600} sx={{ mb: 2, color: FIORI.textPrimary }}>{t('wooConvertFileSectionTitle')}</Typography>
+                <div className={styles.stack}>
+                    <FioriFormGroup title={t('wooConvertFileSectionTitle')}>
                         <FileDropzone
                             file={data.file}
                             onSelect={selectFile}
@@ -205,95 +179,97 @@ export default function WooConvertCreate({ families }: Props) {
                             hint={t('wooConvertFileHelp')}
                             error={errors.file}
                         />
-                    </Paper>
+                    </FioriFormGroup>
 
-                    <Box>
+                    <div>
                         <Button
+                            design="Transparent"
+                            endIcon={advancedOpen ? 'slim-arrow-up' : 'slim-arrow-down'}
                             onClick={() => setAdvancedOpen((v) => !v)}
-                            endIcon={<ExpandMoreIcon sx={{ transform: advancedOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }} />}
-                            sx={{ ...fioriGhostSx, color: FIORI.textSecondary }}
                         >
                             {t('wooConvertAdvancedOptions')}
                         </Button>
 
-                        <Collapse in={advancedOpen || advancedErrorCount > 0} timeout="auto" unmountOnExit>
-                            <Stack spacing={2} sx={{ mt: 1 }}>
-                                <Paper elevation={0} sx={{ ...fioriCardSx, p: 3 }}>
-                                    <Typography variant="h6" fontWeight={600} sx={{ mb: 2, color: FIORI.textPrimary }}>{t('wooConvertCategorySectionTitle')}</Typography>
-                                    <Stack spacing={2}>
-                                        <Typography variant="body2" sx={{ color: FIORI.textSecondary }}>{t('wooConvertCategoryHelp')}</Typography>
-                                        <FileDropzone
-                                            file={data.category_map}
-                                            onSelect={(file) => setData('category_map', file)}
-                                            label={t('wooConvertCategoryMapChoose')}
-                                            error={errors.category_map}
-                                        />
-                                    </Stack>
-                                </Paper>
+                        {(advancedOpen || advancedErrorCount > 0) && (
+                            <div className={styles.stack} style={{ marginTop: '0.5rem' }}>
+                                <FioriFormGroup title={t('wooConvertCategorySectionTitle')} description={t('wooConvertCategoryHelp')}>
+                                    <FileDropzone
+                                        file={data.category_map}
+                                        onSelect={(file) => setData('category_map', file)}
+                                        label={t('wooConvertCategoryMapChoose')}
+                                        error={errors.category_map}
+                                    />
+                                </FioriFormGroup>
 
-                                <Paper elevation={0} sx={{ ...fioriCardSx, p: 3 }}>
-                                    <Typography variant="h6" fontWeight={600} sx={{ mb: 2, color: FIORI.textPrimary }}>{t('wooConvertFamilySectionTitle')}</Typography>
-                                    <FormControl fullWidth>
-                                        <InputLabel id="woo-convert-family-label">{t('wooConvertFamilyCode')}</InputLabel>
+                                <FioriFormGroup title={t('wooConvertFamilySectionTitle')}>
+                                    <FioriField
+                                        label={t('wooConvertFamilyCode')}
+                                        htmlFor="woo-convert-family"
+                                        hint={t('wooConvertFamilyCodeHelp')}
+                                        valueState={errors.family_code ? 'error' : 'none'}
+                                        message={errors.family_code}
+                                        labelWidth={160}
+                                    >
                                         <Select
-                                            labelId="woo-convert-family-label"
-                                            label={t('wooConvertFamilyCode')}
+                                            id="woo-convert-family"
+                                            className={styles.fullWidth}
                                             value={data.family_code}
-                                            onChange={(e) => setData('family_code', e.target.value)}
+                                            valueState={errors.family_code ? 'Negative' : 'None'}
+                                            onChange={(e) => setData('family_code', e.detail.selectedOption.value ?? '')}
                                         >
-                                            <MenuItem value=""><em>{t('wooConvertFamilyCodeNone')}</em></MenuItem>
+                                            <Option value="">{t('wooConvertFamilyCodeNone')}</Option>
                                             {families.map((family) => (
-                                                <MenuItem key={family.code} value={family.code}>{family.name} ({family.code})</MenuItem>
+                                                <Option key={family.code} value={family.code}>
+                                                    {family.name} ({family.code})
+                                                </Option>
                                             ))}
                                         </Select>
-                                        <FormHelperText>{t('wooConvertFamilyCodeHelp')}</FormHelperText>
-                                    </FormControl>
-                                </Paper>
+                                    </FioriField>
+                                </FioriFormGroup>
 
-                                <Paper elevation={0} sx={{ ...fioriCardSx, p: 3 }}>
-                                    <Typography variant="h6" fontWeight={600} sx={{ mb: 2, color: FIORI.textPrimary }}>{t('wooConvertOptionsSectionTitle')}</Typography>
-                                    <Stack spacing={1}>
-                                        <FormControlLabel
-                                            control={<Checkbox checked={data.emit_name} onChange={(e) => setData('emit_name', e.target.checked)} />}
-                                            label={t('wooConvertEmitName')}
+                                <FioriFormGroup title={t('wooConvertOptionsSectionTitle')}>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                                        <CheckBox
+                                            text={t('wooConvertEmitName')}
+                                            checked={data.emit_name}
+                                            onChange={(e) => setData('emit_name', e.target.checked)}
                                         />
-                                        <FormControlLabel
-                                            control={<Checkbox checked={data.emit_description} onChange={(e) => setData('emit_description', e.target.checked)} />}
-                                            label={t('wooConvertEmitDescription')}
+                                        <CheckBox
+                                            text={t('wooConvertEmitDescription')}
+                                            checked={data.emit_description}
+                                            onChange={(e) => setData('emit_description', e.target.checked)}
                                         />
-                                        <FormControlLabel
-                                            control={<Checkbox checked={data.strip_html} onChange={(e) => setData('strip_html', e.target.checked)} />}
-                                            label={t('wooConvertStripHtml')}
+                                        <CheckBox
+                                            text={t('wooConvertStripHtml')}
+                                            checked={data.strip_html}
+                                            onChange={(e) => setData('strip_html', e.target.checked)}
                                         />
                                         {(data.emit_name || data.emit_description) && (
-                                            <Typography variant="caption" sx={{ color: FIORI.textSecondary, whiteSpace: 'pre-line' }}>
+                                            <span className={styles.smallText} style={{ whiteSpace: 'pre-line' }}>
                                                 {t('wooConvertLocaleCaveat')}
-                                            </Typography>
+                                            </span>
                                         )}
-                                    </Stack>
-                                </Paper>
-                            </Stack>
-                        </Collapse>
-                    </Box>
-                </Stack>
+                                    </div>
+                                </FioriFormGroup>
+                            </div>
+                        )}
+                    </div>
+                </div>
 
-                {Object.keys(errors).length > 0 && (
-                    <Alert severity="error" sx={{ mt: 2 }}>
-                        {tCatalog('correctHighlightedFields')}
-                    </Alert>
-                )}
+                <FioriFormErrorSummary errors={errors} message={tCatalog('correctHighlightedFields')} style={{ marginTop: '1rem' }} />
 
                 <Button
-                    type="submit"
-                    fullWidth
-                    size="large"
+                    design="Emphasized"
+                    icon="play"
                     disabled={processing || !data.file}
-                    startIcon={processing ? <CircularProgress size={16} color="inherit" /> : <PlayArrowIcon />}
-                    sx={{ ...fioriEmphasizedSx, mt: 3, py: 1.25 }}
+                    loading={processing}
+                    loadingDelay={0}
+                    onClick={() => submit()}
+                    style={{ width: '100%', marginTop: '1.5rem' }}
                 >
                     {processing ? t('wooConvertSubmitting') : t('wooConvertSubmit')}
                 </Button>
-            </Box>
+            </form>
         </AppLayout>
     );
 }

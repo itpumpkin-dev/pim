@@ -1,5 +1,7 @@
-import CloseIcon from '@mui/icons-material/Close';
-import { Autocomplete, IconButton, Stack, TextField, Typography } from '@mui/material';
+import '@ui5/webcomponents-icons/dist/decline.js';
+import '@ui5/webcomponents-icons/dist/search.js';
+import { BusyIndicator, Button, FlexBox, Icon, Input, SuggestionItem, Text } from '@ui5/webcomponents-react';
+import '@ui5/webcomponents/dist/features/InputSuggestions.js';
 import { useEffect, useState } from 'react';
 
 export interface ProductOption {
@@ -7,6 +9,8 @@ export interface ProductOption {
     sku: string;
     name: string;
 }
+
+const optionLabel = (opt: ProductOption) => `${opt.sku} — ${opt.name}`;
 
 /**
  * Search-by-SKU-or-name picker for the product edit page's Associations
@@ -64,42 +68,52 @@ export function ProductPicker({
     };
 
     return (
-        <Stack spacing={1}>
-            <Autocomplete
-                size="small"
-                options={results}
-                loading={loading}
-                filterOptions={(options) => options}
-                getOptionLabel={(opt) => `${opt.sku} — ${opt.name}`}
-                inputValue={query}
-                onInputChange={(_, val) => setQuery(val)}
-                onChange={(_, val) => val && addProduct(val)}
-                value={null}
-                renderInput={(params) => <TextField {...params} placeholder={placeholder ?? 'ค้นหาด้วย SKU หรือชื่อสินค้า'} />}
-            />
-            <Stack spacing={0.5}>
+        <FlexBox direction="Column" style={{ gap: '0.5rem' }}>
+            {/* UI5 Input + suggestions: ผลค้นหามาจาก server แล้ว เลยไม่ให้ Input
+                กรองซ้ำ (filter ค่าเริ่มต้นคือ "None") — เลือกรายการ (คลิก/Enter)
+                แล้ว Input ยิง change พร้อม value = ข้อความของรายการนั้น จึงจับคู่กลับ
+                ไปหาสินค้าด้วย label */}
+            <Input
+                style={{ width: '100%' }}
+                showSuggestions
+                value={query}
+                placeholder={placeholder ?? 'ค้นหาด้วย SKU หรือชื่อสินค้า'}
+                icon={loading ? <BusyIndicator active size="S" delay={0} /> : <Icon name="search" />}
+                onInput={(e) => setQuery(e.target.value)}
+                onChange={(e) => {
+                    const picked = results.find((opt) => optionLabel(opt) === e.target.value);
+                    if (picked) addProduct(picked);
+                }}
+            >
+                {results.map((opt) => (
+                    <SuggestionItem key={opt.id} text={optionLabel(opt)} />
+                ))}
+            </Input>
+            <FlexBox direction="Column" style={{ gap: '0.25rem' }}>
                 {value.map((product) => (
-                    <Stack
+                    <FlexBox
                         key={product.id}
-                        direction="row"
-                        alignItems="center"
-                        justifyContent="space-between"
-                        sx={{ border: 1, borderColor: 'divider', borderRadius: 1, px: 1.5, py: 0.75 }}
+                        alignItems="Center"
+                        justifyContent="SpaceBetween"
+                        style={{
+                            border: '1px solid var(--sapGroup_ContentBorderColor)',
+                            borderRadius: 'var(--sapElement_BorderCornerRadius)',
+                            padding: '0.375rem 0.75rem',
+                            gap: '0.5rem',
+                        }}
                     >
-                        <Typography variant="body2">
+                        <Text>
                             {product.sku} — {product.name}
-                        </Typography>
-                        <IconButton size="small" onClick={() => removeProduct(product.id)}>
-                            <CloseIcon fontSize="small" />
-                        </IconButton>
-                    </Stack>
+                        </Text>
+                        <Button design="Transparent" icon="decline" tooltip="ลบ" accessibleName="ลบ" onClick={() => removeProduct(product.id)} />
+                    </FlexBox>
                 ))}
                 {value.length === 0 && (
-                    <Typography variant="caption" color="text.disabled">
+                    <Text style={{ fontSize: 'var(--sapFontSmallSize)', color: 'var(--sapContent_DisabledTextColor, var(--sapContent_LabelColor))' }}>
                         ยังไม่มีสินค้า
-                    </Typography>
+                    </Text>
                 )}
-            </Stack>
-        </Stack>
+            </FlexBox>
+        </FlexBox>
     );
 }

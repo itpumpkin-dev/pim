@@ -1,31 +1,13 @@
+import { FioriMessageBox } from '@/components/fiori-message-box';
+import { FioriResponsiveTable, type FioriResponsiveColumn } from '@/components/fiori-responsive-table';
 import AppLayout from '@/layouts/app-layout';
+import { FioriStatus } from '@/lib/fiori-style';
 import { type BreadcrumbItem, type SharedData } from '@/types';
 import { Head, router, usePage } from '@inertiajs/react';
-import AddIcon from '@mui/icons-material/Add';
-import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
-import ChevronRightIcon from '@mui/icons-material/ChevronRight';
-import DeleteIcon from '@mui/icons-material/Delete';
-import EditIcon from '@mui/icons-material/Edit';
-import FirstPageIcon from '@mui/icons-material/FirstPage';
-import LastPageIcon from '@mui/icons-material/LastPage';
-import SearchIcon from '@mui/icons-material/Search';
-import {
-    Box,
-    Button,
-    IconButton,
-    InputAdornment,
-    Paper,
-    Stack,
-    TableSortLabel,
-    TextField,
-    Typography,
-} from '@mui/material';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { FioriMessageBox } from '@/components/fiori-message-box';
-import { FioriResponsiveColumn, FioriResponsiveTable } from '@/components/fiori-responsive-table';
-import { FIORI, FioriStatus, fioriEmphasizedSx, fioriIconButtonSx, fioriSearchFieldSx } from '@/lib/fiori-style';
+import { MasterListPage, MasterListToolbar, MasterPagination, RowActions, SecondaryText, SortableHeader, StrongText } from '../master-crud';
 
 interface BusinessTypeItem {
     id: number;
@@ -82,7 +64,8 @@ export default function BusinessTypeIndex({ businessTypes, filters }: Props) {
 
     const currentPage = businessTypes.current_page ?? 1;
     const lastPage = businessTypes.last_page ?? 1;
-    const goToPage = (page: number) => router.get('/catalog/business-types', { search, page, sort: sortField, dir: sortDir }, { preserveState: true });
+    const goToPage = (page: number) =>
+        router.get('/catalog/business-types', { search, page, sort: sortField, dir: sortDir }, { preserveState: true });
 
     const handleSort = (field: string) => {
         const nextDir: 'asc' | 'desc' = sortField === field && sortDir === 'asc' ? 'desc' : 'asc';
@@ -91,34 +74,28 @@ export default function BusinessTypeIndex({ businessTypes, filters }: Props) {
         router.get('/catalog/business-types', { search, sort: field, dir: nextDir }, { preserveState: true });
     };
 
+    const sortHeader = (field: string, label: string) => (
+        <SortableHeader label={label} active={sortField === field} direction={sortDir} onSort={() => handleSort(field)} />
+    );
+
     const columns: FioriResponsiveColumn<BusinessTypeItem>[] = [
         {
             key: 'name',
-            header: (
-                <TableSortLabel active={sortField === 'name'} direction={sortField === 'name' ? sortDir : 'asc'} onClick={() => handleSort('name')}>
-                    {t('businessTypeName')}
-                </TableSortLabel>
-            ),
+            header: sortHeader('name', t('businessTypeName')),
+            popinText: t('businessTypeName'),
             priority: 'always',
-            render: (row) => <Typography sx={{ fontWeight: 600 }}>{row.name}</Typography>,
+            render: (row) => <StrongText>{row.name}</StrongText>,
         },
         {
             key: 'description',
             header: t('description'),
             priority: 'medium',
-            render: (row) => (
-                <Typography sx={{ color: FIORI.textSecondary, maxWidth: 420, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {row.description || <Typography component="span" color="text.disabled">—</Typography>}
-                </Typography>
-            ),
+            render: (row) => <SecondaryText value={row.description} maxWidth={420} />,
         },
         {
             key: 'is_active',
-            header: (
-                <TableSortLabel active={sortField === 'is_active'} direction={sortField === 'is_active' ? sortDir : 'asc'} onClick={() => handleSort('is_active')}>
-                    {t('status')}
-                </TableSortLabel>
-            ),
+            header: sortHeader('is_active', t('status')),
+            popinText: t('status'),
             priority: 'high',
             render: (row) => <FioriStatus label={row.is_active ? t('active') : t('nonActive')} tone={row.is_active ? 'success' : 'neutral'} />,
         },
@@ -130,14 +107,7 @@ export default function BusinessTypeIndex({ businessTypes, filters }: Props) {
                       priority: 'always' as const,
                       align: 'right' as const,
                       render: (row: BusinessTypeItem) => (
-                          <Stack direction="row" spacing={0.5} justifyContent="flex-end">
-                              <IconButton size="small" sx={fioriIconButtonSx} onClick={() => router.visit(`/catalog/business-types/${row.id}/edit`)}>
-                                  <EditIcon fontSize="small" />
-                              </IconButton>
-                              <IconButton size="small" sx={fioriIconButtonSx} onClick={() => setDeleteId(row.id)}>
-                                  <DeleteIcon fontSize="small" />
-                              </IconButton>
-                          </Stack>
+                          <RowActions onEdit={() => router.visit(`/catalog/business-types/${row.id}/edit`)} onDelete={() => setDeleteId(row.id)} />
                       ),
                   },
               ]
@@ -147,73 +117,27 @@ export default function BusinessTypeIndex({ businessTypes, filters }: Props) {
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={tNav('businessTypes')} />
-            <Box sx={{ p: { xs: 2, md: 4 }, bgcolor: FIORI.pageBg, minHeight: '100%' }}>
-                <Box
-                    sx={{
-                        display: 'flex',
-                        flexDirection: { xs: 'column', sm: 'row' },
-                        justifyContent: 'space-between',
-                        alignItems: { xs: 'stretch', sm: 'flex-start' },
-                        gap: 2,
-                        mb: 3,
-                    }}
-                >
-                    <Box>
-                        <Typography variant="h5" fontWeight={600} sx={{ color: FIORI.textPrimary }}>{tNav('businessTypes')}</Typography>
-                        <Typography variant="body2" sx={{ color: FIORI.textSecondary, mt: 0.25 }}>{tGrid('results', { count: businessTypes.total })}</Typography>
-                    </Box>
-                    {canEdit && (
-                        <Button
-                            variant="contained"
-                            startIcon={<AddIcon />}
-                            onClick={() => router.visit('/catalog/business-types/create')}
-                            sx={fioriEmphasizedSx}
-                        >
-                            {t('createBusinessType')}
-                        </Button>
-                    )}
-                </Box>
+            <MasterListPage
+                title={tNav('businessTypes')}
+                addLabel={t('createBusinessType')}
+                onAdd={canEdit ? () => router.visit('/catalog/business-types/create') : undefined}
+            >
+                <MasterListToolbar
+                    resultsLabel={tGrid('results', { count: businessTypes.total })}
+                    search={search}
+                    onSearchChange={setSearch}
+                    searchPlaceholder={t('searchBusinessTypes')}
+                />
 
-                <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="flex-end" sx={{ mb: 2 }}>
-                    <TextField
-                        value={search}
-                        onChange={(e) => setSearch(e.target.value)}
-                        placeholder={t('searchBusinessTypes')}
-                        size="small"
-                        sx={{ ...fioriSearchFieldSx, width: { xs: '100%', md: 'auto' }, minWidth: { xs: 0, md: 260 } }}
-                        InputProps={{
-                            startAdornment: (
-                                <InputAdornment position="start">
-                                    <SearchIcon fontSize="small" sx={{ color: FIORI.textSecondary }} />
-                                </InputAdornment>
-                            ),
-                        }}
-                    />
-                </Stack>
+                <FioriResponsiveTable
+                    columns={columns}
+                    rows={businessTypes.data}
+                    getRowKey={(row) => row.id}
+                    emptyMessage={t('noBusinessTypesFound')}
+                />
 
-                <FioriResponsiveTable columns={columns} rows={businessTypes.data} getRowKey={(row) => row.id} emptyMessage={t('noBusinessTypesFound')} />
-
-                <Stack direction="row" justifyContent="flex-end" alignItems="center" spacing={1.5} sx={{ mt: 2 }}>
-                    <Typography variant="body2" sx={{ color: FIORI.textSecondary }}>{tGrid('pageOf', { lastPage })}</Typography>
-                    <Stack direction="row" spacing={0.2}>
-                        <IconButton size="small" sx={fioriIconButtonSx} disabled={currentPage <= 1} onClick={() => goToPage(1)}>
-                            <FirstPageIcon fontSize="small" />
-                        </IconButton>
-                        <IconButton size="small" sx={fioriIconButtonSx} disabled={currentPage <= 1} onClick={() => goToPage(currentPage - 1)}>
-                            <ChevronLeftIcon fontSize="small" />
-                        </IconButton>
-                        <Paper variant="outlined" sx={{ px: 1.5, py: 0.5, bgcolor: FIORI.surface, borderRadius: '8px', borderColor: FIORI.border, display: 'flex', alignItems: 'center' }}>
-                            <Typography variant="body2" sx={{ color: FIORI.textPrimary }}>{currentPage}</Typography>
-                        </Paper>
-                        <IconButton size="small" sx={fioriIconButtonSx} disabled={currentPage >= lastPage} onClick={() => goToPage(currentPage + 1)}>
-                            <ChevronRightIcon fontSize="small" />
-                        </IconButton>
-                        <IconButton size="small" sx={fioriIconButtonSx} disabled={currentPage >= lastPage} onClick={() => goToPage(lastPage)}>
-                            <LastPageIcon fontSize="small" />
-                        </IconButton>
-                    </Stack>
-                </Stack>
-            </Box>
+                <MasterPagination currentPage={currentPage} lastPage={lastPage} label={tGrid('pageOf', { lastPage })} onPageChange={goToPage} />
+            </MasterListPage>
 
             <FioriMessageBox
                 open={deleteId !== null}

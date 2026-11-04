@@ -1,24 +1,11 @@
-import { FIORI, FIORI_RAW, fioriDefaultSx, fioriEmphasizedSx, fioriSearchFieldSx } from '@/lib/fiori-style';
-import { UI_BORDER, UI_BORDER_STRONG } from '@/lib/ui-style';
-import ChevronRightIcon from '@mui/icons-material/ChevronRight';
-import CloseIcon from '@mui/icons-material/Close';
-import SearchIcon from '@mui/icons-material/Search';
-import {
-    Box,
-    Button,
-    Chip,
-    Dialog,
-    DialogActions,
-    DialogContent,
-    DialogTitle,
-    IconButton,
-    InputAdornment,
-    Stack,
-    TextField,
-    Typography,
-} from '@mui/material';
+import '@ui5/webcomponents-icons/dist/decline.js';
+import '@ui5/webcomponents-icons/dist/search.js';
+import '@ui5/webcomponents-icons/dist/slim-arrow-right.js';
+import { Bar, Button, Dialog, Icon, Input, Tag, Title } from '@ui5/webcomponents-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+
+import styles from './category-cascade-select.module.css';
 
 export interface CategoryNode {
     id: number;
@@ -87,27 +74,19 @@ function MarketplaceMappingSummary({ node }: { node: CategoryNode | undefined })
     const names = mappedPlatformNames(node);
 
     return (
-        <Stack direction="row" spacing={1} alignItems="center" sx={{ pt: 0.5 }}>
-            <Typography variant="caption" color="text.secondary" fontWeight={600}>
-                {t('marketplaceMappingLabel')}
-            </Typography>
+        <div className={styles.summary}>
+            <span className={styles.summaryLabel}>{t('marketplaceMappingLabel')}</span>
             {names.length > 0 ? (
                 <>
-                    <Chip
-                        label={t('mappedToPlatformsCount', { count: names.length })}
-                        size="small"
-                        sx={{ bgcolor: FIORI.brand, color: '#fff', fontWeight: 600, height: 20, fontSize: 11 }}
-                    />
-                    <Typography variant="caption" color="text.secondary">
-                        ({names.join(', ')})
-                    </Typography>
+                    <Tag design="Information" hideStateIcon>
+                        {t('mappedToPlatformsCount', { count: names.length })}
+                    </Tag>
+                    <span>({names.join(', ')})</span>
                 </>
             ) : (
-                <Typography variant="caption" color="text.disabled" sx={{ fontStyle: 'italic' }}>
-                    {t('notMappedToAnyMarketplace')}
-                </Typography>
+                <span className={`${styles.empty} ${styles.small}`}>{t('notMappedToAnyMarketplace')}</span>
             )}
-        </Stack>
+        </div>
     );
 }
 
@@ -142,28 +121,18 @@ export function CategoryPathReadOnly({ categoryIds }: { categoryIds: number[] })
     }, [tree, categoryIds]);
 
     if (loading) {
-        return (
-            <Typography variant="body2" color="text.secondary">
-                {t('loadingCategories')}
-            </Typography>
-        );
+        return <span className={styles.muted}>{t('loadingCategories')}</span>;
     }
 
     if (currentPath.length === 0) {
-        return (
-            <Typography variant="body2" color="text.disabled" sx={{ fontStyle: 'italic' }}>
-                {t('categoryNotAssigned')}
-            </Typography>
-        );
+        return <span className={styles.empty}>{t('categoryNotAssigned')}</span>;
     }
 
     return (
-        <Stack spacing={1}>
-            <Typography variant="body2" color="text.primary">
-                {currentPath.map((n) => n.name).join(' > ')}
-            </Typography>
+        <div className={styles.readOnlyStack}>
+            <span style={{ color: 'var(--sapTextColor)', fontSize: 'var(--sapFontSize)' }}>{currentPath.map((n) => n.name).join(' > ')}</span>
             <MarketplaceMappingSummary node={currentPath[currentPath.length - 1]} />
-        </Stack>
+        </div>
     );
 }
 
@@ -181,35 +150,23 @@ function CategoryColumn({
     onSelect: (node: CategoryNode) => void;
 }) {
     return (
-        <Box sx={{ width: 220, flexShrink: 0, overflowY: 'auto', borderRight: `1px solid ${UI_BORDER}`, '&:last-child': { borderRight: 'none' } }}>
+        <div className={styles.column}>
             {nodes.map((node) => {
                 const isSelected = node.id === selectedId;
                 return (
-                    <Box
+                    <button
+                        type="button"
                         key={node.id}
                         onClick={() => onSelect(node)}
-                        sx={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'space-between',
-                            gap: 1,
-                            px: 2,
-                            py: 1,
-                            cursor: 'pointer',
-                            bgcolor: isSelected ? FIORI_RAW.brand + '1a' : 'transparent',
-                            color: isSelected ? FIORI.brand : 'text.primary',
-                            fontWeight: isSelected ? 700 : 400,
-                            '&:hover': { bgcolor: isSelected ? FIORI_RAW.brand + '1a' : 'action.hover' },
-                        }}
+                        aria-pressed={isSelected}
+                        className={isSelected ? `${styles.option} ${styles.optionSelected}` : styles.option}
                     >
-                        <Typography variant="body2" sx={{ fontWeight: 'inherit', color: 'inherit' }}>
-                            {node.name}
-                        </Typography>
-                        {node.children.length > 0 && <ChevronRightIcon fontSize="small" sx={{ color: isSelected ? FIORI.brand : 'text.disabled' }} />}
-                    </Box>
+                        <span>{node.name}</span>
+                        {node.children.length > 0 && <Icon name="slim-arrow-right" className={styles.optionChevron} />}
+                    </button>
                 );
             })}
-        </Box>
+        </div>
     );
 }
 
@@ -306,108 +263,112 @@ export function CategoryCascadeSelect({
     };
 
     if (loading) {
-        return (
-            <Typography variant="body2" color="text.secondary">
-                {t('loadingCategories')}
-            </Typography>
-        );
+        return <span className={styles.muted}>{t('loadingCategories')}</span>;
     }
 
     return (
-        <Stack spacing={1.5}>
-            <Box
-                onClick={disabled ? undefined : openPicker}
-                sx={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    gap: 1,
-                    px: 1.5,
-                    py: 1,
-                    border: `1px solid ${UI_BORDER_STRONG}`,
-                    borderRadius: 1,
-                    cursor: disabled ? 'not-allowed' : 'pointer',
-                    opacity: disabled ? 0.5 : 1,
-                    bgcolor: disabled ? 'action.disabledBackground' : 'transparent',
-                    '&:hover': disabled ? undefined : { borderColor: FIORI.brand },
-                }}
-            >
-                <Typography variant="body2" color={currentPath.length > 0 ? 'text.primary' : 'text.disabled'} sx={{ fontStyle: currentPath.length > 0 ? 'normal' : 'italic' }}>
+        <div className={styles.stack}>
+            <button type="button" className={styles.trigger} disabled={disabled} onClick={disabled ? undefined : openPicker}>
+                <span className={currentPath.length > 0 ? undefined : styles.triggerEmpty}>
                     {currentPath.length > 0 ? currentPath.map((n) => n.name).join(' > ') : t('noCategorySelectedClickToSelect')}
-                </Typography>
-                <ChevronRightIcon fontSize="small" sx={{ color: 'text.disabled' }} />
-            </Box>
+                </span>
+                <Icon name="slim-arrow-right" className={styles.chevron} />
+            </button>
 
             {currentPath.length > 0 && <MarketplaceMappingSummary node={currentPath[currentPath.length - 1]} />}
 
-            <Dialog open={open} onClose={() => setOpen(false)} maxWidth="md" fullWidth>
-                <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    {t('editProductCategoryDialogTitle')}
-                    <IconButton size="small" onClick={() => setOpen(false)}>
-                        <CloseIcon fontSize="small" />
-                    </IconButton>
-                </DialogTitle>
-                <DialogContent dividers sx={{ p: 0 }}>
-                    <Box sx={{ p: 2, borderBottom: `1px solid ${UI_BORDER}` }}>
-                        <TextField
-                            size="small"
-                            fullWidth
+            <Dialog
+                open={open}
+                className={styles.dialog}
+                onClose={() => setOpen(false)}
+                header={
+                    <div className={styles.dialogHeader}>
+                        <Title level="H5" size="H5" wrappingType="Normal">
+                            {t('editProductCategoryDialogTitle')}
+                        </Title>
+                        <Button
+                            design="Transparent"
+                            icon="decline"
+                            tooltip={t('cancel')}
+                            accessibleName={t('cancel')}
+                            onClick={() => setOpen(false)}
+                        />
+                    </div>
+                }
+                footer={
+                    <Bar
+                        design="Footer"
+                        startContent={
+                            <span className={styles.footerNote}>
+                                {t('currentlySelected')} {pendingPath.length > 0 ? pendingPath.map((n) => n.name).join(' > ') : '—'}
+                            </span>
+                        }
+                        endContent={
+                            <>
+                                <Button design="Emphasized" onClick={handleConfirm} disabled={pendingPath.length === 0}>
+                                    {t('confirm')}
+                                </Button>
+                                <Button design="Transparent" onClick={() => setOpen(false)}>
+                                    {t('cancel')}
+                                </Button>
+                            </>
+                        }
+                    />
+                }
+            >
+                <div className={styles.dialogBody}>
+                    <div className={styles.searchBox}>
+                        <Input
+                            style={{ width: '100%' }}
                             placeholder={t('categorySearchPlaceholder')}
                             value={search}
-                            onChange={(e) => setSearch(e.target.value)}
-                            InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" /></InputAdornment> }}
-                            sx={fioriSearchFieldSx}
+                            showClearIcon
+                            icon={<Icon name="search" />}
+                            onInput={(e) => setSearch(e.target.value)}
                         />
-                    </Box>
+                    </div>
 
                     {search.trim() !== '' ? (
-                        <Box sx={{ maxHeight: 360, overflowY: 'auto' }}>
+                        <div className={styles.searchResults}>
                             {searchResults.length === 0 ? (
-                                <Typography variant="body2" color="text.secondary" sx={{ p: 2 }}>
+                                <div className={styles.muted} style={{ padding: '1rem' }}>
                                     {t('noCategoryMatching', { query: search })}
-                                </Typography>
+                                </div>
                             ) : (
                                 searchResults.map(({ node, path }) => (
-                                    <Box
+                                    <button
+                                        type="button"
                                         key={node.id}
+                                        className={`${styles.option} ${styles.resultItem}`}
                                         onClick={() => selectFromSearch(path)}
-                                        sx={{ px: 2, py: 1, cursor: 'pointer', '&:hover': { bgcolor: 'action.hover' } }}
                                     >
-                                        <Typography variant="body2">{node.name}</Typography>
-                                        <Typography variant="caption" color="text.secondary">
-                                            {path.map((n) => n.name).join(' > ')}
-                                        </Typography>
-                                    </Box>
+                                        <span>{node.name}</span>
+                                        <span className={`${styles.muted} ${styles.small}`}>{path.map((n) => n.name).join(' > ')}</span>
+                                    </button>
                                 ))
                             )}
-                        </Box>
+                        </div>
                     ) : (
-                        <Stack direction="row" sx={{ height: 360 }}>
+                        <div className={styles.columns}>
                             <CategoryColumn nodes={tree} selectedId={pendingPath[0]?.id} onSelect={(node) => selectAt(0, node)} />
                             {pendingPath[0] && (
-                                <CategoryColumn nodes={pendingPath[0].children} selectedId={pendingPath[1]?.id} onSelect={(node) => selectAt(1, node)} />
+                                <CategoryColumn
+                                    nodes={pendingPath[0].children}
+                                    selectedId={pendingPath[1]?.id}
+                                    onSelect={(node) => selectAt(1, node)}
+                                />
                             )}
                             {pendingPath[1] && (
-                                <CategoryColumn nodes={pendingPath[1].children} selectedId={pendingPath[2]?.id} onSelect={(node) => selectAt(2, node)} />
+                                <CategoryColumn
+                                    nodes={pendingPath[1].children}
+                                    selectedId={pendingPath[2]?.id}
+                                    onSelect={(node) => selectAt(2, node)}
+                                />
                             )}
-                        </Stack>
+                        </div>
                     )}
-                </DialogContent>
-                <DialogActions sx={{ justifyContent: 'space-between', px: 2, py: 1.5 }}>
-                    <Typography variant="caption" color="text.secondary">
-                        {t('currentlySelected')}{' '}
-                        {pendingPath.length > 0 ? pendingPath.map((n) => n.name).join(' > ') : '—'}
-                    </Typography>
-                    <Stack direction="row" spacing={1}>
-                        <Button onClick={() => setOpen(false)} sx={fioriDefaultSx}>
-                            {t('cancel')}
-                        </Button>
-                        <Button variant="contained" onClick={handleConfirm} disabled={pendingPath.length === 0} sx={fioriEmphasizedSx}>
-                            {t('confirm')}
-                        </Button>
-                    </Stack>
-                </DialogActions>
+                </div>
             </Dialog>
-        </Stack>
+        </div>
     );
 }

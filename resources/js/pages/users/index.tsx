@@ -1,38 +1,28 @@
+import { FioriResponsiveColumn, FioriResponsiveTable } from '@/components/fiori-responsive-table';
 import { useInitials } from '@/hooks/use-initials';
 import AppLayout from '@/layouts/app-layout';
+import { FioriStatus } from '@/lib/fiori-style';
 import { type BreadcrumbItem, type User } from '@/types';
 import { Head } from '@inertiajs/react';
-import AddIcon from '@mui/icons-material/Add';
-import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
-import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
-import SearchIcon from '@mui/icons-material/Search';
-import {
-    Avatar,
-    Box,
-    Button,
-    IconButton,
-    InputAdornment,
-    Paper,
-    Stack,
-    TablePagination,
-    TextField,
-    Tooltip,
-    Typography,
-} from '@mui/material';
+import '@ui5/webcomponents-icons/dist/add.js';
+import '@ui5/webcomponents-icons/dist/delete.js';
+import '@ui5/webcomponents-icons/dist/edit.js';
+import '@ui5/webcomponents-icons/dist/search.js';
+import '@ui5/webcomponents-icons/dist/slim-arrow-left.js';
+import '@ui5/webcomponents-icons/dist/slim-arrow-right.js';
+import { Avatar, Button, FlexBox, Icon, Input, Label, Option, Select, Text, Title } from '@ui5/webcomponents-react';
 import { useMemo, useState } from 'react';
-import { FioriResponsiveColumn, FioriResponsiveTable } from '@/components/fiori-responsive-table';
-import {
-    FIORI,
-    FioriStatus,
-    fioriCardSx,
-    fioriEmphasizedSx,
-    fioriIconButtonSx,
-    fioriSearchFieldSx,
-} from '@/lib/fiori-style';
+
+import styles from './index.module.css';
 
 const breadcrumbs: BreadcrumbItem[] = [{ title: 'Users', href: '/users' }];
 
+const ROWS_PER_PAGE_OPTIONS = [5, 10, 25];
+
 const formatDate = (value: string) => new Date(value).toLocaleDateString('th-TH', { year: 'numeric', month: 'short', day: 'numeric' });
+
+// รูปผู้ใช้ — User type มี avatar_url; ของเดิมอ่าน `avatar` (unknown) เลยเก็บไว้เป็น fallback
+const avatarSrc = (user: User) => user.avatar_url ?? (typeof user.avatar === 'string' ? user.avatar : undefined);
 
 export default function UsersIndex({ users }: { users: User[] }) {
     const getInitials = useInitials();
@@ -47,6 +37,9 @@ export default function UsersIndex({ users }: { users: User[] }) {
     }, [users, search]);
 
     const paged = filtered.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
+    const lastPage = Math.max(0, Math.ceil(filtered.length / rowsPerPage) - 1);
+    const rangeFrom = filtered.length === 0 ? 0 : page * rowsPerPage + 1;
+    const rangeTo = Math.min(filtered.length, (page + 1) * rowsPerPage);
 
     // Column pop-in priority (SAP Fiori responsive table): the name
     // (with avatar) identifies the row and stays visible everywhere along
@@ -57,47 +50,37 @@ export default function UsersIndex({ users }: { users: User[] }) {
             key: 'name',
             header: 'ชื่อผู้ใช้งาน',
             priority: 'always',
-            render: (user) => (
-                <Stack direction="row" spacing={1.5} alignItems="center">
-                    <Avatar src={user.avatar} alt={user.name} sx={{ width: 32, height: 32, fontSize: 14 }}>
-                        {getInitials(user.name)}
-                    </Avatar>
-                    <Typography variant="body2" sx={{ fontWeight: 600, color: FIORI.textPrimary }}>
-                        {user.name}
-                    </Typography>
-                </Stack>
-            ),
+            render: (user: User) => {
+                const src = avatarSrc(user);
+                return (
+                    <FlexBox alignItems="Center" style={{ gap: '0.75rem' }}>
+                        <Avatar size="XS" initials={src ? undefined : getInitials(user.name)} accessibleName={user.name}>
+                            {src && <img src={src} alt={user.name} />}
+                        </Avatar>
+                        <span style={{ fontWeight: 600, color: 'var(--sapTextColor)' }}>{user.name}</span>
+                    </FlexBox>
+                );
+            },
         },
         {
             key: 'email',
             header: 'อีเมล',
             priority: 'high',
-            render: (user) => (
-                <Typography variant="body2" sx={{ color: FIORI.textSecondary }}>
-                    {user.email}
-                </Typography>
-            ),
+            render: (user: User) => <span style={{ color: 'var(--sapContent_LabelColor)' }}>{user.email}</span>,
         },
         {
             key: 'status',
             header: 'สถานะอีเมล',
             priority: 'medium',
-            render: (user) => (
-                <FioriStatus
-                    label={user.email_verified_at ? 'ยืนยันแล้ว' : 'ยังไม่ยืนยัน'}
-                    tone={user.email_verified_at ? 'success' : 'warning'}
-                />
+            render: (user: User) => (
+                <FioriStatus label={user.email_verified_at ? 'ยืนยันแล้ว' : 'ยังไม่ยืนยัน'} tone={user.email_verified_at ? 'success' : 'warning'} />
             ),
         },
         {
             key: 'created_at',
             header: 'วันที่สมัคร',
             priority: 'low',
-            render: (user) => (
-                <Typography variant="body2" sx={{ color: FIORI.textSecondary }}>
-                    {formatDate(user.created_at)}
-                </Typography>
-            ),
+            render: (user: User) => <span style={{ color: 'var(--sapContent_LabelColor)' }}>{formatDate(user.created_at)}</span>,
         },
         {
             key: 'actions',
@@ -105,18 +88,10 @@ export default function UsersIndex({ users }: { users: User[] }) {
             priority: 'always',
             align: 'right',
             render: () => (
-                <>
-                    <Tooltip title="แก้ไข">
-                        <IconButton size="small" sx={fioriIconButtonSx}>
-                            <EditOutlinedIcon fontSize="small" />
-                        </IconButton>
-                    </Tooltip>
-                    <Tooltip title="ลบ">
-                        <IconButton size="small" sx={{ ...fioriIconButtonSx, '&:hover': { bgcolor: FIORI.headerBg, color: FIORI.error } }}>
-                            <DeleteOutlineIcon fontSize="small" />
-                        </IconButton>
-                    </Tooltip>
-                </>
+                <FlexBox justifyContent="End" style={{ gap: '0.25rem' }}>
+                    <Button design="Transparent" icon="edit" tooltip="แก้ไข" accessibleName="แก้ไข" />
+                    <Button design="Transparent" icon="delete" tooltip="ลบ" accessibleName="ลบ" className={styles.deleteButton} />
+                </FlexBox>
             ),
         },
     ];
@@ -124,66 +99,77 @@ export default function UsersIndex({ users }: { users: User[] }) {
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Users" />
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, p: { xs: 2, md: 3 }, bgcolor: FIORI.pageBg, minHeight: '100%' }}>
-                <Stack direction="row" alignItems="center" justifyContent="space-between" flexWrap="wrap" gap={2}>
-                    <Box>
-                        <Typography variant="h5" fontWeight={600} sx={{ color: FIORI.textPrimary }}>
+            <div className={styles.page}>
+                <FlexBox alignItems="Center" justifyContent="SpaceBetween" wrap="Wrap" style={{ gap: '1rem' }}>
+                    <div>
+                        <Title level="H4" size="H4">
                             ผู้ใช้งานระบบ
-                        </Typography>
-                        <Typography variant="body2" sx={{ color: FIORI.textSecondary, mt: 0.25 }}>
-                            ทั้งหมด {users.length} คน
-                        </Typography>
-                    </Box>
-                    <Stack direction="row" spacing={1.5}>
-                        <TextField
-                            size="small"
+                        </Title>
+                        <Text style={{ color: 'var(--sapContent_LabelColor)', marginTop: '0.125rem' }}>ทั้งหมด {users.length} คน</Text>
+                    </div>
+                    <FlexBox style={{ gap: '0.75rem' }}>
+                        <Input
                             placeholder="ค้นหาชื่อหรืออีเมล"
                             value={search}
-                            onChange={(event) => {
+                            icon={<Icon name="search" />}
+                            style={{ minWidth: 240 }}
+                            onInput={(event) => {
                                 setSearch(event.target.value);
                                 setPage(0);
                             }}
-                            sx={{ ...fioriSearchFieldSx, minWidth: 240 }}
-                            slotProps={{
-                                input: {
-                                    startAdornment: (
-                                        <InputAdornment position="start">
-                                            <SearchIcon fontSize="small" sx={{ color: FIORI.textSecondary }} />
-                                        </InputAdornment>
-                                    ),
-                                },
-                            }}
                         />
-                        <Button variant="contained" startIcon={<AddIcon />} sx={fioriEmphasizedSx}>
+                        <Button design="Emphasized" icon="add">
                             เพิ่มผู้ใช้งาน
                         </Button>
-                    </Stack>
-                </Stack>
+                    </FlexBox>
+                </FlexBox>
 
-                <Paper elevation={0} sx={fioriCardSx}>
+                <div className={styles.card}>
                     <FioriResponsiveTable
                         variant="plain"
                         columns={columns}
                         rows={paged}
-                        getRowKey={(user) => user.id}
+                        getRowKey={(user: User) => user.id}
                         emptyMessage="ไม่พบผู้ใช้งานที่ค้นหา"
                     />
-                    <TablePagination
-                        component="div"
-                        count={filtered.length}
-                        page={page}
-                        onPageChange={(_, newPage) => setPage(newPage)}
-                        rowsPerPage={rowsPerPage}
-                        onRowsPerPageChange={(event) => {
-                            setRowsPerPage(parseInt(event.target.value, 10));
-                            setPage(0);
-                        }}
-                        rowsPerPageOptions={[5, 10, 25]}
-                        labelRowsPerPage="แถวต่อหน้า"
-                        sx={{ borderTop: `1px solid ${FIORI.border}` }}
-                    />
-                </Paper>
-            </Box>
+                    <FlexBox alignItems="Center" justifyContent="End" wrap="Wrap" className={styles.pagination}>
+                        <Label showColon={false}>แถวต่อหน้า</Label>
+                        <Select
+                            value={String(rowsPerPage)}
+                            style={{ width: '5rem' }}
+                            onChange={(event) => {
+                                setRowsPerPage(parseInt(event.detail.selectedOption.value ?? '10', 10));
+                                setPage(0);
+                            }}
+                        >
+                            {ROWS_PER_PAGE_OPTIONS.map((option) => (
+                                <Option key={option} value={String(option)}>
+                                    {option}
+                                </Option>
+                            ))}
+                        </Select>
+                        <Text>
+                            {rangeFrom}–{rangeTo} of {filtered.length}
+                        </Text>
+                        <Button
+                            design="Transparent"
+                            icon="slim-arrow-left"
+                            accessibleName="Previous page"
+                            tooltip="Previous page"
+                            disabled={page === 0}
+                            onClick={() => setPage(page - 1)}
+                        />
+                        <Button
+                            design="Transparent"
+                            icon="slim-arrow-right"
+                            accessibleName="Next page"
+                            tooltip="Next page"
+                            disabled={page >= lastPage}
+                            onClick={() => setPage(page + 1)}
+                        />
+                    </FlexBox>
+                </div>
+            </div>
         </AppLayout>
     );
 }

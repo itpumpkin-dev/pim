@@ -1,0 +1,89 @@
+/* SAP Fiori (Horizon) look for TinyMCE's oxide skin — see rich-text-editor.tsx. */
+
+.placeholder {
+    min-height: 220px;
+    border: var(--sapField_BorderWidth, 1px) solid var(--sapField_BorderColor);
+    border-radius: var(--sapField_BorderCornerRadius, 0.375rem);
+    background: var(--sapField_Background);
+}
+
+.editor {
+    border: var(--sapField_BorderWidth, 1px) solid var(--sapField_BorderColor);
+    border-radius: var(--sapField_BorderCornerRadius, 0.375rem);
+    background: var(--sapField_Background);
+    overflow: hidden;
+    transition: border-color 0.1s ease;
+}
+
+.editor:focus-within {
+    border-color: var(--sapField_Focus_BorderColor, var(--sapBrandColor));
+}
+
+.error {
+    border-width: 2px;
+    border-color: var(--sapField_InvalidColor);
+    background: var(--sapField_InvalidBackground);
+}
+
+/* Fiori display mode: toolbar is off (init toolbar:false), muted surface. */
+.readOnly {
+    background: var(--sapField_ReadOnly_Background, var(--sapList_HeaderBackground));
+}
+
+/* TinyMCE draws its own outer border/shadow on .tox-tinymce — the wrapper owns the outline. */
+.editor :global(.tox.tox-tinymce) {
+    border: none;
+    box-shadow: none;
+    border-radius: 0;
+}
+
+.editor :global(.tox .tox-editor-header) {
+    border-bottom: 1px solid var(--sapGroup_ContentBorderColor);
+    background-color: var(--sapList_HeaderBackground);
+    box-shadow: none;
+    padding: 5px 8px;
+    z-index: 0;
+}
+
+.editor :global(.tox .tox-toolbar),
+.editor :global(.tox .tox-toolbar__primary),
+.editor :global(.tox .tox-toolbar__overflow) {
+    background: transparent;
+}
+
+.editor :global(.tox .tox-toolbar__group) {
+    margin-right: 8px;
+    padding-right: 8px;
+    border-right: 1px solid var(--sapGroup_ContentBorderColor);
+}
+
+.editor :global(.tox .tox-toolbar__group:last-child) {
+    border-right: none;
+    margin-right: 0;
+    padding-right: 0;
+}
+
+.editor :global(.tox .tox-tbtn) {
+    height: 26px;
+    border-radius: 0.25rem;
+    color: var(--sapContent_IconColor);
+}
+
+.editor :global(.tox .tox-tbtn svg) {
+    fill: currentColor;
+}
+
+.editor :global(.tox .tox-tbtn:hover) {
+    background-color: var(--sapButton_Lite_Hover_Background, var(--sapList_Hover_Background));
+    color: var(--sapTextColor);
+}
+
+.editor :global(.tox .tox-tbtn--enabled),
+.editor :global(.tox .tox-tbtn--enabled:hover) {
+    background-color: var(--sapButton_Selected_Background, var(--sapList_SelectionBackgroundColor));
+    color: var(--sapButton_Selected_TextColor, var(--sapBrandColor));
+}
+
+.editor :global(.tox .tox-edit-area__iframe) {
+    background-color: transparent;
+}

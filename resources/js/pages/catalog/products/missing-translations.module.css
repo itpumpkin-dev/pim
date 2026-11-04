@@ -1,0 +1,79 @@
+/* Layout for the missing-translations page (missing-translations.tsx). Breakpoint md = 900px. */
+
+.page {
+    padding: 1rem;
+    background: var(--sapBackgroundColor);
+    min-height: 100%;
+    box-sizing: border-box;
+}
+
+.header {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.subtitle {
+    display: block;
+    margin-top: 0.25rem;
+    font-size: var(--sapFontSize);
+    color: var(--sapContent_LabelColor);
+}
+
+.card {
+    background: var(--sapGroup_ContentBackground);
+    border: 1px solid var(--sapGroup_ContentBorderColor);
+    border-radius: var(--sapElement_BorderCornerRadius, 0.5rem);
+}
+
+.summary {
+    padding: 1.25rem;
+    margin-bottom: 1rem;
+}
+
+.allTranslated {
+    padding: 2rem;
+    text-align: center;
+    color: var(--sapContent_LabelColor);
+    font-size: var(--sapFontSize);
+}
+
+.search {
+    margin-bottom: 1rem;
+    min-width: 320px;
+    max-width: 100%;
+}
+
+.tableCard {
+    overflow: hidden;
+}
+
+.sku {
+    font-family: monospace;
+    font-size: 0.8rem;
+}
+
+.selectedRow {
+    background: var(--sapList_SelectionBackgroundColor);
+}
+
+.pager {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.5rem 1rem;
+    border-top: 1px solid var(--sapGroup_ContentBorderColor);
+    font-size: var(--sapFontSize);
+    color: var(--sapTextColor);
+}
+
+@media (min-width: 900px) {
+    .page {
+        padding: 2rem;
+    }
+}

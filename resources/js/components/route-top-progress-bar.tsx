@@ -1,6 +1,6 @@
 import { router } from '@inertiajs/react';
-import { LinearProgress } from '@mui/material';
 import { useEffect, useState } from 'react';
+import styles from './shell-loading.module.css';
 
 // Same show-delay reasoning as RouteLoadingSkeleton: most navigations resolve
 // well under this, so it avoids a flash of loading state for them.
@@ -47,15 +47,8 @@ export function RouteTopProgressBar() {
     }
 
     return (
-        <LinearProgress
-            sx={{
-                position: 'fixed',
-                top: 0,
-                left: 0,
-                right: 0,
-                zIndex: (theme) => theme.zIndex.appBar + 1,
-                height: 3,
-            }}
-        />
+        <div className={styles.progressTrack} role="progressbar" aria-busy="true">
+            <div className={styles.progressBar} />
+        </div>
     );
 }

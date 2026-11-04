@@ -14,6 +14,14 @@ export default defineConfig({
     esbuild: {
         jsx: 'automatic',
     },
+    // Pages are lazy-loaded and each one side-effect imports its own
+    // @ui5/webcomponents-icons modules. Without scanning every page up front,
+    // Vite discovers those deps only when a page is first opened, re-optimizes
+    // mid-session and aborts in-flight imports with "504 Outdated Optimize Dep"
+    // (e.g. the redirect to home.tsx after logout fails to load).
+    optimizeDeps: {
+        entries: ['resources/js/app.tsx', 'resources/js/pages/**/*.tsx'],
+    },
     server: {
         host: '0.0.0.0',
         port: 2000,

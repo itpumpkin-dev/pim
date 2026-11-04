@@ -1,0 +1,267 @@
+/*
+ * Shared layout for the Categories module pages (categories/, subcategories/,
+ * categoryFields/ list + form pages). Breakpoints follow the old MUI ones:
+ * sm 600px, md 900px.
+ */
+
+.page {
+    padding: 1rem;
+    min-height: 100%;
+    box-sizing: border-box;
+    background: var(--sapBackgroundColor);
+}
+
+.formPage {
+    padding: 1rem;
+    width: 100%;
+    max-width: 760px;
+    box-sizing: border-box;
+    background: var(--sapBackgroundColor);
+}
+
+@media (min-width: 900px) {
+    .page,
+    .formPage {
+        padding: 2rem;
+    }
+}
+
+/* Title block + primary actions */
+.header {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.formHeader {
+    composes: header;
+}
+
+@media (min-width: 600px) {
+    .header {
+        flex-direction: row;
+        justify-content: space-between;
+        align-items: flex-start;
+    }
+
+    .formHeader {
+        align-items: center;
+    }
+}
+
+.headerText {
+    display: flex;
+    flex-direction: column;
+    gap: 0.125rem;
+    min-width: 0;
+}
+
+.subtitle {
+    color: var(--sapContent_LabelColor);
+    font-size: var(--sapFontSize);
+}
+
+.actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem 0.75rem;
+}
+
+/* Search + filter/pagination row above a table */
+.toolbar {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.toolbarEnd {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem 0.75rem;
+}
+
+.search {
+    width: 100%;
+}
+
+@media (min-width: 900px) {
+    .toolbar {
+        flex-direction: row;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .toolbarEnd {
+        justify-content: flex-end;
+    }
+
+    .search {
+        width: auto;
+        min-width: 280px;
+    }
+}
+
+.perPage {
+    width: 5rem;
+}
+
+.categorySelect {
+    min-width: 200px;
+}
+
+.pageBox {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.25rem 0.75rem;
+    border: 1px solid var(--sapGroup_ContentBorderColor);
+    border-radius: var(--sapElement_BorderCornerRadius);
+    background: var(--sapGroup_ContentBackground);
+    color: var(--sapTextColor);
+    font-size: var(--sapFontSize);
+}
+
+.pager {
+    display: flex;
+    gap: 0.125rem;
+}
+
+/* Table cell text */
+.strong {
+    font-weight: 600;
+    color: var(--sapTextColor);
+}
+
+.muted {
+    color: var(--sapContent_LabelColor);
+}
+
+.disabled {
+    color: var(--sapContent_DisabledTextColor, var(--sapContent_LabelColor));
+}
+
+.italicDisabled {
+    composes: disabled;
+    font-style: italic;
+}
+
+.brandText {
+    color: var(--sapBrandColor);
+    font-weight: 500;
+}
+
+.ellipsis {
+    display: block;
+    max-width: 250px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--sapContent_LabelColor);
+}
+
+.link {
+    font-weight: 600;
+}
+
+.rowActions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.25rem;
+}
+
+/* Clickable, sortable column header */
+.sortHeader {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    cursor: pointer;
+    user-select: none;
+    color: inherit;
+    font: inherit;
+    background: none;
+    border: none;
+    padding: 0;
+}
+
+.sortHeader:hover,
+.sortHeader:focus-visible {
+    color: var(--sapBrandColor);
+}
+
+.sortIcon {
+    width: 0.875rem;
+    height: 0.875rem;
+    color: currentColor;
+}
+
+/* Form pages */
+.formStack {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.fullWidth {
+    width: 100%;
+}
+
+.checkStack {
+    display: flex;
+    flex-direction: column;
+}
+
+.checkRow {
+    display: flex;
+    flex-wrap: wrap;
+    column-gap: 1.5rem;
+}
+
+.thumbRow {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.thumbRow > :first-child {
+    flex: 1;
+    min-width: 0;
+}
+
+.thumb {
+    height: 40px;
+    width: 40px;
+    object-fit: cover;
+    border-radius: 4px;
+    flex: 0 0 auto;
+}
+
+.tabs {
+    margin-bottom: 1.5rem;
+}
+
+.subStack {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    align-items: flex-start;
+}
+
+.subStack > :last-child {
+    align-self: stretch;
+}
+
+.errorSummary {
+    margin-top: 1rem;
+    max-width: 760px;
+}
+
+.warning {
+    margin-top: 0.75rem;
+    font-weight: 600;
+    color: var(--sapNegativeColor);
+}

@@ -1,15 +1,15 @@
 import AppLogo from '@/components/app-logo';
+import { FioriMessageStrip } from '@/components/fiori-form';
 import { useForm } from '@inertiajs/react';
-import CloseIcon from '@mui/icons-material/Close';
-import CloudDownloadIcon from '@mui/icons-material/CloudDownload';
-import PersonIcon from '@mui/icons-material/Person';
-import PhotoCameraIcon from '@mui/icons-material/PhotoCamera';
-import Visibility from '@mui/icons-material/Visibility';
-import VisibilityOff from '@mui/icons-material/VisibilityOff';
-import { Alert, Avatar, Box, Button, Checkbox, CircularProgress, Dialog, DialogContent, Divider, FormControlLabel, IconButton, InputAdornment, MenuItem, TextField, Typography } from '@mui/material';
-import { ChangeEvent, FormEventHandler, useEffect, useState } from 'react';
+import '@ui5/webcomponents-icons/dist/camera.js';
+import '@ui5/webcomponents-icons/dist/decline.js';
+import '@ui5/webcomponents-icons/dist/download.js';
+import '@ui5/webcomponents-icons/dist/hide.js';
+import '@ui5/webcomponents-icons/dist/person-placeholder.js';
+import '@ui5/webcomponents-icons/dist/show.js';
+import { Button, CheckBox, Dialog, Icon, Input, Label, Option, Select, Text, Title } from '@ui5/webcomponents-react';
+import { ChangeEvent, FormEventHandler, ReactNode, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FIORI, fioriDefaultSx, fioriEmphasizedSx } from '@/lib/fiori-style';
 
 interface ManagerOption {
     id: number;
@@ -68,13 +68,35 @@ const textFields: { key: keyof CreateUserForm; label: string }[] = [
 // เท่ากับ 'avatar' => max:2048 ใน StoreUserRequest/UpdateUserRequest — เช็คก่อนส่งจะได้ไม่ต้องรอ server
 const AVATAR_MAX_BYTES = 2048 * 1024;
 
-const labelSx = { fontWeight: 600, color: FIORI.textPrimary, mb: 0.5 };
+const UI5_INPUT_TYPE: Record<string, 'Text' | 'Password' | 'Email'> = {
+    text: 'Text',
+    password: 'Password',
+    email: 'Email',
+};
 
-function RequiredMark() {
+const fieldMessageStyle = { display: 'block', marginTop: '0.25rem', fontSize: 'var(--sapFontSmallSize)' } as const;
+
+function FieldBlock({
+    id,
+    label,
+    required = false,
+    error,
+    children,
+}: {
+    id?: string;
+    label: string;
+    required?: boolean;
+    error?: string;
+    children: ReactNode;
+}) {
     return (
-        <Box component="span" aria-hidden sx={{ color: FIORI.error, ml: 0.25 }}>
-            *
-        </Box>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+            <Label for={id} required={required} showColon={false} style={{ fontWeight: 600, color: 'var(--sapTextColor)' }}>
+                {label}
+            </Label>
+            {children}
+            {error && <span style={{ ...fieldMessageStyle, color: 'var(--sapNegativeTextColor, var(--sapNegativeColor))' }}>{error}</span>}
+        </div>
     );
 }
 
@@ -82,6 +104,7 @@ export default function CreateUserDialog({ open, onClose, managerOptions = [] }:
     const { t } = useTranslation('system');
     // ลูกตาแสดง/ซ่อนรหัสผ่าน แยกต่อช่อง (Password / Password (repeat)) — แบบเดียวกับหน้า Edit User
     const [visiblePasswords, setVisiblePasswords] = useState<Partial<Record<keyof CreateUserForm, boolean>>>({});
+    const fileInputRef = useRef<HTMLInputElement>(null);
     const { data, setData, post, processing, errors, reset, clearErrors, setError } = useForm<CreateUserForm>({
         username: '',
         employee_id: '',
@@ -156,9 +179,12 @@ export default function CreateUserDialog({ open, onClose, managerOptions = [] }:
     // รูปที่อัปโหลดเอง — ชนะรูปจาก HR เสมอ (อัปโหลดแล้วติ๊ก use_lark_photo ออกให้เลย
     // กดลบรูปที่อัปโหลดแล้วถ้ามีรูป HR อยู่ก็กลับไปใช้รูปนั้นแทน)
     const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
-    useEffect(() => () => {
-        if (avatarPreview) URL.revokeObjectURL(avatarPreview);
-    }, [avatarPreview]);
+    useEffect(
+        () => () => {
+            if (avatarPreview) URL.revokeObjectURL(avatarPreview);
+        },
+        [avatarPreview],
+    );
 
     const handleAvatarChange = (e: ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
@@ -204,228 +230,223 @@ export default function CreateUserDialog({ open, onClose, managerOptions = [] }:
     const textInput = (key: keyof CreateUserForm, type = 'text') => {
         const isPassword = type === 'password';
         const visible = isPassword && Boolean(visiblePasswords[key]);
+        const id = `create-user-${String(key)}`;
 
         return (
-            <TextField
-                fullWidth
-                size="small"
-                type={visible ? 'text' : type}
-                value={data[key]}
-                onChange={(e) => {
+            <Input
+                id={id}
+                style={{ width: '100%' }}
+                type={visible ? 'Text' : (UI5_INPUT_TYPE[type] ?? 'Text')}
+                value={String(data[key] ?? '')}
+                onInput={(e) => {
                     setData(key, e.target.value);
                     clearErrors(key);
                 }}
-                error={Boolean(errors[key])}
-                helperText={errors[key]}
-                autoComplete={isPassword ? 'new-password' : 'off'}
-                slotProps={
-                    isPassword
-                        ? {
-                              input: {
-                                  endAdornment: (
-                                      <InputAdornment position="end">
-                                          <IconButton
-                                              aria-label={visible ? t('hidePassword') : t('showPassword')}
-                                              onClick={() => setVisiblePasswords((prev) => ({ ...prev, [key]: !prev[key] }))}
-                                              edge="end"
-                                              size="small"
-                                              tabIndex={-1}
-                                          >
-                                              {visible ? <VisibilityOff fontSize="small" /> : <Visibility fontSize="small" />}
-                                          </IconButton>
-                                      </InputAdornment>
-                                  ),
-                              },
-                          }
-                        : undefined
+                valueState={errors[key] ? 'Negative' : 'None'}
+                icon={
+                    isPassword ? (
+                        <Icon
+                            name={visible ? 'hide' : 'show'}
+                            mode="Interactive"
+                            accessibleName={visible ? t('hidePassword') : t('showPassword')}
+                            showTooltip
+                            onClick={() => setVisiblePasswords((prev) => ({ ...prev, [key]: !prev[key] }))}
+                        />
+                    ) : undefined
                 }
             />
         );
     };
 
     return (
-        <Dialog open={open} onClose={handleClose} maxWidth="xs" fullWidth component="form" onSubmit={submit}>
-            <DialogContent sx={{ p: 3 }}>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
+        <Dialog
+            open={open}
+            // Dialog ปิดตัวเองเมื่อกด ESC — sync state กลับ (แต่ไม่เรียกซ้ำตอนที่ parent ปิดให้แล้ว)
+            onClose={() => {
+                if (open) handleClose();
+            }}
+            style={{ width: '444px', maxWidth: 'calc(100vw - 2rem)' }}
+        >
+            <form onSubmit={submit} style={{ padding: '0.5rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center' }}>
                         <AppLogo />
-                    </Box>
-                    <IconButton size="small" onClick={handleClose} sx={{ mt: -1, mr: -1 }}>
-                        <CloseIcon />
-                    </IconButton>
-                </Box>
+                    </div>
+                    <Button design="Transparent" icon="decline" tooltip="Close" accessibleName="Close" onClick={handleClose} />
+                </div>
 
-                <Typography variant="overline" sx={{ color: FIORI.textSecondary, fontWeight: 700, display: 'block', lineHeight: 1 }}>
+                <Text
+                    style={{
+                        display: 'block',
+                        color: 'var(--sapContent_LabelColor)',
+                        fontWeight: 700,
+                        fontSize: 'var(--sapFontSmallSize)',
+                        letterSpacing: '0.08em',
+                        lineHeight: 1,
+                    }}
+                >
                     USERS
-                </Typography>
-                <Typography variant="h5" fontWeight={600} sx={{ color: FIORI.textPrimary, mb: 2 }}>
+                </Text>
+                <Title level="H2" size="H3" style={{ marginBottom: '1rem' }}>
                     CREATE
-                </Typography>
-                <Divider sx={{ mb: 3, borderColor: FIORI.border }} />
+                </Title>
+                <div style={{ borderTop: '1px solid var(--sapGroup_ContentBorderColor)', marginBottom: '1.5rem' }} />
 
-                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
-                    <Box>
-                        <Typography variant="body2" sx={labelSx}>
-                            Username
-                            <RequiredMark />
-                        </Typography>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                    <FieldBlock id="create-user-username" label="Username" required error={errors.username}>
                         {textInput('username')}
-                    </Box>
+                    </FieldBlock>
 
-                    <Box>
-                        <Typography variant="body2" sx={labelSx}>
-                            Employee ID
-                            <RequiredMark />
-                        </Typography>
-                        <Box sx={{ display: 'flex', gap: 1, alignItems: 'flex-start' }}>
-                            <TextField
-                                fullWidth
-                                size="small"
+                    <FieldBlock id="create-user-employee-id" label="Employee ID" required error={errors.employee_id}>
+                        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-start' }}>
+                            <Input
+                                id="create-user-employee-id"
+                                style={{ flex: 1, minWidth: 0 }}
                                 value={data.employee_id}
-                                onChange={(e) => {
+                                onInput={(e) => {
                                     setData('employee_id', e.target.value);
                                     clearErrors('employee_id');
                                     clearFetched();
                                 }}
-                                onKeyDown={(e) => {
+                                onKeyDownCapture={(e) => {
                                     // Enter ในช่องนี้ = ดึงข้อมูล ไม่ใช่ submit ฟอร์มทั้งใบ
+                                    // (capture phase — กันไม่ให้ UI5 Input ส่ง submit ฟอร์มเอง)
                                     if (e.key === 'Enter') {
                                         e.preventDefault();
+                                        e.stopPropagation();
                                         fetchEmployee();
                                     }
                                 }}
-                                error={Boolean(errors.employee_id)}
-                                helperText={errors.employee_id}
-                                autoComplete="off"
+                                valueState={errors.employee_id ? 'Negative' : 'None'}
                             />
                             <Button
-                                variant="outlined"
+                                icon={fetching ? undefined : 'download'}
                                 onClick={fetchEmployee}
                                 disabled={!data.employee_id.trim() || fetching}
-                                startIcon={fetching ? <CircularProgress size={14} color="inherit" /> : <CloudDownloadIcon fontSize="small" />}
-                                sx={{ ...fioriDefaultSx, whiteSpace: 'nowrap', flexShrink: 0, height: 40 }}
+                                loading={fetching}
+                                style={{ whiteSpace: 'nowrap', flexShrink: 0 }}
                             >
                                 ดึงข้อมูล
                             </Button>
-                        </Box>
+                        </div>
                         {fetchMessage && (
-                            <Alert severity={fetchMessage.severity} sx={{ mt: 1, py: 0 }}>
+                            <FioriMessageStrip severity={fetchMessage.severity} style={{ marginTop: '0.5rem' }}>
                                 {fetchMessage.text}
-                            </Alert>
+                            </FioriMessageStrip>
                         )}
-                    </Box>
+                    </FieldBlock>
 
                     {/* รูปโปรไฟล์ — อัปโหลดเองได้เลย (ชนะรูปจาก HR เสมอ) หรือถ้ากดดึงข้อมูล
                     แล้วพนักงานมีรูปใน HR ก็ติ๊กใช้รูปนั้นได้ ไม่เลือกอะไรเลยก็ได้ */}
-                    <Box>
-                        <Typography variant="body2" sx={labelSx}>
-                            Profile photo
-                        </Typography>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                            <Avatar
-                                src={shownPhoto ?? undefined}
-                                variant="rounded"
-                                sx={{ width: 72, height: 72, bgcolor: FIORI.border, color: FIORI.textSecondary }}
-                                slotProps={{
-                                    img: {
+                    <FieldBlock label="Profile photo">
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                            <div
+                                style={{
+                                    width: 72,
+                                    height: 72,
+                                    flexShrink: 0,
+                                    borderRadius: 'var(--sapElement_BorderCornerRadius, 8px)',
+                                    overflow: 'hidden',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    background: 'var(--sapGroup_ContentBorderColor)',
+                                    color: 'var(--sapContent_LabelColor)',
+                                }}
+                            >
+                                {shownPhoto ? (
+                                    <img
+                                        src={shownPhoto}
+                                        alt=""
+                                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                                         // รูป HR โหลดไม่ได้ (Lark ล่ม/รูปถูกลบ) — ตัดตัวเลือกนี้ทิ้ง ไม่ส่งไปบันทึก
-                                        onError: () => {
+                                        onError={() => {
                                             if (!data.avatar) {
                                                 setPhotoUrl(null);
                                                 setData('use_lark_photo', false);
                                             }
-                                        },
-                                    },
-                                }}
-                            >
-                                <PersonIcon fontSize="large" />
-                            </Avatar>
-                            <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 0.5, minWidth: 0 }}>
-                                <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-                                    <Button
-                                        component="label"
-                                        variant="outlined"
-                                        size="small"
-                                        startIcon={<PhotoCameraIcon fontSize="small" />}
-                                        sx={fioriDefaultSx}
-                                    >
+                                        }}
+                                    />
+                                ) : (
+                                    <Icon name="person-placeholder" style={{ width: 36, height: 36, color: 'var(--sapContent_LabelColor)' }} />
+                                )}
+                            </div>
+                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '0.25rem', minWidth: 0 }}>
+                                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                                    <Button icon="camera" onClick={() => fileInputRef.current?.click()}>
                                         {data.avatar ? 'เปลี่ยนรูป' : 'อัปโหลดรูป'}
-                                        <input type="file" accept="image/*" hidden onChange={handleAvatarChange} />
                                     </Button>
+                                    <input ref={fileInputRef} type="file" accept="image/*" hidden onChange={handleAvatarChange} />
                                     {data.avatar && (
-                                        <Button variant="text" size="small" color="inherit" onClick={removeAvatar} sx={{ color: FIORI.textSecondary }}>
+                                        <Button design="Transparent" onClick={removeAvatar}>
                                             ลบ
                                         </Button>
                                     )}
-                                </Box>
+                                </div>
                                 {photoUrl && !data.avatar && (
-                                    <FormControlLabel
-                                        sx={{ ml: -0.5 }}
-                                        control={<Checkbox size="small" checked={data.use_lark_photo} onChange={(e) => setData('use_lark_photo', e.target.checked)} />}
-                                        label={<Typography variant="body2">ใช้รูปจากระบบ HR</Typography>}
+                                    <CheckBox
+                                        text="ใช้รูปจากระบบ HR"
+                                        checked={data.use_lark_photo}
+                                        onChange={(e) => setData('use_lark_photo', e.target.checked)}
                                     />
                                 )}
-                                <Typography variant="caption" sx={{ color: errors.avatar ? FIORI.error : FIORI.textSecondary }}>
+                                <span
+                                    style={{
+                                        fontSize: 'var(--sapFontSmallSize)',
+                                        color: errors.avatar
+                                            ? 'var(--sapNegativeTextColor, var(--sapNegativeColor))'
+                                            : 'var(--sapContent_LabelColor)',
+                                    }}
+                                >
                                     {errors.avatar || 'JPG / PNG ไม่เกิน 2MB'}
-                                </Typography>
-                            </Box>
-                        </Box>
-                    </Box>
+                                </span>
+                            </div>
+                        </div>
+                    </FieldBlock>
 
                     {fields.map((field) => (
-                        <Box key={field.key}>
-                            <Typography variant="body2" sx={labelSx}>
-                                {field.label}
-                                <RequiredMark />
-                            </Typography>
+                        <FieldBlock key={field.key} id={`create-user-${String(field.key)}`} label={field.label} required error={errors[field.key]}>
                             {textInput(field.key, field.type)}
-                        </Box>
+                        </FieldBlock>
                     ))}
 
                     {textFields.map((field) => (
-                        <Box key={field.key}>
-                            <Typography variant="body2" sx={labelSx}>
-                                {field.label}
-                            </Typography>
+                        <FieldBlock key={field.key} id={`create-user-${String(field.key)}`} label={field.label} error={errors[field.key]}>
                             {textInput(field.key)}
-                        </Box>
+                        </FieldBlock>
                     ))}
 
-                    <Box>
-                        <Typography variant="body2" sx={labelSx}>
-                            Reports to
-                        </Typography>
-                        <TextField
-                            select
-                            fullWidth
-                            size="small"
-                            value={data.manager_id}
+                    <FieldBlock id="create-user-manager" label="Reports to" error={errors.manager_id}>
+                        <Select
+                            id="create-user-manager"
+                            style={{ width: '100%' }}
+                            value={String(data.manager_id)}
                             onChange={(e) => {
-                                setData('manager_id', e.target.value === '' ? '' : Number(e.target.value));
+                                const value = e.detail.selectedOption.value;
+                                setData('manager_id', value ? Number(value) : '');
                                 clearErrors('manager_id');
                             }}
-                            error={Boolean(errors.manager_id)}
-                            helperText={errors.manager_id}
+                            valueState={errors.manager_id ? 'Negative' : 'None'}
                         >
-                            <MenuItem value="">—</MenuItem>
+                            <Option value="">—</Option>
                             {managerOptions.map((option) => (
-                                <MenuItem key={option.id} value={option.id}>
+                                <Option key={option.id} value={String(option.id)}>
                                     {option.name}
-                                </MenuItem>
+                                </Option>
                             ))}
-                        </TextField>
-                    </Box>
-                </Box>
+                        </Select>
+                    </FieldBlock>
+                </div>
 
-                <Box sx={{ display: 'flex', justifyContent: 'center', gap: 2, mt: 4 }}>
-                    <Button variant="contained" color="inherit" onClick={handleClose} sx={{ ...fioriDefaultSx, px: 4 }}>
+                <div style={{ display: 'flex', justifyContent: 'center', gap: '1rem', marginTop: '2rem' }}>
+                    <Button onClick={handleClose} style={{ minWidth: '6rem' }}>
                         CANCEL
                     </Button>
-                    <Button type="submit" variant="contained" disabled={processing} startIcon={processing ? <CircularProgress size={16} color="inherit" /> : undefined} sx={{ ...fioriEmphasizedSx, px: 4 }}>
+                    <Button type="Submit" design="Emphasized" disabled={processing} loading={processing} style={{ minWidth: '6rem' }}>
                         {processing ? 'SAVING…' : 'SAVE'}
                     </Button>
-                </Box>
-            </DialogContent>
+                </div>
+            </form>
         </Dialog>
     );
 }
