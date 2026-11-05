@@ -1,9 +1,8 @@
 import { ClickableThumbnail, ImagePreviewProvider } from '@/components/image-preview';
 import AppLayout from '@/layouts/app-layout';
+import { DEFAULT_MASTER_THUMBNAIL } from '@/lib/default-thumbnail';
 import { type BreadcrumbItem, type SharedData } from '@/types';
 import { Head, router, usePage } from '@inertiajs/react';
-import '@ui5/webcomponents-icons/dist/picture.js';
-import { Icon } from '@ui5/webcomponents-react';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -121,13 +120,7 @@ export default function BrandIndex({ brands, parentOptions, attributeId, filters
             priority: 'low',
             hideInPopin: true,
             render: (row) => (
-                <ClickableThumbnail
-                    src={row.thumbnail_url}
-                    alt={row.admin_label || row.code}
-                    size={38}
-                    radius={1.5}
-                    fallback={<Icon name="picture" style={{ color: 'var(--sapContent_IconColor)' }} />}
-                />
+                <ClickableThumbnail src={row.thumbnail_url || DEFAULT_MASTER_THUMBNAIL} alt={row.admin_label || row.code} size={38} radius={1.5} />
             ),
         },
         {

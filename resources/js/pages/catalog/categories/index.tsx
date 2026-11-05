@@ -3,6 +3,7 @@ import { FioriResponsiveColumn, FioriResponsiveTable } from '@/components/fiori-
 import { GridFilterDrawer, type FilterValue, type GridColumn } from '@/components/grid-filter-drawer';
 import { ClickableThumbnail, ImagePreviewProvider } from '@/components/image-preview';
 import AppLayout from '@/layouts/app-layout';
+import { DEFAULT_MASTER_THUMBNAIL } from '@/lib/default-thumbnail';
 import { FioriStatus } from '@/lib/fiori-style';
 import { type BreadcrumbItem, type SharedData } from '@/types';
 import { Head, router, usePage } from '@inertiajs/react';
@@ -190,7 +191,7 @@ export default function CategoryIndex({ categories, parentCategory, filters, fil
             header: t('thumbnail'),
             priority: 'low',
             hideInPopin: true,
-            render: (row) => <ClickableThumbnail src={row.thumbnail_url} alt={row.name} size={36} radius={1} />,
+            render: (row) => <ClickableThumbnail src={row.thumbnail_url || DEFAULT_MASTER_THUMBNAIL} alt={row.name} size={36} radius={1} />,
         },
         {
             key: 'name',

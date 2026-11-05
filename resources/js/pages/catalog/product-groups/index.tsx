@@ -1,4 +1,5 @@
 import AppLayout from '@/layouts/app-layout';
+import { DEFAULT_MASTER_THUMBNAIL } from '@/lib/default-thumbnail';
 import { type BreadcrumbItem, type SharedData } from '@/types';
 import { Head, router, usePage } from '@inertiajs/react';
 import '@ui5/webcomponents-icons/dist/picture.js';
@@ -125,7 +126,7 @@ export default function ProductGroupIndex({ groups, categories, filters }: Props
             header: t('thumbnail'),
             priority: 'low',
             hideInPopin: true,
-            render: (row) => <ClickableThumbnail src={row.thumbnail_url} alt={row.name} size={36} radius={1} />,
+            render: (row) => <ClickableThumbnail src={row.thumbnail_url || DEFAULT_MASTER_THUMBNAIL} alt={row.name} size={36} radius={1} />,
         },
         {
             key: 'code',

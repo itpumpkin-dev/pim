@@ -1,4 +1,5 @@
 import AppLayout from '@/layouts/app-layout';
+import { DEFAULT_MASTER_THUMBNAIL } from '@/lib/default-thumbnail';
 import { type BreadcrumbItem } from '@/types';
 import { Head, router, useForm } from '@inertiajs/react';
 import '@ui5/webcomponents-icons/dist/upload.js';
@@ -151,9 +152,9 @@ export default function BrandEdit({ brand, translations, parentOptions }: Props)
                             </FileUploader>
                             {data.thumbnail ? (
                                 <span className={masterStyles.muted}>{data.thumbnail.name}</span>
-                            ) : brand.thumbnail_url ? (
-                                <img src={brand.thumbnail_url} alt="" className={masterStyles.thumb} />
-                            ) : null}
+                            ) : (
+                                <img src={brand.thumbnail_url || DEFAULT_MASTER_THUMBNAIL} alt="" className={masterStyles.thumb} />
+                            )}
                         </div>
                     </FioriField>
                 </FioriFormGroup>

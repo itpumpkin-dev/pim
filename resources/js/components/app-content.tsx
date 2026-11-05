@@ -25,7 +25,11 @@ export function AppContent({ children, breadcrumbs = [], actions }: AppContentPr
         // sits here, outside the scrolling <main>: an absolute overlay inside a
         // scroll container only covers its first screenful, so on a scrolled or
         // long page the old content showed below it during navigation.
-        <div style={{ position: 'relative', height: '100%', minWidth: 0 }}>
+        // `isolation: isolate` keeps the z-indexes in here (sticky breadcrumb bar,
+        // overlays) local to the content area: the collapsed SideNavigation widens
+        // the hovered item over the content, and without this the breadcrumb bar
+        // (z-index 5) painted over it.
+        <div style={{ position: 'relative', height: '100%', minWidth: 0, isolation: 'isolate' }}>
             <main
                 style={{
                     position: 'relative',

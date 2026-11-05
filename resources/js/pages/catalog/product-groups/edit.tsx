@@ -1,5 +1,6 @@
 import { HistoryPanel } from '@/components/history-panel';
 import AppLayout from '@/layouts/app-layout';
+import { DEFAULT_MASTER_THUMBNAIL } from '@/lib/default-thumbnail';
 import { type BreadcrumbItem } from '@/types';
 import { Head, router, useForm } from '@inertiajs/react';
 import '@ui5/webcomponents-icons/dist/delete.js';
@@ -294,9 +295,9 @@ export default function ProductGroupEdit({
                                 </FileUploader>
                                 {data.thumbnail ? (
                                     <span className={masterStyles.muted}>{data.thumbnail.name}</span>
-                                ) : thumbnailUrl ? (
-                                    <img src={thumbnailUrl} alt="" className={masterStyles.thumb} />
-                                ) : null}
+                                ) : (
+                                    <img src={thumbnailUrl || DEFAULT_MASTER_THUMBNAIL} alt="" className={masterStyles.thumb} />
+                                )}
                             </div>
                         </FioriField>
 

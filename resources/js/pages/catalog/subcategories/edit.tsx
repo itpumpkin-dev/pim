@@ -1,5 +1,6 @@
 import { HistoryPanel } from '@/components/history-panel';
 import AppLayout from '@/layouts/app-layout';
+import { DEFAULT_MASTER_THUMBNAIL } from '@/lib/default-thumbnail';
 import { type BreadcrumbItem } from '@/types';
 import { Head, router, useForm } from '@inertiajs/react';
 import '@ui5/webcomponents-icons/dist/nav-back.js';
@@ -186,7 +187,7 @@ export default function SubcategoryEdit({
                                             valueLabel={data.thumbnail?.name ?? null}
                                             onSelect={(files) => setData('thumbnail', files[0] ?? null)}
                                         />
-                                        {!data.thumbnail && thumbnailUrl && <img src={thumbnailUrl} alt="" className={styles.thumb} />}
+                                        {!data.thumbnail && <img src={thumbnailUrl || DEFAULT_MASTER_THUMBNAIL} alt="" className={styles.thumb} />}
                                     </div>
                                 </FioriField>
 
