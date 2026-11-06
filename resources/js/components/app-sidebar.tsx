@@ -1,5 +1,6 @@
 import { filterNavItemsByPermission, useMainNavItems } from '@/hooks/use-nav-items';
 import { useSidebar } from '@/hooks/use-sidebar';
+import { APP_VERSION_TEXT } from '@/lib/app-version';
 import { type NavItem, type SharedData } from '@/types';
 import { router, usePage } from '@inertiajs/react';
 // Every glyph named by NavItem.icon in hooks/use-nav-items.ts must be
@@ -271,16 +272,13 @@ export function AppSidebar({ slot }: { slot?: string }) {
         );
     };
 
-    // Build version (package.json + git commit, see vite.config.js), pinned at
-    // the bottom of the rail. Disabled = shown greyed and not clickable.
-    const versionText = __APP_COMMIT__ ? `v${__APP_VERSION__} (${__APP_COMMIT__})` : `v${__APP_VERSION__}`;
-
     return (
         <SideNavigation
             slot={slot}
             onItemToggle={onItemToggle}
             accessibleName={t('mainNavigation')}
-            fixedItems={<SideNavigationItem icon="hint" text={versionText} tooltip={versionText} disabled />}
+            // Build version pinned at the bottom of the rail; disabled = greyed, not clickable.
+            fixedItems={<SideNavigationItem icon="hint" text={APP_VERSION_TEXT} tooltip={APP_VERSION_TEXT} disabled />}
         >
             {tree.map((node) =>
                 node.kind === 'group' ? (

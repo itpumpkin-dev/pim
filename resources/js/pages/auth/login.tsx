@@ -2,6 +2,7 @@ import AppLogoIcon from '@/components/app-logo-icon';
 import InputError from '@/components/input-error';
 import LocaleDropdown from '@/components/locale-dropdown';
 import TextLink from '@/components/text-link';
+import { APP_VERSION_TEXT } from '@/lib/app-version';
 import { Head, Link, router, useForm } from '@inertiajs/react';
 import '@ui5/webcomponents-icons/dist/hide.js';
 import '@ui5/webcomponents-icons/dist/show.js';
@@ -168,6 +169,10 @@ export default function Login({ status, canResetPassword }: LoginProps) {
                             </FlexBox>
                         </div>
                     </FlexBox>
+                    <div className={styles.footer}>
+                        <Text className={styles.footerText}>© Pumpkin Corporation Company Limited | Bangkok {new Date().getFullYear()}</Text>
+                        <Text className={styles.footerText}>{APP_VERSION_TEXT}</Text>
+                    </div>
                 </div>
 
                 <div className={styles.heroPanel}>
