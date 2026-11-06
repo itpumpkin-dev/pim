@@ -3,7 +3,6 @@ import { type BreadcrumbItem, type SharedData } from '@/types';
 import { Head, router, usePage } from '@inertiajs/react';
 import '@ui5/webcomponents-icons/dist/chain-link.js';
 import '@ui5/webcomponents-icons/dist/product.js';
-import '@ui5/webcomponents-icons/dist/retail-store.js';
 import '@ui5/webcomponents-icons/dist/settings.js';
 import '@ui5/webcomponents-icons/dist/synchronize.js';
 import '@ui5/webcomponents-icons/dist/tree.js';
@@ -66,14 +65,6 @@ export default function MarketplacePlatformHub({ platform }: Props) {
     const PLATFORMS_WITH_PRODUCT_MAPPING: MarketplacePlatform[] = ['lazada', 'shopee', 'tiktok', 'woocommerce'];
     const hasProductMappingPage = PLATFORMS_WITH_PRODUCT_MAPPING.includes(platform);
 
-    // "Master Product List" — sync สิ่งที่จริงๆ อยู่บนแพลตฟอร์มนั้น (ไม่ใช่แค่
-    // mapping ฝั่ง PIM) ลงมา cache ไว้ดู — เพิ่งมีให้ Lazada เป็น platform แรก
-    // (ดู LazadaMasterProductsController) ต่างจากการ์ด "สินค้า (Product
-    // Mapping)" ด้านบนตรงที่การ์ดนั้นเริ่มจากฝั่ง PIM Product แล้วไปหา mapping
-    // ส่วนการ์ดนี้เริ่มจากฝั่งแพลตฟอร์มแล้วโชว์ว่ามีอะไรอยู่จริงบ้าง
-    const PLATFORMS_WITH_MASTER_PRODUCT_LIST: MarketplacePlatform[] = ['lazada'];
-    const hasMasterProductListPage = PLATFORMS_WITH_MASTER_PRODUCT_LIST.includes(platform);
-
     const tiles: { key: string; icon: string; title: string; description: string; url: string; permission: string }[] = [
         ...(hasProductMappingPage
             ? [
@@ -98,18 +89,6 @@ export default function MarketplacePlatformHub({ platform }: Props) {
             url: `/catalog/marketplace/product-matching?platform=${platform}`,
             permission: 'products.list_products',
         },
-        ...(hasMasterProductListPage
-            ? [
-                  {
-                      key: 'masterProducts',
-                      icon: 'retail-store',
-                      title: 'Master Product List',
-                      description: `สินค้าที่จริงๆ อยู่บน ${platformLabel} ทั้งหมด (sync ลงมาเก็บไว้ดู ไม่ผูกกับสินค้าใน PIM)`,
-                      url: `/catalog/marketplace/${platform}/master-products`,
-                      permission: `marketplace_${platform}.list_marketplace_${platform}`,
-                  },
-              ]
-            : []),
 
         // ซ่อน 2 การ์ดนี้ไว้เฉพาะ platform ที่มีหน้า "สินค้า (Product Mapping)"
         // แล้ว (เคยถูก comment ออกไปแบบไม่มีเงื่อนไขมาก่อน ทำให้ทุก platform

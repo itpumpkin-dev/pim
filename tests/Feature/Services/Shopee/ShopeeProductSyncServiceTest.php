@@ -430,3 +430,51 @@ test('syncLiveStatus pages through get_item_list until has_next_page is false, m
     expect(DB::table('product_platform_shops')->where('product_id', $stillLiveProduct->id)->value('status'))->toBe('live');
     expect(DB::table('product_platform_shops')->where('product_id', $noLongerLiveProduct->id)->value('status'))->toBeNull();
 });
+
+// --- Product Matching: reuse an existing linked listing instead of creating a duplicate ---
+
+function spsFakePushDeps(array $extra = []): void
+{
+    Http::fake(array_merge([
+        '*/logistics/get_channel_list*' => Http::response(['response' => ['logistics_channel_list' => [['logistics_channel_id' => 1, 'logistics_channel_name' => 'Standard', 'enabled' => true]]]], 200),
+        '*/product/get_attribute_tree*' => Http::response(['response' => ['list' => [['attribute_tree' => []]]]], 200),
+        '*/media_space/upload_image*' => Http::response(['response' => ['image_info' => ['image_id' => 'img_1']]], 200),
+        '*/product/add_item*' => Http::response(['response' => ['item_id' => 9999]], 200),
+    ], $extra));
+}
+
+function spsLinkedListing(SalesPlatformShop $shop, Product $product, string $itemId, array $attrs = []): \App\Models\MarketplaceListing
+{
+    return \App\Models\MarketplaceListing::create(array_merge([
+        'sales_platform_shop_id' => $shop->id, 'platform' => 'shopee', 'item_id' => $itemId, 'variant_id' => '',
+        'seller_sku' => $product->sku, 'product_id' => $product->id, 'match_method' => 'auto_sku', 'is_active' => true,
+    ], $attrs));
+}
+
+test('push updates the single linked Shopee listing (no cached id) instead of add_item, and caches its id', function () {
+    $product = spsPushableProduct();
+    $shop = spsShop();
+    spsLinkedListing($shop, $product, '7777');
+    spsFakePushDeps(['*/product/update_item*' => Http::response(['response' => ['item_id' => 7777]], 200)]);
+
+    $this->service->push($product, $shop);
+
+    Http::assertSent(fn ($request) => str_contains($request->url(), '/update_item') && json_decode($request->body(), true)['item_id'] === 7777);
+    Http::assertNotSent(fn ($request) => str_contains($request->url(), '/add_item'));
+    expect(DB::table('product_platform_shops')->where('product_id', $product->id)->where('sales_platform_shop_id', $shop->id)->value('platform_item_id'))->toBe('7777');
+});
+
+test('push keeps using add_item when the linked Shopee listing is a model of a has_model item, or links are ambiguous', function (string $case) {
+    $product = spsPushableProduct();
+    $shop = spsShop();
+    match ($case) {
+        'model row' => spsLinkedListing($shop, $product, '7777', ['variant_id' => 'm1']),
+        'two listings' => [spsLinkedListing($shop, $product, '7777'), spsLinkedListing($shop, $product, '8888')],
+    };
+    spsFakePushDeps();
+
+    $this->service->push($product, $shop);
+
+    Http::assertNotSent(fn ($request) => str_contains($request->url(), '/update_item'));
+    Http::assertSent(fn ($request) => str_contains($request->url(), '/add_item'));
+})->with(['model row', 'two listings']);

@@ -471,3 +471,60 @@ test('checkLiveStatus reports is_live=false for a status other than ACTIVATE (e.
     expect($result)->toBe(['is_live' => false, 'never_pushed' => false, 'status' => 'SELLER_DEACTIVATED']);
     expect(DB::table('product_platform_shops')->where('product_id', $product->id)->value('status'))->toBeNull();
 });
+
+// --- Product Matching: reuse an existing linked listing instead of creating a duplicate ---
+
+function tpsLinkedListing(SalesPlatformShop $shop, Product $product, string $itemId, array $attrs = []): \App\Models\MarketplaceListing
+{
+    return \App\Models\MarketplaceListing::create(array_merge([
+        'sales_platform_shop_id' => $shop->id, 'platform' => 'tiktok', 'item_id' => $itemId, 'variant_id' => 'sku-'.$itemId,
+        'seller_sku' => $product->sku, 'product_id' => $product->id, 'match_method' => 'manual', 'is_active' => true,
+    ], $attrs));
+}
+
+test('push updates the single linked listing (no cached id) instead of creating a new product, and caches its id', function () {
+    $product = tpsPushableProduct();
+    $shop = tpsShop();
+    tpsLinkedListing($shop, $product, 'tt-linked');
+    tpsFakeBuildDeps(extra: [
+        '*/products/tt-linked*' => Http::response(['code' => 0, 'data' => []], 200),
+        '*/products?*' => Http::response(['code' => 0, 'data' => ['product_id' => 'tt-dup']], 200),
+    ]);
+
+    $this->service->push($product, $shop);
+
+    Http::assertSent(fn ($request) => $request->method() === 'PUT' && str_contains($request->url(), '/products/tt-linked'));
+    Http::assertNotSent(fn ($request) => $request->method() === 'POST' && str_contains($request->url(), '/products?'));
+    expect(DB::table('product_platform_shops')->where('product_id', $product->id)->where('sales_platform_shop_id', $shop->id)->value('platform_item_id'))->toBe('tt-linked');
+});
+
+test('push does not fall back to create when updating the linked listing fails', function () {
+    $product = tpsPushableProduct();
+    $shop = tpsShop();
+    tpsLinkedListing($shop, $product, 'tt-linked');
+    tpsFakeBuildDeps(extra: [
+        '*/products/tt-linked*' => Http::response(['code' => 12052032, 'message' => 'boom'], 200),
+        '*/products?*' => Http::response(['code' => 0, 'data' => ['product_id' => 'tt-dup']], 200),
+    ]);
+
+    expect(fn () => $this->service->push($product, $shop))->toThrow(RuntimeException::class);
+    Http::assertNotSent(fn ($request) => $request->method() === 'POST' && str_contains($request->url(), '/products?'));
+});
+
+test('push keeps creating a new product when the link is ambiguous, a pack, a bundle, ignored or multi-variant', function (string $case) {
+    $product = tpsPushableProduct();
+    $shop = tpsShop();
+    match ($case) {
+        'two listings' => [tpsLinkedListing($shop, $product, 'tt-a'), tpsLinkedListing($shop, $product, 'tt-b')],
+        'pack' => tpsLinkedListing($shop, $product, 'tt-a', ['pack_quantity' => 6]),
+        'ignored' => tpsLinkedListing($shop, $product, 'tt-a', ['ignored_at' => now()]),
+        'bundle' => tpsLinkedListing($shop, $product, 'tt-a', ['product_id' => null, 'match_method' => 'bundle']),
+        'multi-variant' => [tpsLinkedListing($shop, $product, 'tt-a'), tpsLinkedListing($shop, $product, 'tt-a', ['variant_id' => 'other', 'product_id' => null, 'match_method' => null])],
+    };
+    tpsFakeBuildDeps(extra: ['*/products?*' => Http::response(['code' => 0, 'data' => ['product_id' => 'tt-new']], 200)]);
+
+    $this->service->push($product, $shop);
+
+    Http::assertNotSent(fn ($request) => $request->method() === 'PUT');
+    expect(DB::table('product_platform_shops')->where('product_id', $product->id)->value('platform_item_id'))->toBe('tt-new');
+})->with(['two listings', 'pack', 'ignored', 'bundle', 'multi-variant']);
