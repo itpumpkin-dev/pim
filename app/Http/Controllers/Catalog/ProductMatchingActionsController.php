@@ -8,6 +8,7 @@ use App\Models\MarketplaceListing;
 use App\Models\MarketplaceListingComponent;
 use App\Models\Product;
 use App\Services\Marketplace\Listings\ListingMatchSuggester;
+use App\Services\Marketplace\Listings\ListingScoreSuggester;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -70,10 +71,29 @@ class ProductMatchingActionsController extends Controller
         $validated = $request->validate([
             'index' => ['nullable', 'integer', 'min:0'],
             'type' => ['required', 'string'],
+            'product_id' => ['nullable', 'integer'],
         ]);
 
         if ($listing->isLinked() || $listing->ignored_at !== null) {
             return back()->with('error', "{$this->label($listing)} ถูกผูกหรือซ่อนไปแล้ว — รีเฟรชหน้าเพื่อดูข้อมูลล่าสุด");
+        }
+
+        // score-based ("ชื่อ/แบรนด์ใกล้เคียง") suggestion: accepted only while
+        // it is still in the stored list for this listing (stale-safe — the
+        // list is replaced on every sync / marketplace:suggest-matches)
+        if ($validated['type'] === ListingScoreSuggester::TYPE) {
+            $stored = empty($validated['product_id']) ? null : DB::table('marketplace_listing_suggestions')
+                ->where('marketplace_listing_id', $listing->id)
+                ->where('product_id', (int) $validated['product_id'])
+                ->first(['product_id', 'score', 'rank']);
+            if ($stored === null) {
+                return back()->with('error', "คำแนะนำของ {$this->label($listing)} เปลี่ยนไปแล้ว — รีเฟรชหน้าแล้วลองใหม่");
+            }
+
+            $this->applySingle($request, $listing, (int) $stored->product_id, null, MarketplaceListing::MATCH_SUGGESTED, ListingScoreSuggester::TYPE, ['suggestion_score' => (int) $stored->score]);
+            $sku = Product::whereKey($stored->product_id)->value('sku');
+
+            return back()->with('success', "ผูก {$this->label($listing)} กับ {$sku} ตามคำแนะนำ (คะแนน {$stored->score}) แล้ว");
         }
 
         $suggestion = ($this->suggester->suggest([$listing->id => $listing->seller_sku])[$listing->id] ?? [])[$validated['index'] ?? 0] ?? null;
@@ -89,7 +109,9 @@ class ProductMatchingActionsController extends Controller
     /**
      * Accepts the top suggestion of many listings at once — only 'high'
      * confidence ones (ListingMatchSuggester::HIGH_TYPES); the rest are
-     * skipped and counted.
+     * skipped and counted. Score-based suggestions (ListingScoreSuggester,
+     * always 'low') are never considered here — only the rule suggester is
+     * asked.
      */
     public function bulkAccept(Request $request): RedirectResponse
     {
@@ -203,7 +225,7 @@ class ProductMatchingActionsController extends Controller
         $this->applySingle($request, $listing, $suggestion['items'][0]['product_id'], $suggestion['pack_quantity'], MarketplaceListing::MATCH_SUGGESTED, $suggestion['type']);
     }
 
-    private function applySingle(Request $request, MarketplaceListing $listing, int $productId, ?int $packQuantity, string $method, ?string $suggestionType = null): void
+    private function applySingle(Request $request, MarketplaceListing $listing, int $productId, ?int $packQuantity, string $method, ?string $suggestionType = null, array $auditExtra = []): void
     {
         $before = $this->snapshot($listing);
 
@@ -221,7 +243,7 @@ class ProductMatchingActionsController extends Controller
             ])->save();
         });
 
-        AuditLog::record('marketplace_listing_linked', $listing, $before, $this->snapshot($listing->fresh()) + array_filter(['suggestion_type' => $suggestionType]));
+        AuditLog::record('marketplace_listing_linked', $listing, $before, $this->snapshot($listing->fresh()) + array_filter(['suggestion_type' => $suggestionType]) + $auditExtra);
     }
 
     /**

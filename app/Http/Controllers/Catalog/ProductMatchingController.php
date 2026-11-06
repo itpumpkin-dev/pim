@@ -7,11 +7,14 @@ use App\Jobs\SyncMarketplaceListingsJob;
 use App\Models\Attribute;
 use App\Models\Locale;
 use App\Models\MarketplaceListing;
+use App\Models\MarketplaceListingSyncRun;
 use App\Models\Product;
 use App\Models\ProductValue;
 use App\Models\SalesPlatformShop;
 use App\Services\Marketplace\Listings\ListingMatchSuggester;
+use App\Services\Marketplace\Listings\ListingScoreSuggester;
 use App\Services\Marketplace\Listings\MarketplaceListingFetcherResolver;
+use App\Services\Marketplace\Listings\MarketplaceListingSyncRunner;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -24,7 +27,8 @@ use Inertia\Response;
  * "จับคู่สินค้า (Product Matching)": per shop, which marketplace listings
  * (marketplace_listings, filled by MarketplaceListingSyncService) are linked
  * to PIM (single product / pack / bundle), which are not (with
- * ListingMatchSuggester suggestions), which were hidden, and which PIM
+ * ListingMatchSuggester rule suggestions, else the stored score-based
+ * ListingScoreSuggester ones), which were hidden, and which PIM
  * products aren't listed on that shop at all. The write actions live in
  * ProductMatchingActionsController.
  */
@@ -32,7 +36,13 @@ class ProductMatchingController extends Controller
 {
     private const TABS = ['matched', 'unmatched', 'suggested', 'ignored', 'not_listed'];
 
-    public function __construct(private readonly ListingMatchSuggester $suggester) {}
+    /** "เฉพาะคะแนน ≥ N" filter values for score-based suggestions (0 = all) */
+    private const MIN_SCORES = [0, 50, 60, 70, 80];
+
+    public function __construct(
+        private readonly ListingMatchSuggester $suggester,
+        private readonly MarketplaceListingSyncRunner $runner,
+    ) {}
 
     private const PLATFORM_ORDER = ['lazada', 'shopee', 'tiktok', 'woocommerce'];
 
@@ -54,8 +64,17 @@ class ProductMatchingController extends Controller
             ->get()
             ->keyBy('sales_platform_shop_id');
 
-        $shopRows = $shops->map(function (SalesPlatformShop $shop) use ($stats) {
+        $lastRuns = MarketplaceListingSyncRun::query()
+            ->whereIn('id', MarketplaceListingSyncRun::query()
+                ->whereIn('sales_platform_shop_id', $shops->pluck('id'))
+                ->groupBy('sales_platform_shop_id')
+                ->selectRaw('max(id)'))
+            ->get()
+            ->keyBy('sales_platform_shop_id');
+
+        $shopRows = $shops->map(function (SalesPlatformShop $shop) use ($stats, $lastRuns) {
             $s = $stats->get($shop->id);
+            $run = $lastRuns->get($shop->id);
 
             return [
                 'id' => $shop->id,
@@ -66,6 +85,7 @@ class ProductMatchingController extends Controller
                 'ignored_count' => (int) ($s->ignored_count ?? 0),
                 'active_count' => (int) ($s->active_count ?? 0),
                 'last_synced_at' => $s?->last_synced_at,
+                'last_run' => $run ? $this->runPayload($run) : null,
             ];
         });
 
@@ -87,6 +107,10 @@ class ProductMatchingController extends Controller
         $tab = in_array($request->input('tab'), self::TABS, true) ? $request->input('tab') : 'unmatched';
         $search = trim((string) $request->input('search', ''));
         $activeOnly = $request->has('active_only') ? $request->boolean('active_only') : true;
+        $minScore = (int) $request->input('min_score', 0);
+        if (! in_array($minScore, self::MIN_SCORES, true)) {
+            $minScore = 0;
+        }
         $perPage = (int) $request->input('per_page', 25);
         if (! in_array($perPage, [25, 50, 100], true)) {
             $perPage = 25;
@@ -97,6 +121,7 @@ class ProductMatchingController extends Controller
             'tab' => $tab,
             'search' => $search,
             'active_only' => $activeOnly,
+            'min_score' => $minScore,
             'per_page' => $perPage,
         ];
 
@@ -110,6 +135,9 @@ class ProductMatchingController extends Controller
             $suggestions = $this->suggester->suggest(
                 $this->listingQuery($shopId, $activeOnly, '')->unlinked()->pluck('seller_sku', 'id')->all()
             );
+            // rule-based suggestions take precedence; listings without one
+            // get their stored score-based suggestions (phase 3A)
+            $suggestions += $this->scoreSuggestions($shopId, $activeOnly, $minScore, array_keys($suggestions));
 
             $summary = [
                 'matched' => $this->listingQuery($shopId, $activeOnly, '')->linked()->count(),
@@ -129,6 +157,9 @@ class ProductMatchingController extends Controller
             'filters' => $filters,
             'summary' => $summary,
             'rows' => $rows,
+            'syncRuns' => $shopId ? MarketplaceListingSyncRun::where('sales_platform_shop_id', $shopId)
+                ->orderByDesc('started_at')->orderByDesc('id')->limit(10)->get()
+                ->map(fn (MarketplaceListingSyncRun $r) => $this->runPayload($r))->all() : [],
         ]);
     }
 
@@ -150,6 +181,16 @@ class ProductMatchingController extends Controller
             }
         }
 
+        // a shop whose sync is already running (button pressed twice, or the
+        // nightly run is on it right now) isn't queued again
+        $busy = $shops->filter(fn (SalesPlatformShop $shop) => $this->runner->isRunning($shop->id))->values();
+        if ($busy->count() === $shops->count()) {
+            return back()->with('warning', $shops->count() === 1
+                ? "กำลังซิงค์ร้าน {$shops->first()->name} อยู่ — รอให้เสร็จแล้วรีเฟรชหน้านี้"
+                : 'ทุกร้านกำลังซิงค์อยู่ — รอให้เสร็จก่อน');
+        }
+        $shops = $shops->reject(fn (SalesPlatformShop $shop) => $busy->contains('id', $shop->id))->values();
+
         foreach ($shops as $shop) {
             SyncMarketplaceListingsJob::dispatch($shop->id);
         }
@@ -157,6 +198,9 @@ class ProductMatchingController extends Controller
         $message = $shops->count() === 1
             ? "เริ่มซิงค์ร้าน {$shops->first()->name} แล้ว — ข้อมูลจะอัปเดตเมื่อเสร็จ (อาจใช้เวลาหลายนาที) รีเฟรชหน้านี้เพื่อดูผล"
             : "เริ่มซิงค์ {$shops->count()} ร้านแล้ว — ข้อมูลจะอัปเดตเมื่อเสร็จ (อาจใช้เวลาหลายนาที)";
+        if ($busy->isNotEmpty()) {
+            $message .= ' — ข้าม '.$busy->pluck('name')->implode(', ').' (กำลังซิงค์อยู่)';
+        }
 
         return back()->with('success', $message);
     }
@@ -254,6 +298,56 @@ class ProductMatchingController extends Controller
             'ignored_by' => $l->ignoredBy?->name,
             'ignore_reason' => $l->ignore_reason,
         ]);
+    }
+
+    /**
+     * Stored score-based suggestions (marketplace_listing_suggestions) of the
+     * shop's unlinked queue, in ListingMatchSuggester's shape (type
+     * 'similar', confidence always 'low') plus score / reasons.
+     *
+     * @param  list<int>  $exclude  listings that already have a rule-based suggestion
+     * @return array<int, list<array<string, mixed>>>
+     */
+    private function scoreSuggestions(int $shopId, bool $activeOnly, int $minScore, array $exclude): array
+    {
+        $rows = DB::table('marketplace_listing_suggestions as s')
+            ->join('products', 'products.id', '=', 's.product_id')
+            ->whereIn('s.marketplace_listing_id', $this->listingQuery($shopId, $activeOnly, '')->unlinked()->select('marketplace_listings.id'))
+            ->when($exclude !== [], fn ($q) => $q->whereNotIn('s.marketplace_listing_id', $exclude))
+            ->where('s.score', '>=', $minScore)
+            ->orderBy('s.marketplace_listing_id')
+            ->orderBy('s.rank')
+            ->get(['s.marketplace_listing_id', 's.product_id', 's.score', 's.reasons', 'products.sku']);
+
+        $out = [];
+        foreach ($rows as $r) {
+            $reasons = json_decode($r->reasons, true) ?: [];
+            $out[(int) $r->marketplace_listing_id][] = [
+                'type' => ListingScoreSuggester::TYPE,
+                'confidence' => 'low',
+                'items' => [['product_id' => (int) $r->product_id, 'sku' => $r->sku, 'quantity' => 1]],
+                'pack_quantity' => null,
+                'reason' => "คะแนน {$r->score}/100 — ".implode(' · ', $reasons),
+                'score' => (int) $r->score,
+                'reasons' => $reasons,
+            ];
+        }
+
+        return $out;
+    }
+
+    private function runPayload(MarketplaceListingSyncRun $run): array
+    {
+        return [
+            'id' => $run->id,
+            'trigger' => $run->trigger,
+            'status' => $run->status,
+            'started_at' => $run->started_at,
+            'finished_at' => $run->finished_at,
+            'duration_ms' => $run->duration_ms,
+            'stats' => $run->stats,
+            'error' => $run->error,
+        ];
     }
 
     private function notListedQuery(int $shopId, string $search): Builder
