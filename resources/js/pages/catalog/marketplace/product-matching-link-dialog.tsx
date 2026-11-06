@@ -27,6 +27,7 @@ export interface LinkDialogListing {
         type: string;
         pack_quantity: number | null;
         items: { product_id: number; sku: string; name: string | null; quantity: number }[];
+        score?: number;
     }[];
 }
 
@@ -242,6 +243,28 @@ export function ProductMatchingLinkDialog({
                                 </Label>
                                 <ProductSearch value={product} onChange={setProduct} />
                             </div>
+                            {listing.suggestions.some((sg) => sg.type === 'similar') && (
+                                <div className={pm.dialogField}>
+                                    <Label showColon={false}>คำแนะนำจากชื่อ/แบรนด์ (เลือกเพื่อใส่ด้านบน)</Label>
+                                    <HStack gap="0.375rem" wrap>
+                                        {listing.suggestions
+                                            .filter((sg) => sg.type === 'similar')
+                                            .map((sg) => {
+                                                const item = sg.items[0];
+                                                return (
+                                                    <Button
+                                                        key={item.product_id}
+                                                        design={product?.id === item.product_id ? 'Emphasized' : 'Default'}
+                                                        tooltip={item.name ?? item.sku}
+                                                        onClick={() => setProduct({ id: item.product_id, sku: item.sku, name: item.name })}
+                                                    >
+                                                        {item.sku} · {sg.score}
+                                                    </Button>
+                                                );
+                                            })}
+                                    </HStack>
+                                </div>
+                            )}
                             <div className={pm.dialogField}>
                                 <Label showColon={false}>จำนวนต่อแพ็ก</Label>
                                 <HStack gap="0.75rem">

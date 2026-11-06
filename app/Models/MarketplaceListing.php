@@ -26,7 +26,9 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  *  - auto_sku  exact products.sku = btrim(seller_sku), owned by the sync's
  *              auto-matcher (re-evaluated every sync);
  *  - manual    linked by a person ("ผูกเอง");
- *  - suggested a ListingMatchSuggester suggestion confirmed by a person;
+ *  - suggested a ListingMatchSuggester suggestion, or a stored score-based
+ *              ListingScoreSuggester one (marketplace_listing_suggestions),
+ *              confirmed by a person;
  *  - bundle    a bundle linked by hand (components);
  *  - pushed    created by our own push.
  * The auto-matcher only ever touches rows whose match_method is NULL or

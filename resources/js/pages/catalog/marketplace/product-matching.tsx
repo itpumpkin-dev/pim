@@ -9,6 +9,7 @@ import '@ui5/webcomponents-icons/dist/action.js';
 import '@ui5/webcomponents-icons/dist/chain-link.js';
 import '@ui5/webcomponents-icons/dist/disconnected.js';
 import '@ui5/webcomponents-icons/dist/hide.js';
+import '@ui5/webcomponents-icons/dist/history.js';
 import '@ui5/webcomponents-icons/dist/show.js';
 import '@ui5/webcomponents-icons/dist/synchronize.js';
 import {
@@ -37,7 +38,7 @@ import pm from './product-matching.module.css';
 
 type Platform = 'lazada' | 'shopee' | 'tiktok' | 'woocommerce';
 type MatchTab = 'matched' | 'unmatched' | 'suggested' | 'ignored' | 'not_listed';
-type SuggestionType = 'normalized' | 'trimmed' | 'prefix' | 'pack' | 'bundle' | 'barcode';
+type SuggestionType = 'normalized' | 'trimmed' | 'prefix' | 'pack' | 'bundle' | 'barcode' | 'similar';
 
 interface ShopRow {
     id: number;
@@ -48,6 +49,18 @@ interface ShopRow {
     ignored_count: number;
     active_count: number;
     last_synced_at: string | null;
+    last_run: SyncRun | null;
+}
+
+interface SyncRun {
+    id: number;
+    trigger: 'schedule' | 'manual' | 'command';
+    status: 'running' | 'success' | 'failed';
+    started_at: string;
+    finished_at: string | null;
+    duration_ms: number | null;
+    stats: Record<string, number | string> | null;
+    error: string | null;
 }
 
 interface ShopGroup {
@@ -75,6 +88,9 @@ interface Suggestion {
     items: SuggestionItem[];
     pack_quantity: number | null;
     reason: string;
+    /** score-based ('similar') suggestions only */
+    score?: number;
+    reasons?: string[];
 }
 
 interface ListingRow {
@@ -120,6 +136,7 @@ interface Filters {
     tab: MatchTab;
     search: string;
     active_only: boolean;
+    min_score: number;
     per_page: number;
 }
 
@@ -128,6 +145,7 @@ interface Props {
     filters: Filters;
     summary: Record<MatchTab, number>;
     rows: Paginated<ListingRow | NotListedRow> | null;
+    syncRuns: SyncRun[];
 }
 
 const PAGE_URL = '/catalog/marketplace/product-matching';
@@ -146,6 +164,15 @@ const MATCH_METHOD_LABEL: Record<NonNullable<ListingRow['match_method']>, string
     bundle: 'Manual',
     pushed: 'Pushed',
 };
+const MIN_SCORES = [0, 50, 60, 70, 80];
+const TRIGGER_LABEL: Record<SyncRun['trigger'], string> = { schedule: 'อัตโนมัติ (กลางคืน)', manual: 'กดซิงค์', command: 'คำสั่ง' };
+const RUN_STATUS_LABEL: Record<SyncRun['status'], string> = { running: 'กำลังซิงค์', success: 'สำเร็จ', failed: 'ล้มเหลว' };
+const formatDuration = (ms: number | null) => {
+    if (ms === null) return '—';
+    const s = Math.round(ms / 1000);
+    return s >= 60 ? `${Math.floor(s / 60)} นาที ${s % 60} วินาที` : `${s} วินาที`;
+};
+const runTagDesign = (status: SyncRun['status']) => (status === 'success' ? 'Positive' : status === 'failed' ? 'Negative' : 'Information');
 const CONFIDENCE_LABEL: Record<Suggestion['confidence'], string> = { high: 'มั่นใจสูง', medium: 'ปานกลาง', low: 'ต่ำ' };
 
 const formatDateTime = (value: string | null) => (value ? new Date(value).toLocaleString('th-TH', { dateStyle: 'medium', timeStyle: 'short' }) : '—');
@@ -154,6 +181,7 @@ const formatNumber = (value: number) => value.toLocaleString('th-TH');
 const suggestionTag = (s: Suggestion) => {
     if (s.type === 'bundle') return 'ชุดรวม';
     if (s.type === 'barcode') return 'บาร์โค้ด';
+    if (s.type === 'similar') return 'ชื่อ/แบรนด์ใกล้เคียง';
     if (s.type === 'pack' && s.pack_quantity && s.pack_quantity > 1) return `แพ็ก ×${s.pack_quantity}`;
     return 'SKU ใกล้เคียง';
 };
@@ -167,7 +195,7 @@ const suggestionTag = (s: Suggestion) => {
  * ProductMatchingActionsController / ListingMatchSuggester. Every action here
  * only changes PIM's own link table, never the marketplace.
  */
-export default function ProductMatching({ shopGroups, filters, summary, rows }: Props) {
+export default function ProductMatching({ shopGroups, filters, summary, rows, syncRuns }: Props) {
     const { auth } = usePage<SharedData>().props;
     const permissions = auth.permissions || [];
     const canSync = permissions.includes('products.edit_products');
@@ -182,6 +210,7 @@ export default function ProductMatching({ shopGroups, filters, summary, rows }: 
     const [linkTarget, setLinkTarget] = useState<ListingRow | null>(null);
     const [ignoreTarget, setIgnoreTarget] = useState<ListingRow | null>(null);
     const [ignoreReason, setIgnoreReason] = useState('');
+    const [historyOpen, setHistoryOpen] = useState(false);
     const firstRender = useRef(true);
     const { confirm, confirmElement } = useFioriConfirm();
 
@@ -210,6 +239,7 @@ export default function ProductMatching({ shopGroups, filters, summary, rows }: 
                 tab: next.tab,
                 search: next.search || undefined,
                 active_only: next.active_only ? 1 : 0,
+                min_score: next.min_score || undefined,
                 per_page: next.per_page,
                 page: overrides.page,
             },
@@ -242,9 +272,11 @@ export default function ProductMatching({ shopGroups, filters, summary, rows }: 
         });
     };
 
-    const accept = (row: ListingRow) => {
-        const top = row.suggestions[0];
-        if (top) postAction(row, 'accept', { index: 0, type: top.type });
+    /** accept one of the row's suggestions (score-based ones by product, stale-checked server-side) */
+    const accept = (row: ListingRow, index = 0) => {
+        const s = row.suggestions[index];
+        if (!s) return;
+        postAction(row, 'accept', s.type === 'similar' ? { index, type: s.type, product_id: s.items[0].product_id } : { index, type: s.type });
     };
 
     const unlink = async (row: ListingRow) => {
@@ -344,9 +376,56 @@ export default function ProductMatching({ shopGroups, filters, summary, rows }: 
         return productLink(row.product, row.pack_quantity && row.pack_quantity > 1 ? `แพ็ก ×${row.pack_quantity}` : undefined);
     };
 
+    /** score-based: up to 3 candidates, each with score + reasons and its own "ผูก" */
+    const scoreSuggestionCell = (row: ListingRow) => (
+        <div className={pm.cellStack}>
+            <HStack gap="0.25rem" wrap>
+                <Tag design="Information" hideStateIcon>
+                    ชื่อ/แบรนด์ใกล้เคียง
+                </Tag>
+                <Tag design="Neutral" hideStateIcon title="คำแนะนำจากคะแนนความคล้าย — ตรวจสอบก่อนยืนยันทุกครั้ง (ไม่รวมในการยืนยันหลายรายการ)">
+                    {CONFIDENCE_LABEL.low}
+                </Tag>
+            </HStack>
+            <div className={pm.scoreList}>
+                {row.suggestions.map((s, index) => {
+                    const item = s.items[0];
+                    const score = s.score ?? 0;
+                    return (
+                        <div key={item.product_id} className={pm.scoreItem}>
+                            <span
+                                className={pm.scoreBadge}
+                                title="คะแนน 0–100"
+                                style={{ color: score >= 80 ? TONE_TEXT.success : score >= 60 ? TONE_TEXT.warning : TONE_TEXT.neutral }}
+                            >
+                                {score}
+                            </span>
+                            <div className={pm.cellStack} style={{ flex: 1 }}>
+                                <Body style={{ fontWeight: 600, fontFamily: 'monospace' }}>{item.sku}</Body>
+                                {item.name && <Caption>{item.name}</Caption>}
+                                {s.reasons && s.reasons.length > 0 && <Caption>{s.reasons.join(' · ')}</Caption>}
+                            </div>
+                            {canMatch && index > 0 && (
+                                <Button
+                                    design="Transparent"
+                                    icon="accept"
+                                    tooltip={`ผูกกับ ${item.sku}`}
+                                    accessibleName={`ผูกกับ ${item.sku}`}
+                                    disabled={busyId === row.id}
+                                    onClick={() => accept(row, index)}
+                                />
+                            )}
+                        </div>
+                    );
+                })}
+            </div>
+        </div>
+    );
+
     const suggestionCell = (row: ListingRow) => {
         const top = row.suggestions[0];
         if (!top) return <Caption>— ไม่มีคำแนะนำ —</Caption>;
+        if (top.type === 'similar') return scoreSuggestionCell(row);
         return (
             <div className={pm.cellStack} title={top.reason}>
                 <HStack gap="0.25rem" wrap>
@@ -392,6 +471,7 @@ export default function ProductMatching({ shopGroups, filters, summary, rows }: 
                         disabled={busyId === row.id}
                         loading={busyId === row.id}
                         loadingDelay={0}
+                        tooltip={row.suggestions[0].type === 'similar' ? `ผูกกับคำแนะนำอันดับ 1 (${row.suggestions[0].items[0].sku})` : undefined}
                         onClick={() => accept(row)}
                     >
                         ยืนยัน
@@ -485,7 +565,7 @@ export default function ProductMatching({ shopGroups, filters, summary, rows }: 
 
     const unmatchedColumns: FioriResponsiveColumn<ListingRow>[] = [
         { key: 'listing', header: `Listing บน ${platformLabel}`, priority: 'always', minWidth: 260, render: listingCell },
-        { key: 'suggestion', header: 'คำแนะนำ', priority: 'high', minWidth: 220, render: suggestionCell },
+        { key: 'suggestion', header: 'คำแนะนำ', priority: 'high', minWidth: 280, render: suggestionCell },
         { key: 'actions', header: '', popinText: 'จัดการ', priority: 'high', minWidth: 240, render: unmatchedActions },
         ...commonListingColumns,
     ];
@@ -576,7 +656,31 @@ export default function ProductMatching({ shopGroups, filters, summary, rows }: 
                                     ซิงค์ร้านนี้
                                 </Button>
                             )}
+                            {shop?.last_run && (
+                                <Tag
+                                    design={runTagDesign(shop.last_run.status)}
+                                    title={
+                                        shop.last_run.error ??
+                                        `${TRIGGER_LABEL[shop.last_run.trigger]} · เริ่ม ${formatDateTime(shop.last_run.started_at)} · ใช้เวลา ${formatDuration(shop.last_run.duration_ms)}`
+                                    }
+                                >
+                                    ซิงค์ล่าสุด: {RUN_STATUS_LABEL[shop.last_run.status]} ·{' '}
+                                    {formatDateTime(shop.last_run.finished_at ?? shop.last_run.started_at)}
+                                    {shop.last_run.duration_ms !== null ? ` · ${formatDuration(shop.last_run.duration_ms)}` : ''}
+                                </Tag>
+                            )}
+                            {shop && (
+                                <Button design="Transparent" icon="history" onClick={() => setHistoryOpen(true)}>
+                                    ประวัติการซิงค์
+                                </Button>
+                            )}
                         </div>
+
+                        {shop?.last_run?.status === 'failed' && shop.last_run.error && (
+                            <FioriMessageStrip severity="error" style={{ marginBottom: '1rem' }}>
+                                ซิงค์ล่าสุดล้มเหลว ({formatDateTime(shop.last_run.started_at)}): {shop.last_run.error}
+                            </FioriMessageStrip>
+                        )}
 
                         <div className={pm.kpiGrid}>
                             {kpis.map((kpi) => (
@@ -632,6 +736,23 @@ export default function ProductMatching({ shopGroups, filters, summary, rows }: 
                                             <Body>เฉพาะที่เปิดขาย</Body>
                                         </HStack>
                                     )}
+                                    {(filters.tab === 'unmatched' || filters.tab === 'suggested') && (
+                                        <HStack gap="0.5rem">
+                                            <Body>คะแนนขั้นต่ำ</Body>
+                                            <Select
+                                                accessibleName="เฉพาะคำแนะนำจากชื่อ/แบรนด์ที่คะแนนอย่างน้อย"
+                                                style={{ width: '8rem' }}
+                                                value={String(filters.min_score ?? 0)}
+                                                onChange={(e) => visit({ min_score: Number(e.detail.selectedOption.value) || 0, page: 1 })}
+                                            >
+                                                {MIN_SCORES.map((n) => (
+                                                    <Option key={n} value={String(n)}>
+                                                        {n === 0 ? 'ทั้งหมด' : `≥ ${n}`}
+                                                    </Option>
+                                                ))}
+                                            </Select>
+                                        </HStack>
+                                    )}
                                     {selectable && (
                                         <Button
                                             design="Emphasized"
@@ -639,7 +760,7 @@ export default function ProductMatching({ shopGroups, filters, summary, rows }: 
                                             disabled={selected.length === 0 || bulkBusy}
                                             loading={bulkBusy}
                                             loadingDelay={0}
-                                            tooltip="ยืนยันคำแนะนำอันดับแรกของแถวที่เลือก — เฉพาะคำแนะนำที่มั่นใจสูง (SKU ใกล้เคียง / แพ็ก _N) ที่เหลือจะถูกข้าม"
+                                            tooltip="ยืนยันคำแนะนำอันดับแรกของแถวที่เลือก — เฉพาะคำแนะนำที่มั่นใจสูง (SKU ใกล้เคียง / แพ็ก _N) ที่เหลือ (รวมถึงคำแนะนำจากชื่อ/แบรนด์) จะถูกข้าม"
                                             onClick={bulkAccept}
                                         >
                                             ยืนยันคำแนะนำที่เลือก{selected.length > 0 ? ` (${selected.length})` : ''}
@@ -747,6 +868,72 @@ export default function ProductMatching({ shopGroups, filters, summary, rows }: 
                         />
                     </div>
                 </div>
+            </Dialog>
+
+            <Dialog
+                open={historyOpen}
+                onClose={() => setHistoryOpen(false)}
+                style={{ width: 'min(760px, calc(100vw - 2rem))' }}
+                header={
+                    <div style={{ width: '100%', padding: '0.5rem 0' }}>
+                        <Title level="H5" size="H5" wrappingType="Normal">
+                            ประวัติการซิงค์
+                        </Title>
+                        <Body style={{ color: TONE_TEXT.neutral, marginTop: '0.125rem' }}>{shop?.name} · 10 ครั้งล่าสุด</Body>
+                    </div>
+                }
+                footer={
+                    <Bar
+                        design="Footer"
+                        endContent={
+                            <Button design="Transparent" onClick={() => setHistoryOpen(false)}>
+                                ปิด
+                            </Button>
+                        }
+                    />
+                }
+            >
+                {syncRuns.length === 0 ? (
+                    <Caption block>ยังไม่มีประวัติการซิงค์ของร้านนี้</Caption>
+                ) : (
+                    <div style={{ overflowX: 'auto' }}>
+                        <table className={pm.runTable}>
+                            <thead>
+                                <tr>
+                                    <th>เริ่ม</th>
+                                    <th>ที่มา</th>
+                                    <th>สถานะ</th>
+                                    <th>ใช้เวลา</th>
+                                    <th>ผล</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {syncRuns.map((run) => (
+                                    <tr key={run.id}>
+                                        <td>{formatDateTime(run.started_at)}</td>
+                                        <td>{TRIGGER_LABEL[run.trigger]}</td>
+                                        <td>
+                                            <Tag design={runTagDesign(run.status)} title={run.error ?? undefined}>
+                                                {RUN_STATUS_LABEL[run.status]}
+                                            </Tag>
+                                        </td>
+                                        <td>{formatDuration(run.duration_ms)}</td>
+                                        <td>
+                                            {run.error ? (
+                                                <span style={{ color: TONE_TEXT.error }}>{run.error}</span>
+                                            ) : run.stats ? (
+                                                `ดึงมา ${run.stats.fetched ?? 0} · ผูกแล้ว ${run.stats.matched ?? 0} · ยังไม่มีคู่ ${run.stats.unmatched ?? 0}` +
+                                                (run.stats.score_suggested !== undefined ? ` · แนะนำจากชื่อ ${run.stats.score_suggested}` : '')
+                                            ) : (
+                                                '—'
+                                            )}
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                )}
             </Dialog>
 
             {confirmElement}

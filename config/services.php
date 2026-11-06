@@ -48,6 +48,16 @@ return [
         'auto_enabled' => env('MARKETPLACE_AUTO_SYNC', false),
     ],
 
+    // Product Matching: nightly read-only listing sync of every shop with a
+    // linked seller account (WooCommerce always) + auto-match + score
+    // suggestions — see App\Services\Marketplace\Listings\MarketplaceListingSyncSchedule.
+    // Needs `php artisan schedule:run` in cron every minute.
+    'marketplace_listing_sync' => [
+        'schedule_enabled' => env('MARKETPLACE_LISTING_SYNC_SCHEDULE', true),
+        'schedule_time' => env('MARKETPLACE_LISTING_SYNC_TIME', '02:00'),
+        'timezone' => 'Asia/Bangkok',
+    ],
+
     'lazada' => [
         'base_url' => env('LAZADA_API_BASE_URL', 'https://api.lazada.co.th/rest'),
     ],
