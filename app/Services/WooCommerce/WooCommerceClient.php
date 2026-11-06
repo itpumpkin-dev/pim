@@ -77,6 +77,30 @@ class WooCommerceClient
     }
 
     /**
+     * GET /products — one page of every product regardless of status
+     * (`status=any`). READ-ONLY. Pagination is the caller's job (loop until a
+     * page comes back shorter than $perPage) — used by the Product Matching
+     * listing fetcher (WooCommerceListingFetcher).
+     *
+     * Confirmed live 2026-11-06: the store intermittently answers a heavy
+     * page (per_page=100 + orderby=id) with a WordPress HTML 500 page, while
+     * per_page=50 with the default ordering is reliable — keep pages small.
+     */
+    public function listProducts(int $page = 1, int $perPage = 50): array
+    {
+        return $this->request('GET', '/products', ['page' => $page, 'per_page' => $perPage, 'status' => 'any']);
+    }
+
+    /**
+     * GET /products/{id}/variations — one page of a variable product's
+     * variations. READ-ONLY.
+     */
+    public function listVariations(int $productId, int $page = 1, int $perPage = 100): array
+    {
+        return $this->request('GET', "/products/{$productId}/variations", ['page' => $page, 'per_page' => $perPage]);
+    }
+
+    /**
      * FIRES A REAL, LIVE WRITE TO WOOCOMMERCE — creates an actual listing on
      * the store, visible to real customers if $payload['status'] is
      * 'publish'. Never call this without the user's explicit, specific
