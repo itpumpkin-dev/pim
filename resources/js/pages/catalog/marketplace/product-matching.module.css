@@ -1,0 +1,97 @@
+/* Product Matching page — extras on top of marketplace.module.css. */
+
+.shopBar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+}
+
+.shopSelect {
+    width: 100%;
+    min-width: 0;
+}
+
+@media (min-width: 600px) {
+    .shopSelect {
+        width: 320px;
+    }
+}
+
+.kpiGrid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+}
+
+@media (min-width: 900px) {
+    .kpiGrid {
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+    }
+}
+
+.kpi {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    padding: 0.75rem 1rem;
+    background: var(--sapGroup_ContentBackground);
+    border: 1px solid var(--sapGroup_ContentBorderColor);
+    border-radius: var(--sapElement_BorderCornerRadius);
+    min-width: 0;
+}
+
+.kpiLabel {
+    font-size: var(--sapFontSmallSize);
+    color: var(--sapContent_LabelColor);
+}
+
+.kpiValue {
+    font-size: var(--sapFontHeader3Size);
+    font-weight: 700;
+    color: var(--sapTextColor);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.kpiValueSmall {
+    font-size: var(--sapFontSize);
+    font-weight: 600;
+    color: var(--sapTextColor);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.tabs {
+    margin-bottom: 0;
+}
+
+.filterRow {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.cellStack {
+    display: flex;
+    flex-direction: column;
+    gap: 0.125rem;
+    min-width: 0;
+}
+
+.clamp {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    word-break: break-word;
+}
+
+.link {
+    font-weight: 600;
+}

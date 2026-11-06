@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Models\Concerns\Auditable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Facades\Cache;
 
 class SalesPlatformShop extends Model
@@ -40,6 +41,15 @@ class SalesPlatformShop extends Model
     public function channel(): BelongsTo
     {
         return $this->belongsTo(Channel::class);
+    }
+
+    /**
+     * Every listing actually on this shop (Product Matching — see
+     * MarketplaceListingSyncService).
+     */
+    public function marketplaceListings(): HasMany
+    {
+        return $this->hasMany(MarketplaceListing::class);
     }
 
     public function creator(): BelongsTo

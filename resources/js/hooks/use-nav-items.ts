@@ -156,22 +156,31 @@ export function useMainNavItems(): NavItem[] {
                                 // นี้เลยถูกยกขึ้นมาเป็น item ข้างๆ "มาสเตอร์" ตอน render (ดู
                                 // toSideNavTree ใน app-sidebar.tsx) จึงต้องมีไอคอนของตัวเอง
                                 icon: 'cart',
-                                items: (['shopee', 'lazada', 'tiktok', 'woocommerce'] as const).map((platform) => ({
-                                    title: platform === 'woocommerce' ? 'WooCommerce' : platform.charAt(0).toUpperCase() + platform.slice(1),
-                                    url: `/catalog/marketplace/${platform}`,
-                                    permission: `marketplace_${platform}.list_marketplace_${platform}`,
-                                    // การ์ดบนหน้า hub พาไปหน้าจริงที่ไม่ได้อยู่ใต้
-                                    // /catalog/marketplace/{platform}/ ทุกอัน (เช่น หน้าจับคู่
-                                    // หมวดหมู่อยู่คนละ path เลย) — ต้องระบุ matchUrls ตรงๆ ไม่งั้น
-                                    // เปิดจากการ์ดแล้วเมนู "มาร์เก็ตเพลส" นี้จะไม่ไฮไลต์ (เหมือน
-                                    // ปัญหาเดียวกับที่หน้า "จัดการ" เจอมาก่อน — ดูคอมเมนต์ที่นั่น)
-                                    matchUrls: [
-                                        `/catalog/categories/${platform}-mapping`,
-                                        `/catalog/marketplace/${platform}/products`,
-                                        `/catalog/marketplace/${platform}/attribute-mapping`,
-                                        `/catalog/marketplace/connect/${platform}`,
-                                    ],
-                                })),
+                                items: [
+                                    ...(['shopee', 'lazada', 'tiktok', 'woocommerce'] as const).map((platform) => ({
+                                        title: platform === 'woocommerce' ? 'WooCommerce' : platform.charAt(0).toUpperCase() + platform.slice(1),
+                                        url: `/catalog/marketplace/${platform}`,
+                                        permission: `marketplace_${platform}.list_marketplace_${platform}`,
+                                        // การ์ดบนหน้า hub พาไปหน้าจริงที่ไม่ได้อยู่ใต้
+                                        // /catalog/marketplace/{platform}/ ทุกอัน (เช่น หน้าจับคู่
+                                        // หมวดหมู่อยู่คนละ path เลย) — ต้องระบุ matchUrls ตรงๆ ไม่งั้น
+                                        // เปิดจากการ์ดแล้วเมนู "มาร์เก็ตเพลส" นี้จะไม่ไฮไลต์ (เหมือน
+                                        // ปัญหาเดียวกับที่หน้า "จัดการ" เจอมาก่อน — ดูคอมเมนต์ที่นั่น)
+                                        matchUrls: [
+                                            `/catalog/categories/${platform}-mapping`,
+                                            `/catalog/marketplace/${platform}/products`,
+                                            `/catalog/marketplace/${platform}/attribute-mapping`,
+                                            `/catalog/marketplace/connect/${platform}`,
+                                        ],
+                                    })),
+                                    // หน้ารวมทุก platform (ไม่ได้แยกต่อแพลตฟอร์ม) — ข้อความไทย
+                                    // ฮาร์ดโค้ดเหมือนหน้า marketplace อื่นๆ (ไม่มี i18n key)
+                                    {
+                                        title: 'จับคู่สินค้า',
+                                        url: '/catalog/marketplace/product-matching',
+                                        permission: 'products.list_products',
+                                    },
+                                ],
                             },
                         ],
                     },

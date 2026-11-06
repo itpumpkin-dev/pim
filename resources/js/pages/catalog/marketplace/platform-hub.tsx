@@ -1,6 +1,7 @@
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem, type SharedData } from '@/types';
 import { Head, router, usePage } from '@inertiajs/react';
+import '@ui5/webcomponents-icons/dist/chain-link.js';
 import '@ui5/webcomponents-icons/dist/product.js';
 import '@ui5/webcomponents-icons/dist/retail-store.js';
 import '@ui5/webcomponents-icons/dist/settings.js';
@@ -86,6 +87,17 @@ export default function MarketplacePlatformHub({ platform }: Props) {
                   },
               ]
             : []),
+        // "จับคู่สินค้า (Product Matching)" — listing จริงบนร้าน ↔ สินค้าใน PIM
+        // (ดู ProductMatchingController) ทุก platform ใช้หน้าเดียวกัน แค่
+        // ?platform= ให้เลือกร้านแรกของ platform นี้ไว้ก่อน
+        {
+            key: 'productMatching',
+            icon: 'chain-link',
+            title: 'จับคู่สินค้า (Product Matching)',
+            description: `เทียบ listing จริงบน ${platformLabel} กับสินค้าใน PIM — จับคู่แล้ว / ยังไม่จับคู่ / ยังไม่ได้ลงขาย`,
+            url: `/catalog/marketplace/product-matching?platform=${platform}`,
+            permission: 'products.list_products',
+        },
         ...(hasMasterProductListPage
             ? [
                   {

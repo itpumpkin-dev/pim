@@ -18,6 +18,7 @@ use App\Http\Controllers\Catalog\PointController;
 use App\Http\Controllers\Catalog\ProductController;
 use App\Http\Controllers\Catalog\ProductGradeController;
 use App\Http\Controllers\Catalog\ProductGroupController;
+use App\Http\Controllers\Catalog\ProductMatchingController;
 use App\Http\Controllers\Catalog\ProductTypeController;
 use App\Http\Controllers\Catalog\RawMaterialController;
 use App\Http\Controllers\Catalog\SubcategoryController;
@@ -175,6 +176,11 @@ Route::middleware(['auth'])->prefix('catalog')->name('catalog.')->group(function
     // ตอนนี้) — ดู LazadaMasterProductsController's docblock
     Route::get('marketplace/lazada/master-products', [LazadaMasterProductsController::class, 'index'])->name('marketplace.lazada.masterProducts')->middleware('permission:marketplace_lazada,list_marketplace_lazada');
     Route::post('marketplace/lazada/master-products/sync', [LazadaMasterProductsController::class, 'sync'])->name('marketplace.lazada.masterProducts.sync')->middleware('permission:marketplace_lazada,sync_master_products_lazada');
+    // "จับคู่สินค้า (Product Matching)" — listing จริงบนทุก marketplace ↔ PIM
+    // product ต่อร้าน (phase 1 อ่านอย่างเดียว + auto-match ตาม SKU) — ดู
+    // ProductMatchingController / MarketplaceListingSyncService
+    Route::get('marketplace/product-matching', [ProductMatchingController::class, 'index'])->name('marketplace.productMatching')->middleware('permission:products,list_products');
+    Route::post('marketplace/product-matching/sync', [ProductMatchingController::class, 'sync'])->name('marketplace.productMatching.sync')->middleware('permission:products,edit_products');
     Route::get('marketplace/shopee/products', [ShopeeAttributeMappingController::class, 'shopeeProducts'])->name('marketplace.shopee.products')->middleware('permission:products,list_products');
     Route::get('marketplace/shopee/products/{product}/detail', [ShopeeAttributeMappingController::class, 'productDetail'])->name('marketplace.shopee.products.detail')->middleware('permission:products,list_products');
     // ปุ่ม "แนะนำหมวดหมู่จาก Shopee" ของ Section 1 (Category Mapping) — mirror

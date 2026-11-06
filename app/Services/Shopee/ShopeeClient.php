@@ -408,6 +408,19 @@ class ShopeeClient
     }
 
     /**
+     * v2.product.get_model_list — every model (variant) of one item: model[]
+     * with model_id/model_sku/price_info[]/stock_info_v2, plus tier_variation.
+     * READ-ONLY. Used by the Product Matching listing fetcher
+     * (ShopeeListingFetcher) for items whose base info says has_model.
+     */
+    public function getModelList(int $itemId): array
+    {
+        return $this->request('/api/v2/product/get_model_list', [
+            'item_id' => $itemId,
+        ]);
+    }
+
+    /**
      * v2.product.unlist_item — hides a listing from the storefront without
      * deleting it (Shopee's equivalent of LazadaClient::deactivateProduct()).
      *
