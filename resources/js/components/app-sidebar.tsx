@@ -17,6 +17,7 @@ import '@ui5/webcomponents-icons/dist/download-from-cloud.js';
 import '@ui5/webcomponents-icons/dist/employee.js';
 import '@ui5/webcomponents-icons/dist/globe.js';
 import '@ui5/webcomponents-icons/dist/group.js';
+import '@ui5/webcomponents-icons/dist/hint.js';
 import '@ui5/webcomponents-icons/dist/history.js';
 import '@ui5/webcomponents-icons/dist/home.js';
 import '@ui5/webcomponents-icons/dist/product.js';
@@ -270,8 +271,17 @@ export function AppSidebar({ slot }: { slot?: string }) {
         );
     };
 
+    // Build version (package.json + git commit, see vite.config.js), pinned at
+    // the bottom of the rail. Disabled = shown greyed and not clickable.
+    const versionText = __APP_COMMIT__ ? `v${__APP_VERSION__} (${__APP_COMMIT__})` : `v${__APP_VERSION__}`;
+
     return (
-        <SideNavigation slot={slot} onItemToggle={onItemToggle} accessibleName={t('mainNavigation')}>
+        <SideNavigation
+            slot={slot}
+            onItemToggle={onItemToggle}
+            accessibleName={t('mainNavigation')}
+            fixedItems={<SideNavigationItem icon="hint" text={versionText} tooltip={versionText} disabled />}
+        >
             {tree.map((node) =>
                 node.kind === 'group' ? (
                     <SideNavigationGroup key={node.key} data-key={node.key} text={node.title} expanded={isExpanded(node)}>
