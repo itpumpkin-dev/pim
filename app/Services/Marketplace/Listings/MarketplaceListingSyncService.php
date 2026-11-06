@@ -22,7 +22,8 @@ use InvalidArgumentException;
  *     than a seller emptying their whole shop), and items the fetcher
  *     reported as incomplete keep their rows.
  *  3. auto-match, set-based in SQL: only rows whose match_method is NULL or
- *     'auto_sku' are touched — 'manual'/'pushed' are never modified.
+ *     'auto_sku' and that are not ignored are touched — 'manual'/'suggested'/
+ *     'bundle'/'pushed' are never modified.
  */
 class MarketplaceListingSyncService
 {
@@ -101,8 +102,8 @@ class MarketplaceListingSyncService
 
         $this->autoMatch($shop->id, $now);
 
-        $matched = MarketplaceListing::where('sales_platform_shop_id', $shop->id)->whereNotNull('product_id')->count();
-        $unmatched = MarketplaceListing::where('sales_platform_shop_id', $shop->id)->whereNull('product_id')->count();
+        $matched = MarketplaceListing::where('sales_platform_shop_id', $shop->id)->linked()->count();
+        $unmatched = MarketplaceListing::where('sales_platform_shop_id', $shop->id)->unlinked()->count();
 
         return [
             'fetched' => $fetched,
@@ -129,6 +130,7 @@ class MarketplaceListingSyncService
                 SET product_id = NULL, match_method = NULL, matched_at = NULL, matched_by = NULL, updated_at = ?
               WHERE ml.sales_platform_shop_id = ?
                 AND ml.match_method = ?
+                AND ml.ignored_at IS NULL
                 AND NOT EXISTS (
                     SELECT 1 FROM products p
                      WHERE p.id = ml.product_id
@@ -137,16 +139,33 @@ class MarketplaceListingSyncService
             [$now, $shopId, MarketplaceListing::MATCH_AUTO_SKU]
         );
 
-        // 2. unmatched rows (never manual/pushed) → exact products.sku match.
+        // 2. unmatched, non-ignored rows (never manual/suggested/bundle/
+        //    pushed) → exact products.sku match.
         DB::update(
             'UPDATE marketplace_listings ml
                 SET product_id = p.id, match_method = ?, matched_at = ?, matched_by = NULL, updated_at = ?
                FROM products p
               WHERE ml.sales_platform_shop_id = ?
                 AND ml.match_method IS NULL
+                AND ml.ignored_at IS NULL
                 AND ml.seller_sku IS NOT NULL
                 AND p.sku = btrim(ml.seller_sku)',
             [MarketplaceListing::MATCH_AUTO_SKU, $now, $now, $shopId]
+        );
+
+        // 3. a manual/suggested/bundle/pushed link whose product(s) were all
+        //    deleted (product_id nulled by the FK, components cascaded away)
+        //    is no longer linked to anything → back to unmatched, so the row
+        //    re-enters the work queue (and auto-match) instead of being stuck.
+        DB::update(
+            'UPDATE marketplace_listings ml
+                SET match_method = NULL, matched_at = NULL, matched_by = NULL, pack_quantity = NULL, updated_at = ?
+              WHERE ml.sales_platform_shop_id = ?
+                AND ml.match_method IS NOT NULL
+                AND ml.match_method <> ?
+                AND ml.product_id IS NULL
+                AND NOT EXISTS (SELECT 1 FROM marketplace_listing_components c WHERE c.marketplace_listing_id = ml.id)',
+            [$now, $shopId, MarketplaceListing::MATCH_AUTO_SKU]
         );
     }
 

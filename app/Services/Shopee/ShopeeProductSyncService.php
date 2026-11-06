@@ -8,6 +8,7 @@ use App\Models\SalesPlatformShop;
 use App\Models\ShopeeAttributeMapping;
 use App\Models\ShopeeAttributeOptionMapping;
 use App\Models\ShopeeBrand;
+use App\Services\Marketplace\Listings\LinkedListingResolver;
 use App\Services\Marketplace\ResolvesProductAttributeValues;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -302,6 +303,24 @@ class ShopeeProductSyncService
             ->where('product_id', $product->id)
             ->where('sales_platform_shop_id', $shop->id)
             ->value('platform_item_id');
+
+        // Product Matching: never pushed from here, but the product is already
+        // linked to an existing Shopee listing on this shop → update that item
+        // instead of creating a duplicate. No create fallback on failure (that
+        // would be exactly the duplicate this avoids) — the error surfaces.
+        $linkedItemId = $cachedItemId ? null : app(LinkedListingResolver::class)->itemIdFor($product->id, $shop->id, requireNoVariant: true);
+        if ($linkedItemId) {
+            $result = $this->submitToShopee(
+                fn (array $p) => $this->client->updateItem([...$p, 'item_id' => (int) $linkedItemId]),
+                $payload
+            );
+            DB::table('product_platform_shops')->updateOrInsert(
+                ['product_id' => $product->id, 'sales_platform_shop_id' => $shop->id],
+                ['platform_item_id' => $linkedItemId, 'updated_at' => now()]
+            );
+
+            return $this->withVideoWarning($result);
+        }
 
         if ($cachedItemId) {
             try {

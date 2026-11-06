@@ -9,6 +9,7 @@ use App\Models\SalesPlatformShop;
 use App\Models\TikTokAttributeMapping;
 use App\Models\TikTokAttributeOptionMapping;
 use App\Models\TikTokBrand;
+use App\Services\Marketplace\Listings\LinkedListingResolver;
 use App\Services\Marketplace\ResolvesProductAttributeValues;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
@@ -281,6 +282,21 @@ class TikTokProductSyncService
             ->where('product_id', $product->id)
             ->where('sales_platform_shop_id', $shop->id)
             ->value('platform_item_id');
+
+        // Product Matching: never pushed from here, but the product is already
+        // linked to an existing single-SKU TikTok product on this shop →
+        // update it instead of creating a duplicate. No create fallback on
+        // failure (that would be exactly the duplicate this avoids).
+        $linkedProductId = $cachedProductId ? null : app(LinkedListingResolver::class)->itemIdFor($product->id, $shop->id);
+        if ($linkedProductId) {
+            $result = $this->client->updateProduct($linkedProductId, $payload);
+            DB::table('product_platform_shops')->updateOrInsert(
+                ['product_id' => $product->id, 'sales_platform_shop_id' => $shop->id],
+                ['platform_item_id' => $linkedProductId, 'updated_at' => now()]
+            );
+
+            return $this->withAutoBrandMapping($result);
+        }
 
         if ($cachedProductId) {
             try {

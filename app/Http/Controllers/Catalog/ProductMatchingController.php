@@ -10,6 +10,7 @@ use App\Models\MarketplaceListing;
 use App\Models\Product;
 use App\Models\ProductValue;
 use App\Models\SalesPlatformShop;
+use App\Services\Marketplace\Listings\ListingMatchSuggester;
 use App\Services\Marketplace\Listings\MarketplaceListingFetcherResolver;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
@@ -20,14 +21,18 @@ use Inertia\Inertia;
 use Inertia\Response;
 
 /**
- * "จับคู่สินค้า (Product Matching)" — phase 1, read-only: per shop, which
- * marketplace listings (marketplace_listings, filled by
- * MarketplaceListingSyncService) are matched to a PIM product, which are not,
- * and which PIM products aren't listed on that shop at all.
+ * "จับคู่สินค้า (Product Matching)": per shop, which marketplace listings
+ * (marketplace_listings, filled by MarketplaceListingSyncService) are linked
+ * to PIM (single product / pack / bundle), which are not (with
+ * ListingMatchSuggester suggestions), which were hidden, and which PIM
+ * products aren't listed on that shop at all. The write actions live in
+ * ProductMatchingActionsController.
  */
 class ProductMatchingController extends Controller
 {
-    private const TABS = ['matched', 'unmatched', 'not_listed'];
+    private const TABS = ['matched', 'unmatched', 'suggested', 'ignored', 'not_listed'];
+
+    public function __construct(private readonly ListingMatchSuggester $suggester) {}
 
     private const PLATFORM_ORDER = ['lazada', 'shopee', 'tiktok', 'woocommerce'];
 
@@ -42,7 +47,8 @@ class ProductMatchingController extends Controller
             ->groupBy('sales_platform_shop_id')
             ->selectRaw('sales_platform_shop_id,
                 count(*) as listing_count,
-                count(product_id) as matched_count,
+                sum(case when product_id is not null or exists (select 1 from marketplace_listing_components c where c.marketplace_listing_id = marketplace_listings.id) then 1 else 0 end) as matched_count,
+                sum(case when ignored_at is not null then 1 else 0 end) as ignored_count,
                 sum(case when is_active then 1 else 0 end) as active_count,
                 max(last_synced_at) as last_synced_at')
             ->get()
@@ -57,6 +63,7 @@ class ProductMatchingController extends Controller
                 'platform' => MarketplaceListingFetcherResolver::platformKey($shop),
                 'listing_count' => (int) ($s->listing_count ?? 0),
                 'matched_count' => (int) ($s->matched_count ?? 0),
+                'ignored_count' => (int) ($s->ignored_count ?? 0),
                 'active_count' => (int) ($s->active_count ?? 0),
                 'last_synced_at' => $s?->last_synced_at,
             ];
@@ -93,19 +100,28 @@ class ProductMatchingController extends Controller
             'per_page' => $perPage,
         ];
 
-        $summary = ['matched' => 0, 'unmatched' => 0, 'not_listed' => 0];
+        $summary = ['matched' => 0, 'unmatched' => 0, 'suggested' => 0, 'ignored' => 0, 'not_listed' => 0];
         $rows = null;
 
         if ($shopId) {
+            // Suggestions for this shop's whole unmatched queue in one batched
+            // pass (a few queries) — needed for the "มีคำแนะนำ" count/filter
+            // anyway; the page rows below reuse it.
+            $suggestions = $this->suggester->suggest(
+                $this->listingQuery($shopId, $activeOnly, '')->unlinked()->pluck('seller_sku', 'id')->all()
+            );
+
             $summary = [
-                'matched' => $this->listingQuery($shopId, $activeOnly, '')->whereNotNull('product_id')->count(),
-                'unmatched' => $this->listingQuery($shopId, $activeOnly, '')->whereNull('product_id')->count(),
+                'matched' => $this->listingQuery($shopId, $activeOnly, '')->linked()->count(),
+                'unmatched' => $this->listingQuery($shopId, $activeOnly, '')->unlinked()->count(),
+                'suggested' => count($suggestions),
+                'ignored' => $this->listingQuery($shopId, $activeOnly, '')->whereNotNull('ignored_at')->count(),
                 'not_listed' => $this->notListedQuery($shopId, '')->count(),
             ];
 
             $rows = $tab === 'not_listed'
                 ? $this->notListedRows($shopId, $search, $perPage)
-                : $this->listingRows($shopId, $tab, $activeOnly, $search, $perPage);
+                : $this->listingRows($shopId, $tab, $activeOnly, $search, $perPage, $suggestions);
         }
 
         return Inertia::render('catalog/marketplace/product-matching', [
@@ -178,16 +194,27 @@ class ProductMatchingController extends Controller
             });
     }
 
-    private function listingRows(int $shopId, string $tab, bool $activeOnly, string $search, int $perPage)
+    /**
+     * @param  array<int, list<array<string, mixed>>>  $suggestions  listing id => suggestions (unmatched queue only)
+     */
+    private function listingRows(int $shopId, string $tab, bool $activeOnly, string $search, int $perPage, array $suggestions)
     {
         $query = $this->listingQuery($shopId, $activeOnly, $search)
-            ->with('product:id,sku')
-            ->when($tab === 'matched', fn ($q) => $q->whereNotNull('product_id'), fn ($q) => $q->whereNull('product_id'))
+            ->with(['product:id,sku', 'components.product:id,sku', 'ignoredBy:id,name'])
+            ->when($tab === 'matched', fn ($q) => $q->linked())
+            ->when($tab === 'unmatched', fn ($q) => $q->unlinked())
+            ->when($tab === 'suggested', fn ($q) => $q->unlinked()->whereIn('marketplace_listings.id', array_keys($suggestions) ?: [0]))
+            ->when($tab === 'ignored', fn ($q) => $q->whereNotNull('marketplace_listings.ignored_at'))
             ->orderBy('seller_sku')
             ->orderBy('id');
 
         $paginator = $query->paginate($perPage)->withQueryString();
-        $names = $this->productNames($paginator->getCollection()->pluck('product_id')->filter()->unique()->values());
+        $page = $paginator->getCollection();
+        $productIds = $page->pluck('product_id')
+            ->merge($page->flatMap(fn (MarketplaceListing $l) => $l->components->pluck('product_id')))
+            ->merge($page->flatMap(fn (MarketplaceListing $l) => collect($suggestions[$l->id] ?? [])->flatMap(fn ($s) => array_column($s['items'], 'product_id'))))
+            ->filter()->unique()->values();
+        $names = $this->productNames($productIds);
 
         return $paginator->through(fn (MarketplaceListing $l) => [
             'id' => $l->id,
@@ -208,7 +235,24 @@ class ProductMatchingController extends Controller
                 'sku' => $l->product->sku,
                 'name' => $names[$l->product->id] ?? null,
             ] : null,
-            'sku_drift' => $l->product !== null && $l->product->sku !== trim((string) $l->seller_sku),
+            'pack_quantity' => $l->pack_quantity,
+            'components' => $l->components->filter(fn ($c) => $c->product !== null)->map(fn ($c) => [
+                'product_id' => $c->product_id,
+                'sku' => $c->product->sku,
+                'name' => $names[$c->product_id] ?? null,
+                'quantity' => $c->quantity,
+            ])->values()->all(),
+            // only meaningful for links that claim "same SKU" — a pack /
+            // accepted suggestion differs from the PIM SKU by design
+            'sku_drift' => $l->product !== null && $l->product->sku !== trim((string) $l->seller_sku)
+                && $l->match_method !== MarketplaceListing::MATCH_SUGGESTED && ! $l->pack_quantity,
+            'suggestions' => array_map(fn (array $s) => [
+                ...$s,
+                'items' => array_map(fn (array $i) => $i + ['name' => $names[$i['product_id']] ?? null], $s['items']),
+            ], array_slice($suggestions[$l->id] ?? [], 0, 3)),
+            'ignored_at' => $l->ignored_at,
+            'ignored_by' => $l->ignoredBy?->name,
+            'ignore_reason' => $l->ignore_reason,
         ]);
     }
 

@@ -18,6 +18,7 @@ use App\Http\Controllers\Catalog\PointController;
 use App\Http\Controllers\Catalog\ProductController;
 use App\Http\Controllers\Catalog\ProductGradeController;
 use App\Http\Controllers\Catalog\ProductGroupController;
+use App\Http\Controllers\Catalog\ProductMatchingActionsController;
 use App\Http\Controllers\Catalog\ProductMatchingController;
 use App\Http\Controllers\Catalog\ProductTypeController;
 use App\Http\Controllers\Catalog\RawMaterialController;
@@ -181,6 +182,15 @@ Route::middleware(['auth'])->prefix('catalog')->name('catalog.')->group(function
     // ProductMatchingController / MarketplaceListingSyncService
     Route::get('marketplace/product-matching', [ProductMatchingController::class, 'index'])->name('marketplace.productMatching')->middleware('permission:products,list_products');
     Route::post('marketplace/product-matching/sync', [ProductMatchingController::class, 'sync'])->name('marketplace.productMatching.sync')->middleware('permission:products,edit_products');
+    // phase 2 — ผูก/ชุดรวม/ยืนยันคำแนะนำ/ยกเลิกการผูก/ซ่อน (แก้แค่ DB ไม่ยิง API
+    // marketplace) — ดู ProductMatchingActionsController
+    Route::post('marketplace/product-matching/bulk-accept', [ProductMatchingActionsController::class, 'bulkAccept'])->name('marketplace.productMatching.bulkAccept')->middleware('permission:products,edit_products');
+    Route::post('marketplace/product-matching/listings/{listing}/link', [ProductMatchingActionsController::class, 'link'])->name('marketplace.productMatching.link')->middleware('permission:products,edit_products');
+    Route::post('marketplace/product-matching/listings/{listing}/bundle', [ProductMatchingActionsController::class, 'bundle'])->name('marketplace.productMatching.bundle')->middleware('permission:products,edit_products');
+    Route::post('marketplace/product-matching/listings/{listing}/accept', [ProductMatchingActionsController::class, 'accept'])->name('marketplace.productMatching.accept')->middleware('permission:products,edit_products');
+    Route::post('marketplace/product-matching/listings/{listing}/unlink', [ProductMatchingActionsController::class, 'unlink'])->name('marketplace.productMatching.unlink')->middleware('permission:products,edit_products');
+    Route::post('marketplace/product-matching/listings/{listing}/ignore', [ProductMatchingActionsController::class, 'ignore'])->name('marketplace.productMatching.ignore')->middleware('permission:products,edit_products');
+    Route::post('marketplace/product-matching/listings/{listing}/unignore', [ProductMatchingActionsController::class, 'unignore'])->name('marketplace.productMatching.unignore')->middleware('permission:products,edit_products');
     Route::get('marketplace/shopee/products', [ShopeeAttributeMappingController::class, 'shopeeProducts'])->name('marketplace.shopee.products')->middleware('permission:products,list_products');
     Route::get('marketplace/shopee/products/{product}/detail', [ShopeeAttributeMappingController::class, 'productDetail'])->name('marketplace.shopee.products.detail')->middleware('permission:products,list_products');
     // ปุ่ม "แนะนำหมวดหมู่จาก Shopee" ของ Section 1 (Category Mapping) — mirror
