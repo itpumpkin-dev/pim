@@ -1,0 +1,160 @@
+{
+    "error": "",
+    "message": "",
+    "request_id": "e3e3e7f35fce53c24e59844d4a4ca300",
+    "response": {
+        "item_list": [
+            {
+                "item_id": 1001570619,
+                "category_id": 101795,
+                "item_name": "พัมคิน โปร ตลับเมตร CND 7525 7.5 ม.X25 มม.",
+                "description": "ตัวตลับ ผลิตจากพลาสติก ABS แท้ 100% \r\nขอบยางลดการกระแทกของหัวเทป เมื่อดึงสายเทปย้อนกลับ \r\nขอเกี่ยวหัวเทป ใช้หมุดในการยึด 3 ตัว",
+                "item_sku": "10103",
+                "create_time": 1521606478,
+                "update_time": 1792103552,
+                "price_info": [
+                    {
+                        "currency": "THB",
+                        "original_price": 492,
+                        "current_price": 492
+                    }
+                ],
+                "image": {
+                    "image_id_list": [
+                        "5d61914ecdaa783dc8ee0cb912e51ed9",
+                        "34a5e6f1b375be35a4b2cb1094257b55",
+                        "2fc2e614b7cb40b93acc426761c12fb9"
+                    ],
+                    "image_url_list": [
+                        "https://cf.shopee.co.th/file/5d61914ecdaa783dc8ee0cb912e51ed9",
+                        "https://cf.shopee.co.th/file/34a5e6f1b375be35a4b2cb1094257b55",
+                        "https://cf.shopee.co.th/file/2fc2e614b7cb40b93acc426761c12fb9"
+                    ],
+                    "image_ratio": "1:1"
+                },
+                "weight": "0.1",
+                "dimension": {
+                    "package_length": 0,
+                    "package_width": 0,
+                    "package_height": 0
+                },
+                "logistic_info": [
+                    {
+                        "logistic_id": 70036,
+                        "logistic_name": "SPX Self Collection Point - รับสินค้าที่จุดบริการ",
+                        "enabled": true,
+                        "size_id": 0,
+                        "is_free": false,
+                        "estimated_shipping_fee": 0,
+                        "include_pickup": false
+                    },
+                    {
+                        "logistic_id": 70126,
+                        "logistic_name": "Instant Delivery - ส่งทันที",
+                        "enabled": true,
+                        "size_id": 0,
+                        "is_free": false,
+                        "estimated_shipping_fee": 30,
+                        "include_pickup": false
+                    },
+                    {
+                        "logistic_id": 70074,
+                        "logistic_name": "SPX Locker Collection Point - รับสินค้าที่ตู้ล็อกเกอร์",
+                        "enabled": true,
+                        "size_id": 0,
+                        "is_free": false,
+                        "estimated_shipping_fee": 0,
+                        "include_pickup": false
+                    },
+                    {
+                        "logistic_id": 7001,
+                        "logistic_name": "Standard Delivery Bulky - ส่งสินค้าขนาดใหญ่",
+                        "enabled": false,
+                        "size_id": 0,
+                        "is_free": false,
+                        "estimated_shipping_fee": 100,
+                        "include_pickup": false
+                    },
+                    {
+                        "logistic_id": 7000,
+                        "logistic_name": "Standard Delivery - ส่งธรรมดาในประเทศ",
+                        "enabled": true,
+                        "size_id": 0,
+                        "is_free": false,
+                        "estimated_shipping_fee": 29,
+                        "include_pickup": false
+                    },
+                    {
+                        "logistic_id": 7002,
+                        "logistic_name": "Express Delivery - ส่งด่วน",
+                        "enabled": true,
+                        "size_id": 0,
+                        "is_free": false,
+                        "estimated_shipping_fee": 29,
+                        "include_pickup": false
+                    }
+                ],
+                "pre_order": {
+                    "is_pre_order": false,
+                    "days_to_ship": 2
+                },
+                "condition": "NEW",
+                "size_chart": "",
+                "item_status": "UNLIST",
+                "has_model": false,
+                "default_model_id": 62141405593,
+                "promotion_id": 0,
+                "has_promotion": true,
+                "brand": {
+                    "brand_id": 1127450,
+                    "original_brand_name": "Pumpkin(พัมคินส์)"
+                },
+                "item_dangerous": 0,
+                "description_type": "normal",
+                "stock_info_v2": {
+                    "summary_info": {
+                        "total_reserved_stock": 0,
+                        "total_available_stock": 0
+                    },
+                    "seller_stock": [
+                        {
+                            "location_id": "THZ",
+                            "stock": 0,
+                            "if_saleable": true
+                        }
+                    ],
+                    "shopee_stock": [
+                        {
+                            "location_id": "",
+                            "stock": 0
+                        }
+                    ],
+                    "advance_stock": {
+                        "sellable_advance_stock": 0,
+                        "in_transit_advance_stock": 0
+                    }
+                },
+                "size_chart_id": 0,
+                "promotion_image": {
+                    "image_id_list": [
+                        "5d61914ecdaa783dc8ee0cb912e51ed9"
+                    ],
+                    "image_url_list": [
+                        "https://cf.shopee.co.th/file/5d61914ecdaa783dc8ee0cb912e51ed9"
+                    ]
+                },
+                "deboost": "FALSE",
+                "compatibility_info": [],
+                "authorised_brand_id": 0,
+                "is_fulfillment_by_shopee": false,
+                "tag": {
+                    "kit": false
+                },
+                "purchase_limit_info": {
+                    "min_purchase_limit": 1
+                }
+            }
+        ]
+    },
+    "debug_message": ""
+}

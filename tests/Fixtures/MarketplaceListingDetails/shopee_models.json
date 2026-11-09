@@ -1,0 +1,349 @@
+{
+    "error": "",
+    "message": "",
+    "warning": "",
+    "request_id": "e3e3e7f35fce53d076853d830fc9cd00",
+    "response": {
+        "tier_variation": [
+            {
+                "name": "ขนาด",
+                "option_list": [
+                    {
+                        "option": "8mm",
+                        "image": {
+                            "image_url": "https://cf.shopee.co.th/file/sg-11134201-7rdxy-m12gxxnj71l3b6",
+                            "image_id": "sg-11134201-7rdxy-m12gxxnj71l3b6"
+                        }
+                    },
+                    {
+                        "option": "9mm",
+                        "image": {
+                            "image_url": "https://cf.shopee.co.th/file/sg-11134201-7rdxy-m12gxxnj71l3b6",
+                            "image_id": "sg-11134201-7rdxy-m12gxxnj71l3b6"
+                        }
+                    },
+                    {
+                        "option": "10mm",
+                        "image": {
+                            "image_url": "https://cf.shopee.co.th/file/sg-11134201-7rdxy-m12gxxnj71l3b6",
+                            "image_id": "sg-11134201-7rdxy-m12gxxnj71l3b6"
+                        }
+                    },
+                    {
+                        "option": "11mm",
+                        "image": {
+                            "image_url": "https://cf.shopee.co.th/file/sg-11134201-7rdxy-m12gxxnj71l3b6",
+                            "image_id": "sg-11134201-7rdxy-m12gxxnj71l3b6"
+                        }
+                    },
+                    {
+                        "option": "12mm",
+                        "image": {
+                            "image_url": "https://cf.shopee.co.th/file/sg-11134201-7rdxy-m12gxxnj71l3b6",
+                            "image_id": "sg-11134201-7rdxy-m12gxxnj71l3b6"
+                        }
+                    },
+                    {
+                        "option": "13mm",
+                        "image": {
+                            "image_url": "https://cf.shopee.co.th/file/sg-11134201-7rdxy-m12gxxnj71l3b6",
+                            "image_id": "sg-11134201-7rdxy-m12gxxnj71l3b6"
+                        }
+                    },
+                    {
+                        "option": "14mm",
+                        "image": {
+                            "image_url": "https://cf.shopee.co.th/file/sg-11134201-7rdxy-m12gxxnj71l3b6",
+                            "image_id": "sg-11134201-7rdxy-m12gxxnj71l3b6"
+                        }
+                    },
+                    {
+                        "option": "15mm",
+                        "image": {
+                            "image_url": "https://cf.shopee.co.th/file/sg-11134201-7rdxy-m12gxxnj71l3b6",
+                            "image_id": "sg-11134201-7rdxy-m12gxxnj71l3b6"
+                        }
+                    },
+                    {
+                        "option": "16mm",
+                        "image": {
+                            "image_url": "https://cf.shopee.co.th/file/sg-11134201-7rdxy-m12gxxnj71l3b6",
+                            "image_id": "sg-11134201-7rdxy-m12gxxnj71l3b6"
+                        }
+                    },
+                    {
+                        "option": "17mm",
+                        "image": {
+                            "image_url": "https://cf.shopee.co.th/file/sg-11134201-7rdxy-m12gxxnj71l3b6",
+                            "image_id": "sg-11134201-7rdxy-m12gxxnj71l3b6"
+                        }
+                    },
+                    {
+                        "option": "18mm",
+                        "image": {
+                            "image_url": "https://cf.shopee.co.th/file/sg-11134201-7rdxy-m12gxxnj71l3b6",
+                            "image_id": "sg-11134201-7rdxy-m12gxxnj71l3b6"
+                        }
+                    },
+                    {
+                        "option": "19mm",
+                        "image": {
+                            "image_url": "https://cf.shopee.co.th/file/sg-11134201-7rdxy-m12gxxnj71l3b6",
+                            "image_id": "sg-11134201-7rdxy-m12gxxnj71l3b6"
+                        }
+                    },
+                    {
+                        "option": "20mm",
+                        "image": {
+                            "image_url": "https://cf.shopee.co.th/file/sg-11134201-7rdxy-m12gxxnj71l3b6",
+                            "image_id": "sg-11134201-7rdxy-m12gxxnj71l3b6"
+                        }
+                    },
+                    {
+                        "option": "21mm",
+                        "image": {
+                            "image_url": "https://cf.shopee.co.th/file/sg-11134201-7rdxy-m12gxxnj71l3b6",
+                            "image_id": "sg-11134201-7rdxy-m12gxxnj71l3b6"
+                        }
+                    },
+                    {
+                        "option": "22mm",
+                        "image": {
+                            "image_url": "https://cf.shopee.co.th/file/sg-11134201-7rdxy-m12gxxnj71l3b6",
+                            "image_id": "sg-11134201-7rdxy-m12gxxnj71l3b6"
+                        }
+                    },
+                    {
+                        "option": "23mm",
+                        "image": {
+                            "image_url": "https://cf.shopee.co.th/file/sg-11134201-7rdxy-m12gxxnj71l3b6",
+                            "image_id": "sg-11134201-7rdxy-m12gxxnj71l3b6"
+                        }
+                    },
+                    {
+                        "option": "24mm",
+                        "image": {
+                            "image_url": "https://cf.shopee.co.th/file/sg-11134201-7rdxy-m12gxxnj71l3b6",
+                            "image_id": "sg-11134201-7rdxy-m12gxxnj71l3b6"
+                        }
+                    },
+                    {
+                        "option": "25mm",
+                        "image": {
+                            "image_url": "https://cf.shopee.co.th/file/sg-11134201-7rdxy-m12gxxnj71l3b6",
+                            "image_id": "sg-11134201-7rdxy-m12gxxnj71l3b6"
+                        }
+                    },
+                    {
+                        "option": "26mm",
+                        "image": {
+                            "image_url": "https://cf.shopee.co.th/file/sg-11134201-7rdxy-m12gxxnj71l3b6",
+                            "image_id": "sg-11134201-7rdxy-m12gxxnj71l3b6"
+                        }
+                    },
+                    {
+                        "option": "27mm",
+                        "image": {
+                            "image_url": "https://cf.shopee.co.th/file/sg-11134201-7rdxy-m12gxxnj71l3b6",
+                            "image_id": "sg-11134201-7rdxy-m12gxxnj71l3b6"
+                        }
+                    },
+                    {
+                        "option": "28mm",
+                        "image": {
+                            "image_url": "https://cf.shopee.co.th/file/sg-11134201-7rdxy-m12gxxnj71l3b6",
+                            "image_id": "sg-11134201-7rdxy-m12gxxnj71l3b6"
+                        }
+                    },
+                    {
+                        "option": "29mm",
+                        "image": {
+                            "image_url": "https://cf.shopee.co.th/file/sg-11134201-7rdxy-m12gxxnj71l3b6",
+                            "image_id": "sg-11134201-7rdxy-m12gxxnj71l3b6"
+                        }
+                    },
+                    {
+                        "option": "30mm",
+                        "image": {
+                            "image_url": "https://cf.shopee.co.th/file/sg-11134201-7rdxy-m12gxxnj71l3b6",
+                            "image_id": "sg-11134201-7rdxy-m12gxxnj71l3b6"
+                        }
+                    },
+                    {
+                        "option": "32mm",
+                        "image": {
+                            "image_url": "https://cf.shopee.co.th/file/sg-11134201-7rdxy-m12gxxnj71l3b6",
+                            "image_id": "sg-11134201-7rdxy-m12gxxnj71l3b6"
+                        }
+                    }
+                ]
+            }
+        ],
+        "model": [
+            {
+                "model_id": 226855724334,
+                "model_name": "21mm",
+                "promotion_id": 514890930794884,
+                "has_promotion": true,
+                "tier_index": [
+                    13
+                ],
+                "price_info": [
+                    {
+                        "current_price": 67,
+                        "original_price": 73,
+                        "inflated_price_of_current_price": 67,
+                        "inflated_price_of_original_price": 73,
+                        "currency": "THB"
+                    }
+                ],
+                "model_sku": "40278",
+                "pre_order": {
+                    "is_pre_order": false,
+                    "days_to_ship": 2
+                },
+                "stock_info_v2": {
+                    "summary_info": {
+                        "total_reserved_stock": 0,
+                        "total_available_stock": 72
+                    },
+                    "seller_stock": [
+                        {
+                            "location_id": "THZ",
+                            "stock": 72,
+                            "if_saleable": true
+                        }
+                    ],
+                    "shopee_stock": [
+                        {
+                            "location_id": "",
+                            "stock": 0
+                        }
+                    ],
+                    "advance_stock": {
+                        "sellable_advance_stock": 0,
+                        "in_transit_advance_stock": 0
+                    }
+                },
+                "model_status": "MODEL_NORMAL",
+                "weight": "0.5",
+                "dimension": {
+                    "package_length": 4,
+                    "package_width": 4,
+                    "package_height": 10
+                },
+                "is_fulfillment_by_shopee": false
+            },
+            {
+                "model_id": 226855724338,
+                "model_name": "25mm",
+                "promotion_id": 514890930794884,
+                "has_promotion": true,
+                "tier_index": [
+                    17
+                ],
+                "price_info": [
+                    {
+                        "current_price": 103,
+                        "original_price": 112,
+                        "inflated_price_of_current_price": 103,
+                        "inflated_price_of_original_price": 112,
+                        "currency": "THB"
+                    }
+                ],
+                "model_sku": "40282",
+                "pre_order": {
+                    "is_pre_order": false,
+                    "days_to_ship": 2
+                },
+                "stock_info_v2": {
+                    "summary_info": {
+                        "total_reserved_stock": 0,
+                        "total_available_stock": 27
+                    },
+                    "seller_stock": [
+                        {
+                            "location_id": "THZ",
+                            "stock": 27,
+                            "if_saleable": true
+                        }
+                    ],
+                    "shopee_stock": [
+                        {
+                            "location_id": "",
+                            "stock": 0
+                        }
+                    ],
+                    "advance_stock": {
+                        "sellable_advance_stock": 0,
+                        "in_transit_advance_stock": 0
+                    }
+                },
+                "model_status": "MODEL_NORMAL",
+                "weight": "0.5",
+                "dimension": {
+                    "package_length": 4,
+                    "package_width": 4,
+                    "package_height": 10
+                },
+                "is_fulfillment_by_shopee": false
+            },
+            {
+                "model_id": 226855724344,
+                "model_name": "32mm",
+                "promotion_id": 514890930794884,
+                "has_promotion": true,
+                "tier_index": [
+                    23
+                ],
+                "price_info": [
+                    {
+                        "current_price": 165,
+                        "original_price": 180,
+                        "inflated_price_of_current_price": 165,
+                        "inflated_price_of_original_price": 180,
+                        "currency": "THB"
+                    }
+                ],
+                "model_sku": "40288",
+                "pre_order": {
+                    "is_pre_order": false,
+                    "days_to_ship": 2
+                },
+                "stock_info_v2": {
+                    "summary_info": {
+                        "total_reserved_stock": 0,
+                        "total_available_stock": 0
+                    },
+                    "seller_stock": [
+                        {
+                            "location_id": "THZ",
+                            "stock": 0,
+                            "if_saleable": true
+                        }
+                    ],
+                    "shopee_stock": [
+                        {
+                            "location_id": "",
+                            "stock": 0
+                        }
+                    ],
+                    "advance_stock": {
+                        "sellable_advance_stock": 0,
+                        "in_transit_advance_stock": 0
+                    }
+                },
+                "model_status": "MODEL_NORMAL",
+                "weight": "0.5",
+                "dimension": {
+                    "package_length": 4,
+                    "package_width": 4,
+                    "package_height": 10
+                },
+                "is_fulfillment_by_shopee": false
+            }
+        ],
+        "standardise_tier_variation": []
+    },
+    "debug_message": ""
+}

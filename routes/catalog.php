@@ -20,6 +20,7 @@ use App\Http\Controllers\Catalog\ProductGradeController;
 use App\Http\Controllers\Catalog\ProductGroupController;
 use App\Http\Controllers\Catalog\ProductMatchingActionsController;
 use App\Http\Controllers\Catalog\ProductMatchingController;
+use App\Http\Controllers\Catalog\ProductMatchingDetailController;
 use App\Http\Controllers\Catalog\ProductTypeController;
 use App\Http\Controllers\Catalog\RawMaterialController;
 use App\Http\Controllers\Catalog\SubcategoryController;
@@ -190,6 +191,10 @@ Route::middleware(['auth'])->prefix('catalog')->name('catalog.')->group(function
     Route::post('marketplace/product-matching/listings/{listing}/accept', [ProductMatchingActionsController::class, 'accept'])->name('marketplace.productMatching.accept')->middleware('permission:products,edit_products');
     Route::post('marketplace/product-matching/listings/{listing}/unlink', [ProductMatchingActionsController::class, 'unlink'])->name('marketplace.productMatching.unlink')->middleware('permission:products,edit_products');
     Route::post('marketplace/product-matching/listings/{listing}/ignore', [ProductMatchingActionsController::class, 'ignore'])->name('marketplace.productMatching.ignore')->middleware('permission:products,edit_products');
+    // "รายละเอียด" dialog (JSON) — full listing detail, fetched read-only on
+    // demand into marketplace_listing_details — ดู ProductMatchingDetailController
+    Route::get('marketplace/product-matching/listings/{listing}/detail', [ProductMatchingDetailController::class, 'show'])->name('marketplace.productMatching.detail')->middleware('permission:products,list_products');
+    Route::post('marketplace/product-matching/listings/{listing}/detail/refresh', [ProductMatchingDetailController::class, 'refresh'])->name('marketplace.productMatching.detail.refresh')->middleware('permission:products,edit_products');
     Route::post('marketplace/product-matching/listings/{listing}/unignore', [ProductMatchingActionsController::class, 'unignore'])->name('marketplace.productMatching.unignore')->middleware('permission:products,edit_products');
     Route::get('marketplace/shopee/products', [ShopeeAttributeMappingController::class, 'shopeeProducts'])->name('marketplace.shopee.products')->middleware('permission:products,list_products');
     Route::get('marketplace/shopee/products/{product}/detail', [ShopeeAttributeMappingController::class, 'productDetail'])->name('marketplace.shopee.products.detail')->middleware('permission:products,list_products');

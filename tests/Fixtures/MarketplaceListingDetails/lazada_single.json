@@ -1,0 +1,80 @@
+{
+    "data": {
+        "created_time": "1589366569000",
+        "updated_time": "1760669307800",
+        "images": [
+            "https://th-live.slatic.net/p/023429a8510f139cdf99c880a3f9cbb3.jpg",
+            "https://th-live.slatic.net/p/0b123cdc88d11489a30d86d8ba69d20f.jpg",
+            "https://th-live.slatic.net/p/3bc2dcb452e1f1abed034589c6d1ed27.jpg"
+        ],
+        "skus": [
+            {
+                "Status": "inactive",
+                "quantity": 100,
+                "Images": [
+                    "https://th-live.slatic.net/p/023429a8510f139cdf99c880a3f9cbb3.jpg",
+                    "https://th-live.slatic.net/p/0b123cdc88d11489a30d86d8ba69d20f.jpg",
+                    "https://th-live.slatic.net/p/3bc2dcb452e1f1abed034589c6d1ed27.jpg"
+                ],
+                "SellerSku": "28213",
+                "ShopSku": "1014472745_TH-2241406788",
+                "Url": "https://www.lazada.co.th/products/pumpkin-18-i1014472745-s2241406788.html",
+                "saleProp": {
+                    "color_family": "ส้มแอปริคอต ไซส์ 18 นิ้ว"
+                },
+                "multiWarehouseInventories": [
+                    {
+                        "occupyQuantity": 0,
+                        "quantity": 100,
+                        "totalQuantity": 100,
+                        "bizType": 1,
+                        "withholdQuantity": 0,
+                        "bizCode": "",
+                        "warehouseType": "dropshipping",
+                        "warehouseCode": "dropshipping",
+                        "sellableQuantity": 100
+                    }
+                ],
+                "package_width": "50.00",
+                "color_family": "ส้มแอปริคอต ไซส์ 18 นิ้ว",
+                "package_height": "2.50",
+                "fblWarehouseInventories": [],
+                "special_price": 272,
+                "price": 272,
+                "channelInventories": [],
+                "package_length": "80.00",
+                "Available": 100,
+                "package_weight": "1",
+                "SkuId": 2241406788
+            }
+        ],
+        "item_id": 1014472745,
+        "variation": {
+            "Variation1": {
+                "name": "color_family",
+                "label": "Color family",
+                "hasImage": true,
+                "customize": false,
+                "options": [
+                    "ส้มแอปริคอต ไซส์ 18 นิ้ว"
+                ]
+            }
+        },
+        "trialProduct": false,
+        "primary_category": 10100226,
+        "marketImages": [],
+        "attributes": {
+            "short_description": "<p>คุณสมบัติสินค้า</p>\r\n\r\n<ul>\r\n\t<li>&nbsp;หลอดน้ำผลิตจาก Acrylic เนื้อดี ไม่แห้ง ไม่แตก</li>\r\n\t<li>ไซส์ 18 นิ้ว ขนาด 18 x 50 x 20.5 มม.&nbsp;น้ำหนัก 0.21 กก.</li>\r\n\t<li>ไซส์ 24 นิ้ว ขนาด 24 x 50 x 20.5 มม.&nbsp;น้ำหนัก 0.26 กก.</li>\r\n\t<li>ไซส์ 36 นิ้ว ขนาด 36 x 50 x 20.5 มม.&nbsp;น้ำหนัก 0.26 กก.</li>\r\n\t<li>ไซส์ 48 นิ้ว ขนาด 48 x 50 x 20.5 มม.&nbsp;น้ำหนัก 0.26 กก.</li>\r\n\t<li>ไซส์ 80 นิ้ว ขนาด 80 x 50 x 20.5 มม.&nbsp;น้ำหนัก 0.26 กก.</li>\r\n</ul>",
+            "description": "<div style=\"margin: 0;padding: 8.0px 0;white-space: pre-wrap;\"><div style=\"width: 100.0%;margin: 0;\"><div style=\"width: 100.0%;display: block;font-family: none;margin: 0;\"><div style=\"width: 100.0%;display: block;font-family: none;\"><img src=\"https://th-live-01.slatic.net/shop/1be0f303cafbb527c7493fa6269efc98.jpeg\" style=\"width: 100.0%;display: block;font-family: none;\"/></div></div></div><div style=\"width: 100.0%;margin: 0;\"><div style=\"width: 100.0%;display: block;margin: 0;\"><div style=\"width: 100.0%;display: block;\"><img src=\"https://th-live-01.slatic.net/shop/a253bab2a6913e68a7fdab841e9abe8e.jpeg\" style=\"width: 100.0%;display: block;\"/></div></div></div><div style=\"width: 100.0%;margin: 0;\"><div style=\"width: 100.0%;display: block;margin: 0;\"><div style=\"width: 100.0%;display: block;\"><img src=\"https://th-live-01.slatic.net/shop/c6a21f2818f5218b05cc27acfe994f40.jpeg\" style=\"width: 100.0%;display: block;\"/></div></div></div><div style=\"width: 100.0%;margin: 0;\"><div style=\"width: 100.0%;display: block;margin: 0;\"><div style=\"width: 100.0%;display: block;\"><img src=\"https://th-live-01.slatic.net/shop/eb94bfeb2e847bb79ba8cb829b09937c.jpeg\" style=\"width: 100.0%;display: block;\"/></div></div></div></div>",
+            "brand": "PUMPKIN",
+            "measuring_type": "Spirit Level",
+            "name": "Pumpkin พัมคิน ระดับน้ำ รุ่นซุปเปอร์ฮิต 18 นิ้ว",
+            "source": "asc",
+            "preorder": "No"
+        },
+        "status": "InActive"
+    },
+    "code": "0",
+    "request_id": "21541e4017941896318411164",
+    "_trace_id_": "21411a3017941896318398016ee34b"
+}

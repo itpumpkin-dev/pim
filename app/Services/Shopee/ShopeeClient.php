@@ -384,7 +384,10 @@ class ShopeeClient
      * v2.product.get_item_base_info — status/detail lookup for a known set
      * of item_ids (ours, from platform_item_id — see updateItem()'s
      * docblock for why we track this ourselves instead of searching for
-     * it). Read-only. NOT confirmed live in this session.
+     * it). Read-only. Confirmed live 2026-11-09 (listing detail fetch — see
+     * ShopeeListingDetailFetcher for the fields used: description OR
+     * description_info.extended_description.field_list, image.image_url_list,
+     * brand, weight (kg string), dimension (cm), attribute_list, video_info).
      */
     public function getItemBaseInfo(array $itemIds): array
     {

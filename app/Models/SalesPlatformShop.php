@@ -52,6 +52,15 @@ class SalesPlatformShop extends Model
         return $this->hasMany(MarketplaceListing::class);
     }
 
+    /**
+     * Cached full product details of this shop's listing items, one row per
+     * item (see MarketplaceListingDetailService).
+     */
+    public function marketplaceListingDetails(): HasMany
+    {
+        return $this->hasMany(MarketplaceListingDetail::class);
+    }
+
     public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');

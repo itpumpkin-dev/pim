@@ -307,8 +307,11 @@ class TikTokClient
      * `data.product_status`, which excludes audit) is what
      * TikTokProductSyncService::checkLiveStatus() uses to determine
      * is_live — "ACTIVATE" means live, matching the docs' own example.
-     * NOT yet confirmed live — an entirely different response shape from
-     * anything called live so far in this session.
+     * Confirmed live 2026-11-09 (listing detail fetch — see
+     * TikTokListingDetailFetcher): title, description (HTML), main_images[]
+     * .urls, brand{id,name}, category_chains[] (local_name, is_leaf),
+     * product_attributes[], package_weight{value,unit} /
+     * package_dimensions{length,width,height,unit}, skus[].
      */
     public function getProduct(string $productId, string $apiVersion = '202309'): array
     {

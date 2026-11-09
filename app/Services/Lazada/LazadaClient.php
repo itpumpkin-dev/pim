@@ -172,6 +172,13 @@ class LazadaClient
      * and the full single-item detail — attributes, variation schema,
      * hiddenReason, rejectReason, etc. — is wanted, which /products/get's
      * bulk shape doesn't return.
+     *
+     * READ-ONLY. Confirmed live 2026-11-09 (MarketplaceListingDetail fetch):
+     * `data` = {item_id, status, primary_category, images[], attributes{name,
+     * description, short_description?, brand, <category attrs>}, variation{},
+     * skus[]{SkuId, SellerSku, Status, price, special_price?, quantity,
+     * Images[], Url, saleProp{}, package_weight (kg) / package_length|width|
+     * height (cm) as strings}} — see LazadaListingDetailFetcher.
      */
     public function getProductItem(int $itemId): array
     {

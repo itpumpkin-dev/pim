@@ -1,0 +1,344 @@
+{
+    "code": 0,
+    "data": {
+        "audit": {
+            "not_submitted_reasons": [],
+            "pre_approved_reasons": [],
+            "status": "APPROVED"
+        },
+        "brand": {
+            "id": "7032166665970288386",
+            "name": "pumpkin"
+        },
+        "category_chains": [
+            {
+                "id": "604579",
+                "is_leaf": false,
+                "local_name": "เครื่องมือและอุปกรณ์ช่าง",
+                "parent_id": "0"
+            },
+            {
+                "id": "871560",
+                "is_leaf": false,
+                "local_name": "เครื่องมือไฟฟ้า",
+                "parent_id": "604579"
+            },
+            {
+                "id": "882312",
+                "is_leaf": true,
+                "local_name": "ประแจไฟฟ้า",
+                "parent_id": "871560"
+            }
+        ],
+        "create_time": 1762481611,
+        "description": "<p>ลูกบ๊อกซ์สั้น หกเหลี่ยม ลูกบ๊อกซ์ยาว หกเหลี่ยม</p><p>ㆍผลิตจากเหล็กโครมวานาเดียม</p><p>(Chrome Vanadium Alloy Steel)</p><p>ㆍ บรรจุแผงพลาสติกแขวนโชว์ได้ สวยงาม</p><p>ㆍ ผนังลูกบ๊อกซ์มีขนาดบาง เพื่อช่วยน็อดในพื้นพื้นที่จำกัด</p><img src=\"https://p16-oec-va.ibyteimg.com/tos-maliva-i-o3syd03w52-us/b01a474ec7cd4dd19bcd9b6ca0d0f8b7~tplv-o3syd03w52-origin-jpeg.jpeg?dr=15568&t=555f072d&ps=933b5bde&shp=5563f2fb&shcp=9794469a&idc=maliva&from=1432613627\" width=\"1024\" height=\"1024\"><img src=\"https://p16-oec-va.ibyteimg.com/tos-maliva-i-o3syd03w52-us/9cbdeabbb7f0435cb6a85963ce100c90~tplv-o3syd03w52-origin-jpeg.jpeg?dr=15568&t=555f072d&ps=933b5bde&shp=5563f2fb&shcp=9794469a&idc=maliva&from=1432613627\" width=\"1024\" height=\"1024\"><img src=\"https://p16-oec-va.ibyteimg.com/tos-maliva-i-o3syd03w52-us/2e3e1ea2b6c74faf9847255ab8ab33af~tplv-o3syd03w52-origin-jpeg.jpeg?dr=15568&t=555f072d&ps=933b5bde&shp=5563f2fb&shcp=9794469a&idc=maliva&from=1432613627\" width=\"1024\" height=\"1024\">",
+        "has_draft": false,
+        "id": "1733130164856719020",
+        "is_cod_allowed": true,
+        "is_not_for_sale": false,
+        "is_pre_owned": false,
+        "is_replicated": false,
+        "main_images": [
+            {
+                "height": 1040,
+                "thumb_urls": [
+                    "https://p16-oec-sg.ibyteimg.com/tos-alisg-i-aphluv4xwc-sg/957db6e50bda47eb86db9eaf8ae9eb3d~tplv-aphluv4xwc-resize-jpeg:300:300.jpeg?dr=15584&from=520841845&idc=my2&ps=933b5bde&shcp=2c1af732&shp=1f0b6a75&t=555f072d",
+                    "https://p19-oec-sg.ibyteimg.com/tos-alisg-i-aphluv4xwc-sg/957db6e50bda47eb86db9eaf8ae9eb3d~tplv-aphluv4xwc-resize-jpeg:300:300.jpeg?dr=15584&from=520841845&idc=my2&ps=933b5bde&shcp=2c1af732&shp=1f0b6a75&t=555f072d"
+                ],
+                "uri": "tos-alisg-i-aphluv4xwc-sg/957db6e50bda47eb86db9eaf8ae9eb3d",
+                "urls": [
+                    "https://p16-oec-sg.ibyteimg.com/tos-alisg-i-aphluv4xwc-sg/957db6e50bda47eb86db9eaf8ae9eb3d~tplv-aphluv4xwc-origin-jpeg.jpeg?dr=15568&from=520841845&idc=my2&ps=933b5bde&shcp=2c1af732&shp=1f0b6a75&t=555f072d",
+                    "https://p19-oec-sg.ibyteimg.com/tos-alisg-i-aphluv4xwc-sg/957db6e50bda47eb86db9eaf8ae9eb3d~tplv-aphluv4xwc-origin-jpeg.jpeg?dr=15568&from=520841845&idc=my2&ps=933b5bde&shcp=2c1af732&shp=1f0b6a75&t=555f072d"
+                ],
+                "width": 1040
+            },
+            {
+                "height": 1024,
+                "thumb_urls": [
+                    "https://p16-oec-va.ibyteimg.com/tos-maliva-i-o3syd03w52-us/f25766c7797248a1a2d464a2a195737e~tplv-o3syd03w52-resize-jpeg:300:300.jpeg?dr=15584&from=520841845&idc=my2&ps=933b5bde&shcp=2c1af732&shp=1f0b6a75&t=555f072d",
+                    "https://p21-oec-va.ibyteimg.com/tos-maliva-i-o3syd03w52-us/f25766c7797248a1a2d464a2a195737e~tplv-o3syd03w52-resize-jpeg:300:300.jpeg?dr=15584&from=520841845&idc=my2&ps=933b5bde&shcp=2c1af732&shp=1f0b6a75&t=555f072d"
+                ],
+                "uri": "tos-maliva-i-o3syd03w52-us/f25766c7797248a1a2d464a2a195737e",
+                "urls": [
+                    "https://p16-oec-va.ibyteimg.com/tos-maliva-i-o3syd03w52-us/f25766c7797248a1a2d464a2a195737e~tplv-o3syd03w52-origin-jpeg.jpeg?dr=15568&from=520841845&idc=my2&ps=933b5bde&shcp=2c1af732&shp=1f0b6a75&t=555f072d",
+                    "https://p21-oec-va.ibyteimg.com/tos-maliva-i-o3syd03w52-us/f25766c7797248a1a2d464a2a195737e~tplv-o3syd03w52-origin-jpeg.jpeg?dr=15568&from=520841845&idc=my2&ps=933b5bde&shcp=2c1af732&shp=1f0b6a75&t=555f072d"
+                ],
+                "width": 1024
+            },
+            {
+                "height": 1024,
+                "thumb_urls": [
+                    "https://p16-oec-va.ibyteimg.com/tos-maliva-i-o3syd03w52-us/98233d4c27594d55aaa6fb02b2bd75df~tplv-o3syd03w52-resize-jpeg:300:300.jpeg?dr=15584&from=520841845&idc=my2&ps=933b5bde&shcp=2c1af732&shp=1f0b6a75&t=555f072d",
+                    "https://p21-oec-va.ibyteimg.com/tos-maliva-i-o3syd03w52-us/98233d4c27594d55aaa6fb02b2bd75df~tplv-o3syd03w52-resize-jpeg:300:300.jpeg?dr=15584&from=520841845&idc=my2&ps=933b5bde&shcp=2c1af732&shp=1f0b6a75&t=555f072d"
+                ],
+                "uri": "tos-maliva-i-o3syd03w52-us/98233d4c27594d55aaa6fb02b2bd75df",
+                "urls": [
+                    "https://p16-oec-va.ibyteimg.com/tos-maliva-i-o3syd03w52-us/98233d4c27594d55aaa6fb02b2bd75df~tplv-o3syd03w52-origin-jpeg.jpeg?dr=15568&from=520841845&idc=my2&ps=933b5bde&shcp=2c1af732&shp=1f0b6a75&t=555f072d",
+                    "https://p19-oec-va.ibyteimg.com/tos-maliva-i-o3syd03w52-us/98233d4c27594d55aaa6fb02b2bd75df~tplv-o3syd03w52-origin-jpeg.jpeg?dr=15568&from=520841845&idc=my2&ps=933b5bde&shcp=2c1af732&shp=1f0b6a75&t=555f072d"
+                ],
+                "width": 1024
+            },
+            {
+                "height": 1024,
+                "thumb_urls": [
+                    "https://p16-oec-va.ibyteimg.com/tos-maliva-i-o3syd03w52-us/df53dc1494424126908c9c41a0f97423~tplv-o3syd03w52-resize-jpeg:300:300.jpeg?dr=15584&from=520841845&idc=my2&ps=933b5bde&shcp=2c1af732&shp=1f0b6a75&t=555f072d",
+                    "https://p21-oec-va.ibyteimg.com/tos-maliva-i-o3syd03w52-us/df53dc1494424126908c9c41a0f97423~tplv-o3syd03w52-resize-jpeg:300:300.jpeg?dr=15584&from=520841845&idc=my2&ps=933b5bde&shcp=2c1af732&shp=1f0b6a75&t=555f072d"
+                ],
+                "uri": "tos-maliva-i-o3syd03w52-us/df53dc1494424126908c9c41a0f97423",
+                "urls": [
+                    "https://p16-oec-va.ibyteimg.com/tos-maliva-i-o3syd03w52-us/df53dc1494424126908c9c41a0f97423~tplv-o3syd03w52-origin-jpeg.jpeg?dr=15568&from=520841845&idc=my2&ps=933b5bde&shcp=2c1af732&shp=1f0b6a75&t=555f072d",
+                    "https://p19-oec-va.ibyteimg.com/tos-maliva-i-o3syd03w52-us/df53dc1494424126908c9c41a0f97423~tplv-o3syd03w52-origin-jpeg.jpeg?dr=15568&from=520841845&idc=my2&ps=933b5bde&shcp=2c1af732&shp=1f0b6a75&t=555f072d"
+                ],
+                "width": 1024
+            },
+            {
+                "height": 1024,
+                "thumb_urls": [
+                    "https://p16-oec-va.ibyteimg.com/tos-maliva-i-o3syd03w52-us/37e5ea64e94a4056b8a6544eb52f989c~tplv-o3syd03w52-resize-jpeg:300:300.jpeg?dr=15584&from=520841845&idc=my2&ps=933b5bde&shcp=2c1af732&shp=1f0b6a75&t=555f072d",
+                    "https://p19-oec-va.ibyteimg.com/tos-maliva-i-o3syd03w52-us/37e5ea64e94a4056b8a6544eb52f989c~tplv-o3syd03w52-resize-jpeg:300:300.jpeg?dr=15584&from=520841845&idc=my2&ps=933b5bde&shcp=2c1af732&shp=1f0b6a75&t=555f072d"
+                ],
+                "uri": "tos-maliva-i-o3syd03w52-us/37e5ea64e94a4056b8a6544eb52f989c",
+                "urls": [
+                    "https://p16-oec-va.ibyteimg.com/tos-maliva-i-o3syd03w52-us/37e5ea64e94a4056b8a6544eb52f989c~tplv-o3syd03w52-origin-jpeg.jpeg?dr=15568&from=520841845&idc=my2&ps=933b5bde&shcp=2c1af732&shp=1f0b6a75&t=555f072d",
+                    "https://p19-oec-va.ibyteimg.com/tos-maliva-i-o3syd03w52-us/37e5ea64e94a4056b8a6544eb52f989c~tplv-o3syd03w52-origin-jpeg.jpeg?dr=15568&from=520841845&idc=my2&ps=933b5bde&shcp=2c1af732&shp=1f0b6a75&t=555f072d"
+                ],
+                "width": 1024
+            },
+            {
+                "height": 1024,
+                "thumb_urls": [
+                    "https://p16-oec-va.ibyteimg.com/tos-maliva-i-o3syd03w52-us/a8f8a7c0554c43f4b56fdf7fc663f2fb~tplv-o3syd03w52-resize-jpeg:300:300.jpeg?dr=15584&from=520841845&idc=my2&ps=933b5bde&shcp=2c1af732&shp=1f0b6a75&t=555f072d",
+                    "https://p19-oec-va.ibyteimg.com/tos-maliva-i-o3syd03w52-us/a8f8a7c0554c43f4b56fdf7fc663f2fb~tplv-o3syd03w52-resize-jpeg:300:300.jpeg?dr=15584&from=520841845&idc=my2&ps=933b5bde&shcp=2c1af732&shp=1f0b6a75&t=555f072d"
+                ],
+                "uri": "tos-maliva-i-o3syd03w52-us/a8f8a7c0554c43f4b56fdf7fc663f2fb",
+                "urls": [
+                    "https://p16-oec-va.ibyteimg.com/tos-maliva-i-o3syd03w52-us/a8f8a7c0554c43f4b56fdf7fc663f2fb~tplv-o3syd03w52-origin-jpeg.jpeg?dr=15568&from=520841845&idc=my2&ps=933b5bde&shcp=2c1af732&shp=1f0b6a75&t=555f072d",
+                    "https://p19-oec-va.ibyteimg.com/tos-maliva-i-o3syd03w52-us/a8f8a7c0554c43f4b56fdf7fc663f2fb~tplv-o3syd03w52-origin-jpeg.jpeg?dr=15568&from=520841845&idc=my2&ps=933b5bde&shcp=2c1af732&shp=1f0b6a75&t=555f072d"
+                ],
+                "width": 1024
+            },
+            {
+                "height": 1024,
+                "thumb_urls": [
+                    "https://p16-oec-va.ibyteimg.com/tos-maliva-i-o3syd03w52-us/4de073e0c45e419bb46693ab7cfb4e93~tplv-o3syd03w52-resize-jpeg:300:300.jpeg?dr=15584&from=520841845&idc=my2&ps=933b5bde&shcp=2c1af732&shp=1f0b6a75&t=555f072d",
+                    "https://p21-oec-va.ibyteimg.com/tos-maliva-i-o3syd03w52-us/4de073e0c45e419bb46693ab7cfb4e93~tplv-o3syd03w52-resize-jpeg:300:300.jpeg?dr=15584&from=520841845&idc=my2&ps=933b5bde&shcp=2c1af732&shp=1f0b6a75&t=555f072d"
+                ],
+                "uri": "tos-maliva-i-o3syd03w52-us/4de073e0c45e419bb46693ab7cfb4e93",
+                "urls": [
+                    "https://p16-oec-va.ibyteimg.com/tos-maliva-i-o3syd03w52-us/4de073e0c45e419bb46693ab7cfb4e93~tplv-o3syd03w52-origin-jpeg.jpeg?dr=15568&from=520841845&idc=my2&ps=933b5bde&shcp=2c1af732&shp=1f0b6a75&t=555f072d",
+                    "https://p21-oec-va.ibyteimg.com/tos-maliva-i-o3syd03w52-us/4de073e0c45e419bb46693ab7cfb4e93~tplv-o3syd03w52-origin-jpeg.jpeg?dr=15568&from=520841845&idc=my2&ps=933b5bde&shcp=2c1af732&shp=1f0b6a75&t=555f072d"
+                ],
+                "width": 1024
+            }
+        ],
+        "manufacturer_ids": [],
+        "package_dimensions": {
+            "height": "10",
+            "length": "4",
+            "unit": "CENTIMETER",
+            "width": "4"
+        },
+        "package_weight": {
+            "unit": "KILOGRAM",
+            "value": "0.5"
+        },
+        "product_attributes": [
+            {
+                "id": "100107",
+                "name": "ประเภทของการรับประกัน",
+                "values": [
+                    {
+                        "id": "1000057",
+                        "name": "ไม่รับประกัน"
+                    }
+                ]
+            }
+        ],
+        "product_status": "ACTIVATE",
+        "product_tags": [],
+        "recommended_categories": [],
+        "responsible_person_ids": [],
+        "selling_format": "FIXED_PRICE",
+        "shipping_insurance_requirement": "NOT_SUPPORTED",
+        "skus": [
+            {
+                "global_listing_policy": {
+                    "inventory_type": "EXCLUSIVE",
+                    "price_sync": false
+                },
+                "id": "1733130233410913964",
+                "inventory": [
+                    {
+                        "quantity": 100,
+                        "warehouse_id": "7174771821111281414"
+                    }
+                ],
+                "price": {
+                    "currency": "THB",
+                    "sale_price": "56",
+                    "tax_exclusive_price": "56"
+                },
+                "sales_attributes": [
+                    {
+                        "id": "7531274017689405202",
+                        "name": "ขนาด",
+                        "sku_img": {
+                            "height": 1024,
+                            "thumb_urls": [
+                                "https://p16-oec-va.ibyteimg.com/tos-maliva-i-o3syd03w52-us/f0411eaaf07941c3a41091d6742aba92~tplv-o3syd03w52-resize-jpeg:300:300.jpeg?dr=15584&from=520841845&idc=my2&ps=933b5bde&shcp=2c1af732&shp=1f0b6a75&t=555f072d",
+                                "https://p19-oec-va.ibyteimg.com/tos-maliva-i-o3syd03w52-us/f0411eaaf07941c3a41091d6742aba92~tplv-o3syd03w52-resize-jpeg:300:300.jpeg?dr=15584&from=520841845&idc=my2&ps=933b5bde&shcp=2c1af732&shp=1f0b6a75&t=555f072d"
+                            ],
+                            "uri": "tos-maliva-i-o3syd03w52-us/f0411eaaf07941c3a41091d6742aba92",
+                            "urls": [
+                                "https://p16-oec-va.ibyteimg.com/tos-maliva-i-o3syd03w52-us/f0411eaaf07941c3a41091d6742aba92~tplv-o3syd03w52-origin-jpeg.jpeg?dr=15568&from=520841845&idc=my2&ps=933b5bde&shcp=2c1af732&shp=1f0b6a75&t=555f072d",
+                                "https://p19-oec-va.ibyteimg.com/tos-maliva-i-o3syd03w52-us/f0411eaaf07941c3a41091d6742aba92~tplv-o3syd03w52-origin-jpeg.jpeg?dr=15568&from=520841845&idc=my2&ps=933b5bde&shcp=2c1af732&shp=1f0b6a75&t=555f072d"
+                            ],
+                            "width": 1024
+                        },
+                        "value_id": "7560980047521761046",
+                        "value_name": "8mm"
+                    }
+                ],
+                "seller_sku": "40265",
+                "sku_dimensions": {
+                    "height": "10",
+                    "length": "4",
+                    "unit": "CENTIMETER",
+                    "width": "4"
+                },
+                "sku_weight": {
+                    "unit": "KILOGRAM",
+                    "value": "0.5"
+                },
+                "status_info": {
+                    "status": "NORMAL"
+                }
+            },
+            {
+                "global_listing_policy": {
+                    "inventory_type": "EXCLUSIVE",
+                    "price_sync": false
+                },
+                "id": "1733130233410979500",
+                "inventory": [
+                    {
+                        "quantity": 100,
+                        "warehouse_id": "7174771821111281414"
+                    }
+                ],
+                "price": {
+                    "currency": "THB",
+                    "sale_price": "56",
+                    "tax_exclusive_price": "56"
+                },
+                "sales_attributes": [
+                    {
+                        "id": "7531274017689405202",
+                        "name": "ขนาด",
+                        "sku_img": {
+                            "height": 1024,
+                            "thumb_urls": [
+                                "https://p16-oec-va.ibyteimg.com/tos-maliva-i-o3syd03w52-us/9bb80b777cb14ec78677b3285924c6b2~tplv-o3syd03w52-resize-jpeg:300:300.jpeg?dr=15584&from=520841845&idc=my2&ps=933b5bde&shcp=2c1af732&shp=1f0b6a75&t=555f072d",
+                                "https://p19-oec-va.ibyteimg.com/tos-maliva-i-o3syd03w52-us/9bb80b777cb14ec78677b3285924c6b2~tplv-o3syd03w52-resize-jpeg:300:300.jpeg?dr=15584&from=520841845&idc=my2&ps=933b5bde&shcp=2c1af732&shp=1f0b6a75&t=555f072d"
+                            ],
+                            "uri": "tos-maliva-i-o3syd03w52-us/9bb80b777cb14ec78677b3285924c6b2",
+                            "urls": [
+                                "https://p16-oec-va.ibyteimg.com/tos-maliva-i-o3syd03w52-us/9bb80b777cb14ec78677b3285924c6b2~tplv-o3syd03w52-origin-jpeg.jpeg?dr=15568&from=520841845&idc=my2&ps=933b5bde&shcp=2c1af732&shp=1f0b6a75&t=555f072d",
+                                "https://p19-oec-va.ibyteimg.com/tos-maliva-i-o3syd03w52-us/9bb80b777cb14ec78677b3285924c6b2~tplv-o3syd03w52-origin-jpeg.jpeg?dr=15568&from=520841845&idc=my2&ps=933b5bde&shcp=2c1af732&shp=1f0b6a75&t=555f072d"
+                            ],
+                            "width": 1024
+                        },
+                        "value_id": "7531274070487435016",
+                        "value_name": "9mm"
+                    }
+                ],
+                "seller_sku": "40266",
+                "sku_dimensions": {
+                    "height": "10",
+                    "length": "4",
+                    "unit": "CENTIMETER",
+                    "width": "4"
+                },
+                "sku_weight": {
+                    "unit": "KILOGRAM",
+                    "value": "0.5"
+                },
+                "status_info": {
+                    "status": "NORMAL"
+                }
+            },
+            {
+                "global_listing_policy": {
+                    "inventory_type": "EXCLUSIVE",
+                    "price_sync": false
+                },
+                "id": "1733130233411045036",
+                "inventory": [
+                    {
+                        "quantity": 28,
+                        "warehouse_id": "7174771821111281414"
+                    }
+                ],
+                "price": {
+                    "currency": "THB",
+                    "sale_price": "56",
+                    "tax_exclusive_price": "56"
+                },
+                "sales_attributes": [
+                    {
+                        "id": "7531274017689405202",
+                        "name": "ขนาด",
+                        "sku_img": {
+                            "height": 1024,
+                            "thumb_urls": [
+                                "https://p16-oec-va.ibyteimg.com/tos-maliva-i-o3syd03w52-us/106e88492d314fc49126db1745ea73e8~tplv-o3syd03w52-resize-jpeg:300:300.jpeg?dr=15584&from=520841845&idc=my2&ps=933b5bde&shcp=2c1af732&shp=1f0b6a75&t=555f072d",
+                                "https://p21-oec-va.ibyteimg.com/tos-maliva-i-o3syd03w52-us/106e88492d314fc49126db1745ea73e8~tplv-o3syd03w52-resize-jpeg:300:300.jpeg?dr=15584&from=520841845&idc=my2&ps=933b5bde&shcp=2c1af732&shp=1f0b6a75&t=555f072d"
+                            ],
+                            "uri": "tos-maliva-i-o3syd03w52-us/106e88492d314fc49126db1745ea73e8",
+                            "urls": [
+                                "https://p16-oec-va.ibyteimg.com/tos-maliva-i-o3syd03w52-us/106e88492d314fc49126db1745ea73e8~tplv-o3syd03w52-origin-jpeg.jpeg?dr=15568&from=520841845&idc=my2&ps=933b5bde&shcp=2c1af732&shp=1f0b6a75&t=555f072d",
+                                "https://p19-oec-va.ibyteimg.com/tos-maliva-i-o3syd03w52-us/106e88492d314fc49126db1745ea73e8~tplv-o3syd03w52-origin-jpeg.jpeg?dr=15568&from=520841845&idc=my2&ps=933b5bde&shcp=2c1af732&shp=1f0b6a75&t=555f072d"
+                            ],
+                            "width": 1024
+                        },
+                        "value_id": "7531274070487451400",
+                        "value_name": "10mm"
+                    }
+                ],
+                "seller_sku": "40267",
+                "sku_dimensions": {
+                    "height": "10",
+                    "length": "4",
+                    "unit": "CENTIMETER",
+                    "width": "4"
+                },
+                "sku_weight": {
+                    "unit": "KILOGRAM",
+                    "value": "0.5"
+                },
+                "status_info": {
+                    "status": "NORMAL"
+                }
+            }
+        ],
+        "status": "ACTIVATE",
+        "subscribe_info": {
+            "subscribe_promotion_config": [
+                {
+                    "discount_level": "REGULAR"
+                },
+                {
+                    "discount_level": "FIRST_ORDER",
+                    "max_discount": 99,
+                    "min_discount": 1
+                }
+            ],
+            "subscribe_status": "NOT_ENABLED",
+            "support_subscribe": false
+        },
+        "title": "PUMPKIN ลูกบ๊อกซ์สั้น XTREME หกเหลี่ยม 8mm-32mm/40265-40288",
+        "update_time": 1769054678
+    },
+    "message": "Success",
+    "request_id": "202611091000368470E98BB799CA0FAEEE"
+}

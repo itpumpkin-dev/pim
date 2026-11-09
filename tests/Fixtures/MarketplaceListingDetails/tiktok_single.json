@@ -1,0 +1,253 @@
+{
+    "code": 0,
+    "data": {
+        "audit": {
+            "not_submitted_reasons": [],
+            "pre_approved_reasons": [],
+            "status": "NONE"
+        },
+        "audit_failed_reasons": [
+            {
+                "listing_platform": "TIKTOK_SHOP",
+                "position": "Product Description",
+                "reasons": [
+                    "Redirecting to Third-Party Platforms"
+                ],
+                "suggestions": [
+                    "The product listing directs users to a third-party platform. Redirection to an unaffiliated third party is prohibited."
+                ]
+            }
+        ],
+        "brand": {
+            "id": "7032166665970288386",
+            "name": "pumpkin"
+        },
+        "category_chains": [
+            {
+                "id": "604579",
+                "is_leaf": false,
+                "local_name": "เครื่องมือและอุปกรณ์ช่าง",
+                "parent_id": "0"
+            },
+            {
+                "id": "980488",
+                "is_leaf": false,
+                "local_name": "ปั๊มและอุปกรณ์ประปา",
+                "parent_id": "604579"
+            },
+            {
+                "id": "982536",
+                "is_leaf": true,
+                "local_name": "ปั๊มน้ำ อะไหล่ และอุปกรณ์เสริม",
+                "parent_id": "980488"
+            }
+        ],
+        "create_time": 1671605323,
+        "description": "<p>ประสบการณ์ไร้ขีดจำกัดของปั๊มลมไร้สายใน New Cordless Series จำหน่ายแล้ววันนี้ </p><p> </p><p> </p><p>ปั๊มลมอเนกประสงค์ 3IN1 AC&amp;DC แบบไร้แปรงถ่าน (Brushless Motor) สามารถใช้งานต่อเนื่องนาน 24 ชั่วโมง ทรงพลังและทนทานสูงสุดถึง 10,000 ชั่วโมง</p><p> </p><p> </p><ul><li>Professional Brushless Motor มอเตอร์ไร้แปรงถ่าน เบากว่า กะทัดรัดกว่า แรงเต็มประสิทธิภาพภายใต้การบำรุงรักษาที่ง่ายดายยิ่งขึ้น</li></ul><ul><li>CIRCUIT BOARD มั่นใจด้วยแผงวงจรควบคุม สื่อสารระหว่างเครื่องมือกับแบตเตอรี่</li></ul><ul><li>SHARING LITHIUM-ION BATTERY 20V พัมคินพัฒนาแบตเตอรีลิเทียมไอออน รุ่น P20 ที่ให้กำลังแบตเตอรี่ 20V ให้สามารถใช้งานร่วมกันกับเครื่องมือต่าง ๆ ที่หลากหลายได้มากกว่า 300 รายการ</li></ul><p> </p><p> </p><p>INFINITY POWER 20V 3 IN 1 AC/DC ปั้มลมไร้สาย ไร้แปรงถ่าน 500W ถังอะลูมิเนียม 5 ลิตร PTT-A5005BL รหัสสินค้า 50276 (เฉพาะเครื่องเปล่า ไม่รวมแบตเตอรี่ และแท่นชาร์จ)</p><p> </p><p> </p><p>ข้อมูลทางเทคนิค</p><ul><li>กำลังไฟฟ้า : 500W</li><li>แรงดันไฟฟ้า : 220V/50HZ</li><li>ขนาดถัง : 5 ลิตร</li></ul><p> </p><p> </p><p>กำลังมอเตอร์ :</p><ul><li>50% 1300 rpm</li><li>99% 1700 rpm</li></ul><p> </p><p> </p><ul><li>อัตราการไหลของลมออก : 65L/MIN</li><li>Max Pressure : 0.1-0.9MPA (1-9Bar)</li><li>น้ำหนัก : 10.5 กิโลกรัม</li></ul><p> </p><p> </p><p>แหล่งจ่ายไฟ 3 โหมดสามารถเลือกใช้ไฟได้ทั้ง</p><p>1. ไฟบ้าน (AC220-240v),</p><p>2. แบตเตอรี่ลิเธียมไอออน (DC 18-20V)*</p><p>3. แบตเตอรี่รถยนต์ (DC 12-30) โดยสายจั๊มแบตเตอรี่รถยนต์**</p><p> </p><p> </p><p>การใช้งานระบบ DC สามารถใช้งานร่วมกับแบตเตอรี่พัมคิน 20V</p><p>*มีอะแดปเตอร์แปลงแบตเตอรี่สำหรับลูกค้าที่มีแบตเตอรี่สำหรับเครื่องมือไร้สายอยู่แล้ว (สามารถแจ้งแบตเตอรี่ของท่านกับทีมงานเพื่อเช็คว่าสามารถใช้งานร่วมกันได้หรือไม่)</p><p> </p><p> </p><p>**แถมฟรี สายจั๊มแบตเตอรี่รถยนต์ 2.4M</p><p> </p><p> </p><img src=\"https://p16-oec-va.ibyteimg.com/tos-maliva-i-o3syd03w52-us/8d319d9edfcf4d1aa3fa5c44d735cdde~tplv-o3syd03w52-origin-jpeg.jpeg?\" width=\"1040\" height=\"1040\"><img src=\"https://p16-oec-va.ibyteimg.com/tos-maliva-i-o3syd03w52-us/7b70975b8ab6400a9eee6ed5b760ac25~tplv-o3syd03w52-origin-jpeg.jpeg?\" width=\"1040\" height=\"1040\"><img src=\"https://p16-oec-va.ibyteimg.com/tos-maliva-i-o3syd03w52-us/3fb1633669da4391ac2709def24a75b9~tplv-o3syd03w52-origin-jpeg.jpeg?\" width=\"1040\" height=\"1040\"><img src=\"https://p16-oec-va.ibyteimg.com/tos-maliva-i-o3syd03w52-us/88fcd56bd3224fc1a2275a6762e92b60~tplv-o3syd03w52-origin-jpeg.jpeg?\" width=\"1040\" height=\"1040\"><img src=\"https://p16-oec-va.ibyteimg.com/tos-maliva-i-o3syd03w52-us/acdd03ca5e024df3a05c24d2b509d759~tplv-o3syd03w52-origin-jpeg.jpeg?\" width=\"1040\" height=\"1040\">",
+        "has_draft": false,
+        "id": "1729576598930885292",
+        "is_cod_allowed": false,
+        "is_not_for_sale": false,
+        "is_pre_owned": false,
+        "is_replicated": false,
+        "main_images": [
+            {
+                "height": 1200,
+                "thumb_urls": [
+                    "https://p16-oec-va.ibyteimg.com/tos-maliva-i-o3syd03w52-us/6221986267c94b428b79dda796029d4c~tplv-o3syd03w52-resize-jpeg:300:300.jpeg?dr=15584&from=520841845&idc=my&ps=933b5bde&shcp=2c1af732&shp=1f0b6a75&t=555f072d",
+                    "https://p19-oec-va.ibyteimg.com/tos-maliva-i-o3syd03w52-us/6221986267c94b428b79dda796029d4c~tplv-o3syd03w52-resize-jpeg:300:300.jpeg?dr=15584&from=520841845&idc=my&ps=933b5bde&shcp=2c1af732&shp=1f0b6a75&t=555f072d"
+                ],
+                "uri": "tos-maliva-i-o3syd03w52-us/6221986267c94b428b79dda796029d4c",
+                "urls": [
+                    "https://p16-oec-va.ibyteimg.com/tos-maliva-i-o3syd03w52-us/6221986267c94b428b79dda796029d4c~tplv-o3syd03w52-origin-jpeg.jpeg?dr=15568&from=520841845&idc=my&ps=933b5bde&shcp=2c1af732&shp=1f0b6a75&t=555f072d",
+                    "https://p21-oec-va.ibyteimg.com/tos-maliva-i-o3syd03w52-us/6221986267c94b428b79dda796029d4c~tplv-o3syd03w52-origin-jpeg.jpeg?dr=15568&from=520841845&idc=my&ps=933b5bde&shcp=2c1af732&shp=1f0b6a75&t=555f072d"
+                ],
+                "width": 1200
+            },
+            {
+                "height": 1200,
+                "thumb_urls": [
+                    "https://p16-oec-va.ibyteimg.com/tos-maliva-i-o3syd03w52-us/efcb8748ad6941bbaf2e74a2f1151913~tplv-o3syd03w52-resize-jpeg:300:300.jpeg?dr=15584&from=520841845&idc=my&ps=933b5bde&shcp=2c1af732&shp=1f0b6a75&t=555f072d",
+                    "https://p19-oec-va.ibyteimg.com/tos-maliva-i-o3syd03w52-us/efcb8748ad6941bbaf2e74a2f1151913~tplv-o3syd03w52-resize-jpeg:300:300.jpeg?dr=15584&from=520841845&idc=my&ps=933b5bde&shcp=2c1af732&shp=1f0b6a75&t=555f072d"
+                ],
+                "uri": "tos-maliva-i-o3syd03w52-us/efcb8748ad6941bbaf2e74a2f1151913",
+                "urls": [
+                    "https://p16-oec-va.ibyteimg.com/tos-maliva-i-o3syd03w52-us/efcb8748ad6941bbaf2e74a2f1151913~tplv-o3syd03w52-origin-jpeg.jpeg?dr=15568&from=520841845&idc=my&ps=933b5bde&shcp=2c1af732&shp=1f0b6a75&t=555f072d",
+                    "https://p21-oec-va.ibyteimg.com/tos-maliva-i-o3syd03w52-us/efcb8748ad6941bbaf2e74a2f1151913~tplv-o3syd03w52-origin-jpeg.jpeg?dr=15568&from=520841845&idc=my&ps=933b5bde&shcp=2c1af732&shp=1f0b6a75&t=555f072d"
+                ],
+                "width": 1200
+            },
+            {
+                "height": 1200,
+                "thumb_urls": [
+                    "https://p16-oec-va.ibyteimg.com/tos-maliva-i-o3syd03w52-us/24dce6311308464e9dc87aaf63e8a114~tplv-o3syd03w52-resize-jpeg:300:300.jpeg?dr=15584&from=520841845&idc=my&ps=933b5bde&shcp=2c1af732&shp=1f0b6a75&t=555f072d",
+                    "https://p21-oec-va.ibyteimg.com/tos-maliva-i-o3syd03w52-us/24dce6311308464e9dc87aaf63e8a114~tplv-o3syd03w52-resize-jpeg:300:300.jpeg?dr=15584&from=520841845&idc=my&ps=933b5bde&shcp=2c1af732&shp=1f0b6a75&t=555f072d"
+                ],
+                "uri": "tos-maliva-i-o3syd03w52-us/24dce6311308464e9dc87aaf63e8a114",
+                "urls": [
+                    "https://p16-oec-va.ibyteimg.com/tos-maliva-i-o3syd03w52-us/24dce6311308464e9dc87aaf63e8a114~tplv-o3syd03w52-origin-jpeg.jpeg?dr=15568&from=520841845&idc=my&ps=933b5bde&shcp=2c1af732&shp=1f0b6a75&t=555f072d",
+                    "https://p21-oec-va.ibyteimg.com/tos-maliva-i-o3syd03w52-us/24dce6311308464e9dc87aaf63e8a114~tplv-o3syd03w52-origin-jpeg.jpeg?dr=15568&from=520841845&idc=my&ps=933b5bde&shcp=2c1af732&shp=1f0b6a75&t=555f072d"
+                ],
+                "width": 1200
+            },
+            {
+                "height": 1200,
+                "thumb_urls": [
+                    "https://p16-oec-va.ibyteimg.com/tos-maliva-i-o3syd03w52-us/a6c74cd111674608bc851ad85d836c3f~tplv-o3syd03w52-resize-jpeg:300:300.jpeg?dr=15584&from=520841845&idc=my&ps=933b5bde&shcp=2c1af732&shp=1f0b6a75&t=555f072d",
+                    "https://p21-oec-va.ibyteimg.com/tos-maliva-i-o3syd03w52-us/a6c74cd111674608bc851ad85d836c3f~tplv-o3syd03w52-resize-jpeg:300:300.jpeg?dr=15584&from=520841845&idc=my&ps=933b5bde&shcp=2c1af732&shp=1f0b6a75&t=555f072d"
+                ],
+                "uri": "tos-maliva-i-o3syd03w52-us/a6c74cd111674608bc851ad85d836c3f",
+                "urls": [
+                    "https://p16-oec-va.ibyteimg.com/tos-maliva-i-o3syd03w52-us/a6c74cd111674608bc851ad85d836c3f~tplv-o3syd03w52-origin-jpeg.jpeg?dr=15568&from=520841845&idc=my&ps=933b5bde&shcp=2c1af732&shp=1f0b6a75&t=555f072d",
+                    "https://p21-oec-va.ibyteimg.com/tos-maliva-i-o3syd03w52-us/a6c74cd111674608bc851ad85d836c3f~tplv-o3syd03w52-origin-jpeg.jpeg?dr=15568&from=520841845&idc=my&ps=933b5bde&shcp=2c1af732&shp=1f0b6a75&t=555f072d"
+                ],
+                "width": 1200
+            },
+            {
+                "height": 1200,
+                "thumb_urls": [
+                    "https://p16-oec-va.ibyteimg.com/tos-maliva-i-o3syd03w52-us/1221fe545f2a40779efe142fd2c3d2d9~tplv-o3syd03w52-resize-jpeg:300:300.jpeg?dr=15584&from=520841845&idc=my&ps=933b5bde&shcp=2c1af732&shp=1f0b6a75&t=555f072d",
+                    "https://p21-oec-va.ibyteimg.com/tos-maliva-i-o3syd03w52-us/1221fe545f2a40779efe142fd2c3d2d9~tplv-o3syd03w52-resize-jpeg:300:300.jpeg?dr=15584&from=520841845&idc=my&ps=933b5bde&shcp=2c1af732&shp=1f0b6a75&t=555f072d"
+                ],
+                "uri": "tos-maliva-i-o3syd03w52-us/1221fe545f2a40779efe142fd2c3d2d9",
+                "urls": [
+                    "https://p16-oec-va.ibyteimg.com/tos-maliva-i-o3syd03w52-us/1221fe545f2a40779efe142fd2c3d2d9~tplv-o3syd03w52-origin-jpeg.jpeg?dr=15568&from=520841845&idc=my&ps=933b5bde&shcp=2c1af732&shp=1f0b6a75&t=555f072d",
+                    "https://p19-oec-va.ibyteimg.com/tos-maliva-i-o3syd03w52-us/1221fe545f2a40779efe142fd2c3d2d9~tplv-o3syd03w52-origin-jpeg.jpeg?dr=15568&from=520841845&idc=my&ps=933b5bde&shcp=2c1af732&shp=1f0b6a75&t=555f072d"
+                ],
+                "width": 1200
+            },
+            {
+                "height": 1200,
+                "thumb_urls": [
+                    "https://p16-oec-va.ibyteimg.com/tos-maliva-i-o3syd03w52-us/7e4cb7c69a324cfba7476f57722d63cb~tplv-o3syd03w52-resize-jpeg:300:300.jpeg?dr=15584&from=520841845&idc=my&ps=933b5bde&shcp=2c1af732&shp=1f0b6a75&t=555f072d",
+                    "https://p19-oec-va.ibyteimg.com/tos-maliva-i-o3syd03w52-us/7e4cb7c69a324cfba7476f57722d63cb~tplv-o3syd03w52-resize-jpeg:300:300.jpeg?dr=15584&from=520841845&idc=my&ps=933b5bde&shcp=2c1af732&shp=1f0b6a75&t=555f072d"
+                ],
+                "uri": "tos-maliva-i-o3syd03w52-us/7e4cb7c69a324cfba7476f57722d63cb",
+                "urls": [
+                    "https://p16-oec-va.ibyteimg.com/tos-maliva-i-o3syd03w52-us/7e4cb7c69a324cfba7476f57722d63cb~tplv-o3syd03w52-origin-jpeg.jpeg?dr=15568&from=520841845&idc=my&ps=933b5bde&shcp=2c1af732&shp=1f0b6a75&t=555f072d",
+                    "https://p21-oec-va.ibyteimg.com/tos-maliva-i-o3syd03w52-us/7e4cb7c69a324cfba7476f57722d63cb~tplv-o3syd03w52-origin-jpeg.jpeg?dr=15568&from=520841845&idc=my&ps=933b5bde&shcp=2c1af732&shp=1f0b6a75&t=555f072d"
+                ],
+                "width": 1200
+            },
+            {
+                "height": 1200,
+                "thumb_urls": [
+                    "https://p16-oec-va.ibyteimg.com/tos-maliva-i-o3syd03w52-us/b9ee708679ab45fcbff59b0118d81ffa~tplv-o3syd03w52-resize-jpeg:300:300.jpeg?dr=15584&from=520841845&idc=my&ps=933b5bde&shcp=2c1af732&shp=1f0b6a75&t=555f072d",
+                    "https://p21-oec-va.ibyteimg.com/tos-maliva-i-o3syd03w52-us/b9ee708679ab45fcbff59b0118d81ffa~tplv-o3syd03w52-resize-jpeg:300:300.jpeg?dr=15584&from=520841845&idc=my&ps=933b5bde&shcp=2c1af732&shp=1f0b6a75&t=555f072d"
+                ],
+                "uri": "tos-maliva-i-o3syd03w52-us/b9ee708679ab45fcbff59b0118d81ffa",
+                "urls": [
+                    "https://p16-oec-va.ibyteimg.com/tos-maliva-i-o3syd03w52-us/b9ee708679ab45fcbff59b0118d81ffa~tplv-o3syd03w52-origin-jpeg.jpeg?dr=15568&from=520841845&idc=my&ps=933b5bde&shcp=2c1af732&shp=1f0b6a75&t=555f072d",
+                    "https://p21-oec-va.ibyteimg.com/tos-maliva-i-o3syd03w52-us/b9ee708679ab45fcbff59b0118d81ffa~tplv-o3syd03w52-origin-jpeg.jpeg?dr=15568&from=520841845&idc=my&ps=933b5bde&shcp=2c1af732&shp=1f0b6a75&t=555f072d"
+                ],
+                "width": 1200
+            },
+            {
+                "height": 1200,
+                "thumb_urls": [
+                    "https://p16-oec-va.ibyteimg.com/tos-maliva-i-o3syd03w52-us/2987ec030a2e48f4aa2262094f0a1dd0~tplv-o3syd03w52-resize-jpeg:300:300.jpeg?dr=15584&from=520841845&idc=my&ps=933b5bde&shcp=2c1af732&shp=1f0b6a75&t=555f072d",
+                    "https://p19-oec-va.ibyteimg.com/tos-maliva-i-o3syd03w52-us/2987ec030a2e48f4aa2262094f0a1dd0~tplv-o3syd03w52-resize-jpeg:300:300.jpeg?dr=15584&from=520841845&idc=my&ps=933b5bde&shcp=2c1af732&shp=1f0b6a75&t=555f072d"
+                ],
+                "uri": "tos-maliva-i-o3syd03w52-us/2987ec030a2e48f4aa2262094f0a1dd0",
+                "urls": [
+                    "https://p16-oec-va.ibyteimg.com/tos-maliva-i-o3syd03w52-us/2987ec030a2e48f4aa2262094f0a1dd0~tplv-o3syd03w52-origin-jpeg.jpeg?dr=15568&from=520841845&idc=my&ps=933b5bde&shcp=2c1af732&shp=1f0b6a75&t=555f072d",
+                    "https://p21-oec-va.ibyteimg.com/tos-maliva-i-o3syd03w52-us/2987ec030a2e48f4aa2262094f0a1dd0~tplv-o3syd03w52-origin-jpeg.jpeg?dr=15568&from=520841845&idc=my&ps=933b5bde&shcp=2c1af732&shp=1f0b6a75&t=555f072d"
+                ],
+                "width": 1200
+            }
+        ],
+        "manufacturer_ids": [],
+        "package_dimensions": {
+            "height": "0",
+            "length": "0",
+            "unit": "CENTIMETER",
+            "width": "0"
+        },
+        "package_weight": {
+            "unit": "KILOGRAM",
+            "value": "0.011"
+        },
+        "product_status": "FREEZE",
+        "product_tags": [],
+        "recommended_categories": [],
+        "responsible_person_ids": [],
+        "selling_format": "FIXED_PRICE",
+        "skus": [
+            {
+                "global_listing_policy": {
+                    "inventory_type": "EXCLUSIVE",
+                    "price_sync": false
+                },
+                "id": "1729576621567019692",
+                "identifier_code": {
+                    "type": "UNKNOWN"
+                },
+                "inventory": [
+                    {
+                        "quantity": 12,
+                        "warehouse_id": "7174771821111281414"
+                    }
+                ],
+                "price": {
+                    "currency": "THB",
+                    "sale_price": "16000",
+                    "tax_exclusive_price": "16000"
+                },
+                "sales_attributes": [
+                    {
+                        "id": "100089",
+                        "name": "ข้อมูลจำเพาะ",
+                        "sku_img": {
+                            "height": 1200,
+                            "thumb_urls": [
+                                "https://p16-oec-va.ibyteimg.com/tos-maliva-i-o3syd03w52-us/5da61021d8a040e394a94c50bd5bd1e5~tplv-o3syd03w52-resize-jpeg:300:300.jpeg?dr=15584&from=520841845&idc=my&ps=933b5bde&shcp=2c1af732&shp=1f0b6a75&t=555f072d",
+                                "https://p19-oec-va.ibyteimg.com/tos-maliva-i-o3syd03w52-us/5da61021d8a040e394a94c50bd5bd1e5~tplv-o3syd03w52-resize-jpeg:300:300.jpeg?dr=15584&from=520841845&idc=my&ps=933b5bde&shcp=2c1af732&shp=1f0b6a75&t=555f072d"
+                            ],
+                            "uri": "tos-maliva-i-o3syd03w52-us/5da61021d8a040e394a94c50bd5bd1e5",
+                            "urls": [
+                                "https://p16-oec-va.ibyteimg.com/tos-maliva-i-o3syd03w52-us/5da61021d8a040e394a94c50bd5bd1e5~tplv-o3syd03w52-origin-jpeg.jpeg?dr=15568&from=520841845&idc=my&ps=933b5bde&shcp=2c1af732&shp=1f0b6a75&t=555f072d",
+                                "https://p19-oec-va.ibyteimg.com/tos-maliva-i-o3syd03w52-us/5da61021d8a040e394a94c50bd5bd1e5~tplv-o3syd03w52-origin-jpeg.jpeg?dr=15568&from=520841845&idc=my&ps=933b5bde&shcp=2c1af732&shp=1f0b6a75&t=555f072d"
+                            ],
+                            "width": 1200
+                        },
+                        "value_id": "7179503461044815622",
+                        "value_name": "เครื่องเปล่า"
+                    }
+                ],
+                "seller_sku": "50276",
+                "sku_dimensions": {
+                    "height": "0",
+                    "length": "0",
+                    "unit": "CENTIMETER",
+                    "width": "0"
+                },
+                "sku_weight": {
+                    "unit": "KILOGRAM",
+                    "value": "0.011"
+                },
+                "status_info": {
+                    "status": "NORMAL"
+                }
+            }
+        ],
+        "status": "FREEZE",
+        "subscribe_info": {
+            "subscribe_promotion_config": [
+                {
+                    "discount_level": "REGULAR"
+                },
+                {
+                    "discount_level": "FIRST_ORDER",
+                    "max_discount": 99,
+                    "min_discount": 1
+                }
+            ],
+            "subscribe_status": "NOT_ENABLED",
+            "support_subscribe": false
+        },
+        "title": "PUMPKIN INFINITY POWER 20V พัมคินปั๊มลมไร้สาย ไร้แปรงถ่าน 500W 3 IN 1 AC/DC ถังอะลูมิเนียม 5 ลิตร รุ่น PTT-A5005BL (50276)",
+        "update_time": 1682969754
+    },
+    "message": "Success",
+    "request_id": "202611091000359C20D7E3414665102969"
+}

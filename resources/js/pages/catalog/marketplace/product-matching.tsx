@@ -7,6 +7,7 @@ import { Head, router, usePage } from '@inertiajs/react';
 import '@ui5/webcomponents-icons/dist/accept.js';
 import '@ui5/webcomponents-icons/dist/action.js';
 import '@ui5/webcomponents-icons/dist/chain-link.js';
+import '@ui5/webcomponents-icons/dist/detail-view.js';
 import '@ui5/webcomponents-icons/dist/disconnected.js';
 import '@ui5/webcomponents-icons/dist/hide.js';
 import '@ui5/webcomponents-icons/dist/history.js';
@@ -33,6 +34,7 @@ import { useEffect, useRef, useState } from 'react';
 
 import { Body, Caption, HStack, PageHeader, Pager, SearchField, TONE_TEXT } from './marketplace-ui';
 import styles from './marketplace.module.css';
+import { ProductMatchingDetailDialog } from './product-matching-detail-dialog';
 import { ProductMatchingLinkDialog } from './product-matching-link-dialog';
 import pm from './product-matching.module.css';
 
@@ -208,6 +210,7 @@ export default function ProductMatching({ shopGroups, filters, summary, rows, sy
     const [selected, setSelected] = useState<string[]>([]);
     const [bulkBusy, setBulkBusy] = useState(false);
     const [linkTarget, setLinkTarget] = useState<ListingRow | null>(null);
+    const [detailTarget, setDetailTarget] = useState<ListingRow | null>(null);
     const [ignoreTarget, setIgnoreTarget] = useState<ListingRow | null>(null);
     const [ignoreReason, setIgnoreReason] = useState('');
     const [historyOpen, setHistoryOpen] = useState(false);
@@ -450,16 +453,26 @@ export default function ProductMatching({ shopGroups, filters, summary, rows, sy
         <Body style={{ color: row.is_active ? TONE_TEXT.success : TONE_TEXT.neutral, fontWeight: 600 }}>{row.status ?? '—'}</Body>
     );
 
-    const openCell = (row: ListingRow) =>
-        row.url ? (
+    const openCell = (row: ListingRow) => (
+        <div className={pm.actions} style={{ flexWrap: 'nowrap' }}>
             <Button
                 design="Transparent"
-                icon="action"
-                tooltip={`เปิดบน ${platformLabel}`}
-                accessibleName={`Open on ${platformLabel}`}
-                onClick={() => window.open(row.url ?? undefined, '_blank', 'noopener,noreferrer')}
+                icon="detail-view"
+                tooltip="รายละเอียดสินค้าบนแพลตฟอร์ม"
+                accessibleName={`รายละเอียด ${row.seller_sku ?? 'Item ' + row.item_id}`}
+                onClick={() => setDetailTarget(row)}
             />
-        ) : null;
+            {row.url && (
+                <Button
+                    design="Transparent"
+                    icon="action"
+                    tooltip={`เปิดบน ${platformLabel}`}
+                    accessibleName={`Open on ${platformLabel}`}
+                    onClick={() => window.open(row.url ?? undefined, '_blank', 'noopener,noreferrer')}
+                />
+            )}
+        </div>
+    );
 
     const unmatchedActions = (row: ListingRow) =>
         canMatch ? (
@@ -533,7 +546,7 @@ export default function ProductMatching({ shopGroups, filters, summary, rows, sy
         { key: 'status', header: 'สถานะ', priority: 'low', minWidth: 110, render: statusCell },
         { key: 'price', header: 'ราคา', priority: 'low', align: 'right', minWidth: 90, render: (row) => <Body>{row.price ?? '—'}</Body> },
         { key: 'quantity', header: 'คงเหลือ', priority: 'low', align: 'right', minWidth: 80, render: (row) => <Body>{row.quantity ?? '—'}</Body> },
-        { key: 'open', header: '', popinText: platformLabel, priority: 'always', align: 'right', minWidth: 48, render: openCell },
+        { key: 'open', header: '', popinText: 'รายละเอียด', priority: 'always', align: 'right', minWidth: 96, render: openCell },
     ];
 
     const matchedColumns: FioriResponsiveColumn<ListingRow>[] = [
@@ -812,6 +825,14 @@ export default function ProductMatching({ shopGroups, filters, summary, rows, sy
             </div>
 
             <ProductMatchingLinkDialog listing={linkTarget} pageUrl={PAGE_URL} onClose={() => setLinkTarget(null)} />
+
+            <ProductMatchingDetailDialog
+                listing={detailTarget}
+                pageUrl={PAGE_URL}
+                canRefresh={canMatch}
+                canOpenProduct={canEditProducts}
+                onClose={() => setDetailTarget(null)}
+            />
 
             <Dialog
                 open={ignoreTarget !== null}

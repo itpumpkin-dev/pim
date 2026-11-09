@@ -77,6 +77,28 @@ class WooCommerceClient
     }
 
     /**
+     * GET /products/{id} — like getProduct() but throws on any API error
+     * (404, 401, transient 500) instead of returning null, so a caller can
+     * tell "gone" from "couldn't ask". READ-ONLY. Used by the listing detail
+     * fetcher (WooCommerceListingDetailFetcher). Confirmed live 2026-11-09.
+     */
+    public function getProductOrFail(int $id): array
+    {
+        return $this->request('GET', "/products/{$id}");
+    }
+
+    /**
+     * GET /settings/products/{id} — one store setting of the "products"
+     * group, e.g. woocommerce_weight_unit / woocommerce_dimension_unit
+     * (`value` = 'kg'|'g'|'lbs'|'oz' / 'm'|'cm'|'mm'|'in'|'yd'). READ-ONLY.
+     * Confirmed live 2026-11-09: the REST key can read these (HTTP 200).
+     */
+    public function getProductSetting(string $id): array
+    {
+        return $this->request('GET', "/settings/products/{$id}");
+    }
+
+    /**
      * GET /products — one page of every product regardless of status
      * (`status=any`). READ-ONLY. Pagination is the caller's job (loop until a
      * page comes back shorter than $perPage) — used by the Product Matching

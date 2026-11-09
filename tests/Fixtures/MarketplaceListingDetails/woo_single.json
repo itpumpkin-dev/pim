@@ -1,0 +1,145 @@
+{
+    "id": 1000853,
+    "name": "PUMPKIN 17904 SCORPION WELD ตู้เชื่อม INVERTER รุ่น ECO 140PLUS",
+    "slug": "pumpkin-17904-eco-140plus",
+    "permalink": "https://pumpkin.co.th/product/pumpkin-17904-eco-140plus/",
+    "date_created": "2026-02-06T06:56:35",
+    "date_created_gmt": "2026-02-06T06:56:35",
+    "date_modified": "2026-11-06T05:00:08",
+    "date_modified_gmt": "2026-11-06T05:00:08",
+    "type": "simple",
+    "status": "publish",
+    "featured": false,
+    "catalog_visibility": "visible",
+    "description": "<p>ใช้สาย</p>\n<p>กระแสไฟเชื่อม 20-125 A</p>\n<p>รับประกันแผงวงจร 24 เดือน</p>\n",
+    "short_description": "<ul>\n<li><span style=\"color: #ff0000;\"><strong>ใช้สาย</strong></span></li>\n<li>กระแสไฟเชื่อม 20-125 A</li>\n<li>รับประกันแผงวงจร 24 เดือน</li>\n</ul>\n",
+    "sku": "17904",
+    "price": "4590",
+    "regular_price": "4590",
+    "sale_price": "",
+    "date_on_sale_from": null,
+    "date_on_sale_from_gmt": null,
+    "date_on_sale_to": null,
+    "date_on_sale_to_gmt": null,
+    "on_sale": false,
+    "purchasable": true,
+    "total_sales": 0,
+    "virtual": false,
+    "downloadable": false,
+    "downloads": [],
+    "download_limit": -1,
+    "download_expiry": -1,
+    "external_url": "",
+    "button_text": "",
+    "tax_status": "taxable",
+    "tax_class": "",
+    "manage_stock": true,
+    "stock_quantity": 100,
+    "backorders": "no",
+    "backorders_allowed": false,
+    "backordered": false,
+    "low_stock_amount": null,
+    "sold_individually": false,
+    "weight": "",
+    "dimensions": {
+        "length": "",
+        "width": "",
+        "height": ""
+    },
+    "shipping_required": true,
+    "shipping_taxable": true,
+    "shipping_class": "",
+    "shipping_class_id": 0,
+    "reviews_allowed": false,
+    "average_rating": "0.00",
+    "rating_count": 0,
+    "upsell_ids": [],
+    "cross_sell_ids": [],
+    "parent_id": 0,
+    "purchase_note": "",
+    "categories": [
+        {
+            "id": 1106,
+            "name": "งานช่างเชื่อม",
+            "slug": "welding"
+        },
+        {
+            "id": 1031,
+            "name": "เครื่องมือไฟฟ้า และเครื่องมือไร้สาย",
+            "slug": "a-power-tools"
+        },
+        {
+            "id": 942,
+            "name": "เครื่องมือไฟฟ้างานโลหะ",
+            "slug": "metal-working-power-tools"
+        },
+        {
+            "id": 1142,
+            "name": "เครื่องเชื่อม",
+            "slug": "welding-equipment"
+        }
+    ],
+    "brands": [
+        {
+            "id": 940,
+            "name": "PUMPKIN",
+            "slug": "pumpkin"
+        }
+    ],
+    "tags": [],
+    "images": [
+        {
+            "id": 1021555,
+            "date_created": "2026-08-20T09:12:45",
+            "date_created_gmt": "2026-08-20T09:12:45",
+            "date_modified": "2026-08-20T09:12:49",
+            "date_modified_gmt": "2026-08-20T09:12:49",
+            "src": "https://pumpkin.co.th/wp-content/uploads/2026/08/17904-4.jpg",
+            "name": "17904-4",
+            "alt": "",
+            "srcset": "https://pumpkin.co.th/wp-content/uploads/2026/08/17904-4.jpg 1200w, https://pumpkin.co.th/wp-content/uploads/2026/08/17904-4-150x150.jpg 150w, https://pumpkin.co.th/wp-content/uploads/2026/08/17904-4-768x768.jpg 768w, https://pumpkin.co.th/wp-content/uploads/2026/08/17904-4-12x12.jpg 12w, https://pumpkin.co.th/wp-content/uploads/2026/08/17904-4-16x16.jpg 16w, https://pumpkin.co.th/wp-content/uploads/2026/08/17904-4-300x300.jpg 300w, https://pumpkin.co.th/wp-content/uploads/2026/08/17904-4-600x600.jpg 600w, https://pumpkin.co.th/wp-content/uploads/2026/08/17904-4-100x100.jpg 100w",
+            "sizes": "(max-width: 1200px) 100vw, 1200px",
+            "thumbnail": "https://pumpkin.co.th/wp-content/uploads/2026/08/17904-4-300x300.jpg"
+        }
+    ],
+    "attributes": [
+        {
+            "id": 5,
+            "name": "brand",
+            "slug": "pa_brand",
+            "position": 0,
+            "visible": true,
+            "variation": false,
+            "options": [
+                "PUMPKIN"
+            ]
+        },
+        {
+            "id": 13,
+            "name": "ใช้สาย/ไร้สาย",
+            "slug": "pa_cord-or-cordless",
+            "position": 1,
+            "visible": true,
+            "variation": false,
+            "options": [
+                "ใช้สาย"
+            ]
+        }
+    ],
+    "default_attributes": [],
+    "variations": [],
+    "grouped_products": [],
+    "menu_order": 0,
+    "price_html": "<span class=\"woocommerce-Price-amount amount\"><bdi><span class=\"woocommerce-Price-currencySymbol\" translate=\"no\">&#3647;</span>4,590</bdi></span>",
+    "related_ids": [
+        1001009,
+        1000916,
+        1000932,
+        1000861,
+        1000964
+    ],
+    "stock_status": "instock",
+    "has_options": false,
+    "post_password": "",
+    "global_unique_id": ""
+}
