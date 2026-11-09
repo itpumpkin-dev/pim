@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 /**
  * One sellable unit on a marketplace shop (see the create_marketplace_listings
@@ -106,6 +107,21 @@ class MarketplaceListing extends Model
     public function components(): HasMany
     {
         return $this->hasMany(MarketplaceListingComponent::class);
+    }
+
+    /**
+     * The item's cached full detail (marketplace_listing_details). NOT a real
+     * FK: matched on (sales_platform_shop_id, item_id) — every variant row of
+     * the item shares one detail row, and listing rows are re-created by each
+     * sync. Lazy loading only ($listing->detail): the shop condition reads
+     * this model's own sales_platform_shop_id, which an eager load (with())
+     * doesn't have. May be missing — fetch it with
+     * MarketplaceListingDetailService::fetch().
+     */
+    public function detail(): HasOne
+    {
+        return $this->hasOne(MarketplaceListingDetail::class, 'item_id', 'item_id')
+            ->where('marketplace_listing_details.sales_platform_shop_id', $this->sales_platform_shop_id);
     }
 
     public function isLinked(): bool

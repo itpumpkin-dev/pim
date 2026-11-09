@@ -1,0 +1,161 @@
+{
+    "error": "",
+    "message": "",
+    "request_id": "e3e3e7f35fce53c24e59844d4a4ca300",
+    "response": {
+        "item_list": [
+            {
+                "item_id": 27763421033,
+                "category_id": 101796,
+                "item_name": "PUMPKIN ลูกบ๊อกซ์สั้น XTREME หกเหลี่ยม 8mm-32mm/40265-40288",
+                "item_sku": "",
+                "create_time": 1728286990,
+                "update_time": 1792102163,
+                "image": {
+                    "image_id_list": [
+                        "sg-11134201-82626-mjfdm64zx4ht6f",
+                        "sg-11134201-7rdw4-m12gw1ketyic1a",
+                        "sg-11134201-7rdy0-m12gw1ketyi0f7",
+                        "sg-11134201-7rdyd-m12gw1ketytjce",
+                        "sg-11134201-7rdvs-m12gw1kety6951",
+                        "sg-11134201-7rdw5-m12gw1kotjz14f",
+                        "sg-11134201-7rdy8-m12gw1ketyr501"
+                    ],
+                    "image_url_list": [
+                        "https://cf.shopee.co.th/file/sg-11134201-82626-mjfdm64zx4ht6f",
+                        "https://cf.shopee.co.th/file/sg-11134201-7rdw4-m12gw1ketyic1a",
+                        "https://cf.shopee.co.th/file/sg-11134201-7rdy0-m12gw1ketyi0f7",
+                        "https://cf.shopee.co.th/file/sg-11134201-7rdyd-m12gw1ketytjce",
+                        "https://cf.shopee.co.th/file/sg-11134201-7rdvs-m12gw1kety6951",
+                        "https://cf.shopee.co.th/file/sg-11134201-7rdw5-m12gw1kotjz14f",
+                        "https://cf.shopee.co.th/file/sg-11134201-7rdy8-m12gw1ketyr501"
+                    ],
+                    "image_ratio": "1:1"
+                },
+                "weight": "0.5",
+                "dimension": {
+                    "package_length": 4,
+                    "package_width": 4,
+                    "package_height": 10
+                },
+                "logistic_info": [
+                    {
+                        "logistic_id": 7000,
+                        "logistic_name": "Standard Delivery - ส่งธรรมดาในประเทศ",
+                        "enabled": true,
+                        "size_id": 0,
+                        "is_free": false,
+                        "include_pickup": false
+                    },
+                    {
+                        "logistic_id": 70036,
+                        "logistic_name": "SPX Self Collection Point - รับสินค้าที่จุดบริการ",
+                        "enabled": true,
+                        "size_id": 0,
+                        "is_free": false,
+                        "include_pickup": false
+                    },
+                    {
+                        "logistic_id": 7001,
+                        "logistic_name": "Standard Delivery Bulky - ส่งสินค้าขนาดใหญ่",
+                        "enabled": false,
+                        "size_id": 0,
+                        "is_free": false,
+                        "include_pickup": false
+                    },
+                    {
+                        "logistic_id": 70126,
+                        "logistic_name": "Instant Delivery - ส่งทันที",
+                        "enabled": true,
+                        "size_id": 0,
+                        "is_free": false,
+                        "include_pickup": false
+                    },
+                    {
+                        "logistic_id": 7002,
+                        "logistic_name": "Express Delivery - ส่งด่วน",
+                        "enabled": true,
+                        "size_id": 0,
+                        "is_free": false,
+                        "include_pickup": false
+                    },
+                    {
+                        "logistic_id": 70074,
+                        "logistic_name": "SPX Locker Collection Point - รับสินค้าที่ตู้ล็อกเกอร์",
+                        "enabled": true,
+                        "size_id": 0,
+                        "is_free": false,
+                        "include_pickup": false
+                    }
+                ],
+                "pre_order": {
+                    "is_pre_order": false,
+                    "days_to_ship": 2
+                },
+                "condition": "NEW",
+                "size_chart": "",
+                "item_status": "NORMAL",
+                "has_model": true,
+                "promotion_id": 477433757647483,
+                "has_promotion": true,
+                "brand": {
+                    "brand_id": 1127450,
+                    "original_brand_name": "Pumpkin(พัมคินส์)"
+                },
+                "item_dangerous": 0,
+                "description_info": {
+                    "extended_description": {
+                        "field_list": [
+                            {
+                                "field_type": "text",
+                                "text": "ลูกบ๊อกซ์สั้น หกเหลี่ยม ลูกบ๊อกซ์ยาว หกเหลี่ยม\nㆍผลิตจากเหล็กโครมวานาเดียม\n(Chrome Vanadium Alloy Steel)\nㆍ บรรจุแผงพลาสติกแขวนโชว์ได้ สวยงาม\nㆍ ผนังลูกบ๊อกซ์มีขนาดบาง เพื่อช่วยน็อดในพื้นพื้นที่จำกัด\n"
+                            },
+                            {
+                                "field_type": "image",
+                                "image_info": {
+                                    "image_id": "sg-11134201-7rdvv-m14zd6d3sbk0a6",
+                                    "image_url": "https://cf.shopee.co.th/file/sg-11134201-7rdvv-m14zd6d3sbk0a6"
+                                }
+                            },
+                            {
+                                "field_type": "image",
+                                "image_info": {
+                                    "image_id": "sg-11134201-7rdx1-m14zd6d3piz583",
+                                    "image_url": "https://cf.shopee.co.th/file/sg-11134201-7rdx1-m14zd6d3piz583"
+                                }
+                            },
+                            {
+                                "field_type": "image",
+                                "image_info": {
+                                    "image_id": "sg-11134201-7rdwd-m14zd6d3pifydc",
+                                    "image_url": "https://cf.shopee.co.th/file/sg-11134201-7rdwd-m14zd6d3pifydc"
+                                }
+                            }
+                        ]
+                    }
+                },
+                "description_type": "extended",
+                "size_chart_id": 0,
+                "promotion_image": {
+                    "image_id_list": [
+                        "sg-11134201-82626-mjfdm64zx4ht6f"
+                    ],
+                    "image_url_list": [
+                        "https://cf.shopee.co.th/file/sg-11134201-82626-mjfdm64zx4ht6f"
+                    ]
+                },
+                "deboost": "FALSE",
+                "compatibility_info": [],
+                "authorised_brand_id": 0,
+                "is_fulfillment_by_shopee": false,
+                "tag": {
+                    "kit": false
+                },
+                "purchase_limit_info": {
+                    "min_purchase_limit": 1
+                }
+            }
+        ]
+    },
+    "debug_message": ""
+}

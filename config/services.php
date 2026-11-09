@@ -58,6 +58,13 @@ return [
         'timezone' => 'Asia/Bangkok',
     ],
 
+    // Product Matching "รายละเอียด": how long a fetched marketplace listing
+    // detail (marketplace_listing_details) is served from the table before
+    // opening it fetches again — see MarketplaceListingDetailService.
+    'marketplace_listing_details' => [
+        'ttl_hours' => (int) env('MARKETPLACE_LISTING_DETAILS_TTL_HOURS', 24),
+    ],
+
     'lazada' => [
         'base_url' => env('LAZADA_API_BASE_URL', 'https://api.lazada.co.th/rest'),
     ],

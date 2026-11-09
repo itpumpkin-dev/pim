@@ -1,0 +1,152 @@
+{
+    "data": {
+        "created_time": "1774500333303",
+        "updated_time": "1792581663504",
+        "images": [
+            "https://sg-test-11.slatic.net/p/0ff071f7416f9e2831555d5897d68c67.jpg",
+            "https://sg-test-11.slatic.net/p/75ea8247ba2fd3ed78dcb63e3fbd4d2b.jpg",
+            "https://sg-test-11.slatic.net/p/a29bb5bca3cb7c2e2b1b3a9e88119654.jpg",
+            "https://sg-test-11.slatic.net/p/21c15ab7626c186ff73dfaf231779cf3.jpg",
+            "https://sg-test-11.slatic.net/p/416c6aafa4f559292dc23ffac9053aef.jpg",
+            "https://sg-test-11.slatic.net/p/1ef6ae6ff7167ae1a8187b96a6b1cb4b.jpg",
+            "https://sg-test-11.slatic.net/p/5e4c4d23b034363e4c5732c2ff0b2b8c.jpg"
+        ],
+        "skus": [
+            {
+                "Status": "active",
+                "quantity": 100,
+                "Images": [],
+                "ตัวเลือก ขนาด": "24x26 mm",
+                "SellerSku": "44741",
+                "ShopSku": "16110492401_TH-126958982117",
+                "Url": "https://www.lazada.co.th/products/matsumoto-75-44726-44744-i16110492401-s126958982117.html",
+                "saleProp": {
+                    "ตัวเลือก ขนาด": "24x26 mm"
+                },
+                "multiWarehouseInventories": [
+                    {
+                        "occupyQuantity": 0,
+                        "quantity": 100,
+                        "totalQuantity": 100,
+                        "bizType": 1,
+                        "withholdQuantity": 0,
+                        "bizCode": "",
+                        "warehouseType": "dropshipping",
+                        "warehouseCode": "dropshipping",
+                        "sellableQuantity": 100
+                    }
+                ],
+                "package_width": "15.0",
+                "package_height": "11.0",
+                "fblWarehouseInventories": [],
+                "price": 245,
+                "channelInventories": [],
+                "package_length": "12.0",
+                "Available": 100,
+                "package_weight": "1.2",
+                "SkuId": 126958982117
+            },
+            {
+                "Status": "active",
+                "quantity": 23,
+                "Images": [],
+                "ตัวเลือก ขนาด": "22x24 mm",
+                "SellerSku": "44740",
+                "ShopSku": "16110492401_TH-126958982116",
+                "Url": "https://www.lazada.co.th/products/matsumoto-75-44726-44744-i16110492401-s126958982116.html",
+                "saleProp": {
+                    "ตัวเลือก ขนาด": "22x24 mm"
+                },
+                "multiWarehouseInventories": [
+                    {
+                        "occupyQuantity": 0,
+                        "quantity": 23,
+                        "totalQuantity": 23,
+                        "bizType": 1,
+                        "withholdQuantity": 0,
+                        "bizCode": "",
+                        "warehouseType": "dropshipping",
+                        "warehouseCode": "dropshipping",
+                        "sellableQuantity": 23
+                    }
+                ],
+                "package_width": "15.0",
+                "package_height": "11.0",
+                "fblWarehouseInventories": [],
+                "price": 245,
+                "channelInventories": [],
+                "package_length": "12.0",
+                "Available": 23,
+                "package_weight": "1.2",
+                "SkuId": 126958982116
+            },
+            {
+                "Status": "active",
+                "quantity": 100,
+                "Images": [],
+                "ตัวเลือก ขนาด": "27x32 mm",
+                "SellerSku": "44743",
+                "ShopSku": "16110492401_TH-126958982119",
+                "Url": "https://www.lazada.co.th/products/matsumoto-75-44726-44744-i16110492401-s126958982119.html",
+                "saleProp": {
+                    "ตัวเลือก ขนาด": "27x32 mm"
+                },
+                "multiWarehouseInventories": [
+                    {
+                        "occupyQuantity": 0,
+                        "quantity": 100,
+                        "totalQuantity": 100,
+                        "bizType": 1,
+                        "withholdQuantity": 0,
+                        "bizCode": "",
+                        "warehouseType": "dropshipping",
+                        "warehouseCode": "dropshipping",
+                        "sellableQuantity": 100
+                    }
+                ],
+                "package_width": "15.0",
+                "package_height": "11.0",
+                "fblWarehouseInventories": [],
+                "price": 450,
+                "channelInventories": [],
+                "package_length": "12.0",
+                "Available": 100,
+                "package_weight": "1.2",
+                "SkuId": 126958982119
+            }
+        ],
+        "item_id": 16110492401,
+        "variation": {
+            "Variation1": {
+                "name": "ตัวเลือก ขนาด",
+                "label": "ตัวเลือก ขนาด",
+                "hasImage": false,
+                "customize": true,
+                "options": [
+                    "6x7 mm",
+                    "8x9 mm",
+                    "8x10 mm",
+                    "10x11 mm",
+                    "10x12 mm",
+                    "10x13 mm"
+                ]
+            }
+        },
+        "trialProduct": false,
+        "primary_category": 3065,
+        "marketImages": [],
+        "attributes": {
+            "description": "<html><head></head><body><div><p>MATSUMOTO ประแจแหวนคอ 75° (รุ่น 44726-44744) เเพ็ค 1ชิ้น </p><p></p><p>รายละเอียดสินค้า:</p><p>- ประแจแหวนคอ 75° ใช้สำหรับงานที่ต้องการเข้าถึงพื้นที่แคบหรือการหมุนในมุมที่ยาก</p><p>- ทำจากวัสดุเหล็กคุณภาพสูง มีความทนทานและยืดอายุการใช้งาน</p><p>- ใช้งานง่ายและสะดวกในการเข้าถึงพื้นที่ยากที่ประแจทั่วไปเข้าไม่ถึง</p><p></p><p>ขนาดและรหัสสินค้า:</p><p>- รหัส 44726: 6x7 mm</p><p>- รหัส 44727: 8x9 mm</p><p>- รหัส 44748: 8x10 mm</p><p>- รหัส 44728: 10x11 mm</p><p>- รหัส 44751: 10x12 mm</p><p>- รหัส 44729: 10x13 mm</p><p>- รหัส 44749: 11x13 mm</p><p>- รหัส 44730: 12x13 mm</p><p>- รหัส 44752: 12x14 mm</p><p>- รหัส 44731: 13x15 mm</p><p>- รหัส 44733: 13x17 mm</p><p>- รหัส 44732: 14x15 mm</p><p>- รหัส 44750: 14x17 mm</p><p>- รหัส 44734: 16x17 mm</p><p>- รหัส 44735: 17x19 mm</p><p>- รหัส 44736: 18x19 mm</p><p>- รหัส 44737: 19x22 mm</p><p>- รหัส 44738: 20x22 mm</p><p>- รหัส 44739: 21x23 mm</p><p>- รหัส 44740: 22x24 mm</p><p>- รหัส 44741: 24x26 mm</p><p>- รหัส 44742: 25x28 mm</p><p>- รหัส 44743: 27x32 mm</p><p>- รหัส 44744: 30x32 mm</p><img src=\"https://sg-test-11.slatic.net/p/d9c580c7fd855ce4ce88ca47372292c9.jpg\"></div></body></html>",
+            "brand": "PUMPKIN",
+            "material": "เหล็กชุบแข็ง",
+            "name": "MATSUMOTO ประแจแหวนคอ แบบลึก ขนาด 75° (รุ่น 44726-44744)",
+            "delivery_option_standard": "Yes",
+            "source": "asc",
+            "preorder": "No"
+        },
+        "status": "Active"
+    },
+    "code": "0",
+    "request_id": "0bb4a98017941896324684772",
+    "_trace_id_": "2151e2cb17941896324663828e541f"
+}
