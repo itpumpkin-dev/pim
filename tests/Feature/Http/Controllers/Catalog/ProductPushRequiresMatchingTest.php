@@ -1,7 +1,10 @@
 <?php
 
+use App\Events\ProductDataChanged;
+use App\Http\Controllers\Catalog\PlatformPushController;
 use App\Http\Controllers\Catalog\ProductController;
 use App\Jobs\AutoSyncProductToMarketplaceJob;
+use App\Listeners\QueueAutoMarketplaceSync;
 use App\Models\MarketplaceListing;
 use App\Models\Product;
 use App\Models\ProductMarketplaceSyncJob;
@@ -92,30 +95,6 @@ test('single push of a matched product goes straight through', function () {
     expect(app(ProductController::class)->pushToShopee($product, $shop)->getStatusCode())->toBe(202);
 });
 
-test('bulk push skips unmatched product×shop pairs unless confirmed', function () {
-    $shop = pmgShop();
-    $matched = Product::create(['sku' => 'PMG-BULK-M', 'type' => 'simple', 'enabled' => true]);
-    $unmatched = Product::create(['sku' => 'PMG-BULK-U', 'type' => 'simple', 'enabled' => true]);
-    pmgLink($shop, $matched);
-
-    $bulk = function (array $extra = []) use ($shop, $matched, $unmatched) {
-        $request = Request::create('/catalog/products/push-bulk', 'POST', ['product_ids' => [$matched->id, $unmatched->id], 'shop_ids' => [$shop->id], ...$extra]);
-        $request->setUserResolver(fn () => auth()->user());
-
-        return app(ProductController::class)->pushBulk($request);
-    };
-
-    $bulk();
-    expect(ProductMarketplaceSyncJob::pluck('product_id')->all())->toBe([$matched->id])
-        ->and($unmatched->platformShops()->count())->toBe(0)
-        ->and(session('warning'))->toContain('ยังไม่ได้จับคู่');
-
-    ProductMarketplaceSyncJob::query()->delete();
-    $bulk(['confirm_new_listing' => true]);
-    expect(ProductMarketplaceSyncJob::pluck('product_id')->sort()->values()->all())
-        ->toBe(collect([$matched->id, $unmatched->id])->sort()->values()->all());
-});
-
 test('auto-sync never pushes an unmatched product', function () {
     $shop = pmgShop();
     $product = pmgReadyProduct($shop, 'PMG-AUTO');
@@ -131,4 +110,57 @@ test('auto-sync never pushes an unmatched product', function () {
     $dispatcher = Mockery::mock(MarketplaceSyncDispatcher::class);
     $dispatcher->shouldReceive('queue')->once();
     (new AutoSyncProductToMarketplaceJob($product->id, $shop->id))->handle(new MarketplaceSyncGate, $dispatcher);
+});
+
+test('saving no longer auto-pushes — only switching publishing off still auto-deactivates', function () {
+    config(['services.marketplace_sync.auto_enabled' => true]);
+    $shop = pmgShop();
+    $product = pmgReadyProduct($shop, 'PMG-NO-AUTOPUSH');
+    $listener = new QueueAutoMarketplaceSync;
+
+    $listener->handle(new ProductDataChanged($product->id, true));
+    Queue::assertNotPushed(AutoSyncProductToMarketplaceJob::class);
+    expect(Cache::get("marketplace_autosync:action:{$product->id}:{$shop->id}"))->toBeNull();
+
+    $product->update(['enabled' => false]);
+    $listener->handle(new ProductDataChanged($product->id, false));
+    Queue::assertPushed(AutoSyncProductToMarketplaceJob::class, 1);
+    expect(Cache::get("marketplace_autosync:action:{$product->id}:{$shop->id}"))->toBe('deactivate');
+
+    // switching it back on within the debounce cancels the pending takedown
+    $product->update(['enabled' => true]);
+    $listener->handle(new ProductDataChanged($product->id, true));
+    expect(Cache::get("marketplace_autosync:action:{$product->id}:{$shop->id}"))->toBeNull();
+});
+
+test('publish enables the product and saves the ticked shops without pushing', function () {
+    $shop = pmgShop();
+    $product = Product::create(['sku' => 'PMG-PUBLISH', 'type' => 'simple', 'enabled' => false, 'status' => Product::STATUS_ACTIVE]);
+    $request = Request::create("/catalog/products/{$product->id}/publish", 'POST', ['published_shop_ids' => [$shop->id], 'updated_at' => $product->updated_at?->toIso8601String()]);
+    $request->setUserResolver(fn () => auth()->user());
+
+    app(ProductController::class)->publish($request, $product);
+
+    expect($product->fresh()->enabled)->toBeTrue()
+        ->and($product->platformShops()->pluck('sales_platform_shops.id')->all())->toBe([$shop->id])
+        ->and(ProductMarketplaceSyncJob::count())->toBe(0);
+    Queue::assertNothingPushed();
+});
+
+test('the Push step status lists the platform shops with publish / live / matching / last job', function () {
+    $shop = pmgShop();
+    $product = pmgReadyProduct($shop, 'PMG-STATUS');
+    pmgLink($shop, $product);
+    DB::table('product_platform_shops')->where('product_id', $product->id)->update(['status' => 'live', 'platform_item_id' => '42']);
+    ProductMarketplaceSyncJob::create(['product_id' => $product->id, 'sales_platform_shop_id' => $shop->id, 'platform' => 'shopee', 'action' => 'push', 'status' => 'completed', 'message' => 'ok']);
+
+    $request = Request::create("/catalog/marketplace/products/{$product->id}/push/shopee");
+    $request->setUserResolver(fn () => auth()->user());
+    $body = app(PlatformPushController::class)->status($request, $product, 'shopee')->getData(true);
+
+    $row = collect($body['shops'])->firstWhere('id', $shop->id);
+    expect($row)->toMatchArray(['published' => true, 'is_live' => true, 'platform_item_id' => '42', 'known' => true])
+        ->and($row['last_job'])->toMatchArray(['action' => 'push', 'status' => 'completed'])
+        ->and($body['product'])->toMatchArray(['enabled' => true])
+        ->and($body['history'])->toHaveCount(1);
 });

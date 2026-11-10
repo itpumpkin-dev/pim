@@ -1,4 +1,3 @@
-import { isReviewablePlatform, MarketplacePushReview } from '@/components/catalog/marketplace-push-review';
 import { NewProductSkuField, useSkuAvailability } from '@/components/catalog/new-product-sku-field';
 import { QuickAddOptionDialog } from '@/components/catalog/quick-add-option-dialog';
 import { FioriFormGroup, FioriMessageStrip, ui5ValueState, valueStateOf } from '@/components/fiori-form';
@@ -55,6 +54,7 @@ import {
     Icon,
     Input,
     Label,
+    Link,
     List,
     ListItemCustom,
     Menu,
@@ -264,8 +264,6 @@ interface Props {
     canEditMasterCategories?: boolean;
     /** config('services.marketplace_sync.auto_enabled') — บันทึกแล้วระบบส่ง/ยกเลิกบน marketplace ให้อัตโนมัติ */
     marketplaceAutoSync?: boolean;
-    /** ร้านที่สินค้านี้ผ่าน Product Matching แล้ว (หรือเคย push สำเร็จ) — ร้านอื่นต้องยืนยัน "สร้างเป็นสินค้าใหม่" ก่อน push (ดู MarketplaceSyncGate::knownShopIds()) */
-    marketplaceKnownShopIds?: number[];
     /** ร้านที่สินค้านี้ผูกไว้ใน Product Matching แล้ว (ทุก platform) — โชว์ ✓ ข้างหัวข้อ */
     matchedShopNames?: string[];
     /** ให้แปล attribute.master_source (เช่น 'brands') เป็นชื่ออ่านง่ายสำหรับ chip "Master: ..." — ดู ProductController::buildProductFormProps() */
@@ -358,7 +356,6 @@ export default function ProductEdit({
     canPushProducts = { lazada: false, shopee: false, tiktok: false, woocommerce: false },
     canEditMasterCategories = false,
     marketplaceAutoSync = false,
-    marketplaceKnownShopIds = [],
     matchedShopNames = [],
     masterSources = [],
     platformContext = null,
@@ -1184,29 +1181,9 @@ export default function ProductEdit({
         setPendingSimpleConfirm(false);
     };
 
-    // การ push คือการยิง create/update จริงๆ ไปที่ marketplace แบบ live เลย —
-    // เลยตั้งใจให้ต้อง confirm ก่อนและต้องกดเองเสมอ (ไม่มีทำอัตโนมัติ) ออกแบบให้
-    // ใช้ได้กับทุก platform (Lazada, Shopee, ...) — แต่ละ group ของร้านจะมีชื่อ
-    // platform ของตัวเอง (group.platform) ซึ่งใช้เลือก route `delete` เป็น
-    // ออปชันเสริม ตอนนี้รองรับแค่ Shopee เท่านั้น (ดู
-    // ShopeeProductSyncService::delete() / เงื่อนไข method_exists() ใน
-    // SyncProductToMarketplaceJob) — การลบ listing แบบถาวรยังไม่ได้เชื่อมกับ
-    // platform อื่นๆ
-    const PLATFORM_ROUTES: Record<string, { push: string; deactivate: string; status: string; delete?: string }> = {
-        lazada: { push: 'push-lazada', deactivate: 'deactivate-lazada', status: 'lazada-status' },
-        shopee: { push: 'push-shopee', deactivate: 'deactivate-shopee', status: 'shopee-status', delete: 'delete-shopee' },
-        tiktok: { push: 'push-tiktok', deactivate: 'deactivate-tiktok', status: 'tiktok-status' },
-        woocommerce: { push: 'push-woocommerce', deactivate: 'deactivate-woocommerce', status: 'woocommerce-status' },
-    };
-
-    const [pushConfirmShop, setPushConfirmShop] = useState<{ id: number; name: string; platform: string } | null>(null);
-    const [pushing, setPushing] = useState(false);
-    // ร้านที่สินค้านี้ยังไม่ผ่าน Product Matching — push = สร้างสินค้าใหม่บน platform ต้องติ๊กยืนยันก่อน
-    const pushNeedsNewListingConfirm = pushConfirmShop !== null && !marketplaceKnownShopIds.includes(pushConfirmShop.id);
-    const [pushConfirmNewListing, setPushConfirmNewListing] = useState(false);
-    // Lazada/Shopee/TikTok: ปุ่ม Push กดได้ก็ต่อเมื่อ <MarketplacePushReview> ตรวจผ่านทุกข้อ
-    const [pushReviewReady, setPushReviewReady] = useState(false);
-    const pushNeedsReview = pushConfirmShop !== null && isReviewablePlatform(pushConfirmShop.platform);
+    // Push / ปิดการขาย / ลบ listing / เช็คสถานะ ย้ายไปอยู่ step "Push" ของหน้า Map สินค้าแล้ว
+    // (PlatformPushPanel / PlatformPushController) — หน้านี้เหลือแค่ติ๊กร้านที่จะขาย + ดูสถานะ Live
+    // pushResult = แถบแจ้งผลลอยของหน้านี้ (ใช้กับผลการบันทึกด้วย)
     const [pushResult, setPushResult] = useState<{ severity: 'success' | 'error'; message: string } | null>(null);
     // ซ่อนแถบแจ้งผลเองหลัง 20 วินาที (เท่ากับ autoHideDuration ของ Snackbar เดิม)
     useEffect(() => {
@@ -1214,352 +1191,6 @@ export default function ProductEdit({
         const timer = setTimeout(() => setPushResult(null), 20000);
         return () => clearTimeout(timer);
     }, [pushResult]);
-
-    // เฉพาะ WooCommerce เท่านั้น: push แค่ชื่อภาษาอังกฤษของสินค้านี้เข้า dictionary
-    // ของ TranslatePress — เป็นคนละ action กับการ push listing ด้านบน แต่โชว์อยู่
-    // ใน dialog เดียวกัน จะทำได้ก็ต่อเมื่อคำแปลครบ 100% เท่านั้น ทั้งฝั่งนี้ (disable
-    // ปุ่ม) และฝั่ง server (บังคับจริงๆ — ดู
-    // ProductController::fillWoocommerceTranslationsForProduct())
-    const [fillingTranslation, setFillingTranslation] = useState(false);
-    const [fillTranslationResult, setFillTranslationResult] = useState<{ severity: 'success' | 'error' | 'info'; message: string } | null>(null);
-    const translationComplete = product.translation_completeness === 100;
-    // ค่า null แปลว่า "ไม่มีอะไรให้วัด" (เช่น มี locale active แค่ตัวเดียว หรือ
-    // family ของสินค้านี้ไม่มี attribute ที่แปลได้เลย) — ต่างจาก 0% ที่แปลว่ายังมีงาน
-    // แปลที่วัดได้จริงๆ เหลืออยู่ ถ้าเอาสองกรณีนี้มารวมกันจะกลายเป็นปุ่มที่ disable
-    // ถาวรพร้อมข้อความ "0%" ที่ทำให้เข้าใจผิด แทนที่จะบอกตรงๆ ว่าไม่มีอะไรให้ push
-    const translationBlockedReason =
-        product.translation_completeness == null
-            ? t('noTranslatableContentToPush')
-            : t('translationMustBeComplete', { percent: product.translation_completeness });
-
-    const closePushDialog = () => {
-        setPushConfirmShop(null);
-        setPushConfirmNewListing(false);
-        setFillTranslationResult(null);
-    };
-
-    const confirmFillTranslation = () => {
-        setFillingTranslation(true);
-        setFillTranslationResult(null);
-
-        const xsrfToken = decodeURIComponent(
-            document.cookie
-                .split('; ')
-                .find((row) => row.startsWith('XSRF-TOKEN='))
-                ?.split('=')[1] ?? '',
-        );
-
-        fetch(`/catalog/products/${product.id}/fill-woocommerce-translations`, {
-            method: 'POST',
-            headers: {
-                'X-XSRF-TOKEN': xsrfToken,
-                Accept: 'application/json',
-            },
-        })
-            .then(async (res) => {
-                const body = await res.json();
-                const messages: Record<string, string> = {
-                    upserted: t('translationPushedSuccess'),
-                    skipped_no_english_name: t('translationSkippedNoEnglishName'),
-                    skipped_not_tracked: t('translationSkippedNotTracked'),
-                    not_live_on_woocommerce: t('translationNotLiveOnWoocommerce'),
-                };
-                const status = body.status as string | undefined;
-
-                if (!res.ok) {
-                    setFillTranslationResult({ severity: 'error', message: body.message ?? t('couldNotPushTranslation') });
-                } else if (status === 'upserted') {
-                    setFillTranslationResult({ severity: 'success', message: messages.upserted });
-                } else if (status && messages[status]) {
-                    setFillTranslationResult({ severity: 'info', message: messages[status] });
-                } else {
-                    setFillTranslationResult({ severity: 'error', message: t('unexpectedResponse') });
-                }
-            })
-            .catch(() => {
-                setFillTranslationResult({ severity: 'error', message: t('networkErrorPushingTranslation') });
-            })
-            .finally(() => setFillingTranslation(false));
-    };
-
-    // จะทำงานทันทีที่ dialog confirm ของ Push/Deactivate เปิดขึ้นมา — เช็คกับ
-    // marketplace ตรงๆ เลย (ไม่ใช้ badge "Live" ที่ cache ไว้ ซึ่งอาจเก่าเท่าที่ sync
-    // ครั้งล่าสุด หรืออาจจะยังไม่เคย sync กับสินค้านี้เลยด้วยซ้ำ) เพื่อให้ dialog
-    // สะท้อนสถานะจริงล่าสุดก่อนที่จะยืนยันเขียนข้อมูลแบบ live ใช้ร่วมกันทั้งสอง
-    // dialog เพราะเปิดได้ทีละอันเท่านั้นอยู่แล้ว
-    const [statusCheck, setStatusCheck] = useState<{
-        shopId: number;
-        loading: boolean;
-        is_live?: boolean;
-        never_pushed?: boolean;
-        status?: string | null;
-        error?: string;
-    } | null>(null);
-
-    const checkPlatformStatus = (shopId: number, platform: string) => {
-        setStatusCheck({ shopId, loading: true });
-        const routes = PLATFORM_ROUTES[platform.toLowerCase()];
-        if (!routes) {
-            setStatusCheck({ shopId, loading: false, error: t('unsupportedPlatform', { platform }) });
-            return;
-        }
-
-        fetch(`/catalog/products/${product.id}/${routes.status}/${shopId}`, {
-            headers: { Accept: 'application/json' },
-        })
-            .then(async (res) => {
-                const body = await res.json();
-                setStatusCheck(res.ok ? { shopId, loading: false, ...body } : { shopId, loading: false, error: body.message });
-            })
-            .catch(() => setStatusCheck({ shopId, loading: false, error: t('networkErrorCheckingStatus', { platform }) }));
-    };
-
-    // Push/deactivate ตอนนี้ทำงานเป็น background job (ดู
-    // ProductController::queueMarketplaceSync()) แทนที่จะรันตรงๆ ใน request เลย —
-    // เพราะแต่ก่อนถ้า Shopee หรือ Lazada ตอบช้า/ค้าง จะทำให้ web worker ถูกจองไว้
-    // นานตามนั้น ตอน POST แรกจะได้แค่ job id กลับมา แล้วฟังก์ชันนี้จะ poll
-    // marketplaceSyncJobStatus() ไปเรื่อยๆ จนกว่า job จะพ้นสถานะ queued/processing
-    // ใช้ setTimeout ต่อกันเป็นเชน (ไม่ใช้ setInterval) เพื่อไม่ให้ response ที่ตอบช้า
-    // มาซ้อนทับกับรอบถัดไป จำกัดไว้ที่ประมาณ 60 วินาที — เกินนั้น job ก็ยังรันอยู่ที่
-    // server ต่อไป แค่ไม่รอผลตรงนี้อีกแล้ว
-    const POLL_INTERVAL_MS = 1500;
-    const POLL_MAX_ATTEMPTS = 40;
-
-    const pollSyncJobStatus = (jobId: number, onDone: (result: { severity: 'success' | 'error'; message: string }) => void) => {
-        let attempts = 0;
-
-        const poll = () => {
-            attempts++;
-            fetch(`/catalog/products/${product.id}/sync-jobs/${jobId}`, {
-                headers: { Accept: 'application/json' },
-            })
-                .then(async (res) => {
-                    const body = await res.json();
-
-                    if (!res.ok) {
-                        onDone({ severity: 'error', message: body.message ?? t('couldNotCheckSyncJobStatus') });
-                        return;
-                    }
-                    if (body.status === 'completed') {
-                        onDone({ severity: 'success', message: body.message });
-                        return;
-                    }
-                    if (body.status === 'failed') {
-                        onDone({ severity: 'error', message: body.message ?? t('syncFailed') });
-                        return;
-                    }
-
-                    if (attempts >= POLL_MAX_ATTEMPTS) {
-                        onDone({
-                            severity: 'error',
-                            message: t('syncStillProcessing'),
-                        });
-                        return;
-                    }
-                    setTimeout(poll, POLL_INTERVAL_MS);
-                })
-                .catch(() => {
-                    if (attempts >= POLL_MAX_ATTEMPTS) {
-                        onDone({ severity: 'error', message: t('networkErrorCheckingSyncStatus') });
-                        return;
-                    }
-                    setTimeout(poll, POLL_INTERVAL_MS);
-                });
-        };
-
-        poll();
-    };
-
-    // เดิม "Live" badge กับปุ่ม Deactivate ใน Sales Channels panel (ดูเงื่อนไข
-    // ch.is_live ด้านล่าง) จะไม่โผล่ขึ้นมาทันทีหลัง push/deactivate/delete
-    // สำเร็จ — ผู้ใช้ต้องกด reload หน้าเองถึงจะเห็น เหตุผลมีสองชั้น: (1)
-    // push()/deactivate() เอง "ไม่เขียน" product_platform_shops.status เลย
-    // (ดูคอมเมนต์ที่ LazadaProductSyncService::push() — คืนแค่ผล API กลับมา
-    // เฉยๆ) มีแต่ checkLiveStatus() เท่านั้นที่เขียน และ (2) ต่อให้เขียนแล้ว
-    // channelGroups ก็เป็น prop ที่โหลดมาตอนเปิดหน้าเพจครั้งเดียว ไม่มีอะไรไป
-    // สั่ง refetch ให้เอง ฟังก์ชันนี้ปิดทั้งสองช่องว่าง: เรียก status-check
-    // endpoint เดียวกับที่ checkPlatformStatus() ใช้ตอนเปิด dialog ก่อน (บังคับ
-    // backend เช็คสดจากแพลตฟอร์มจริงแล้วเขียน status ให้ทันใหม่) แล้วค่อย
-    // partial-reload เฉพาะ channelGroups (ไม่ reload ทั้งหน้า เพื่อไม่ให้ฟอร์มที่
-    // กำลังแก้ค้างอยู่ เช่น attribute values ที่ยังไม่ได้ save หายไปด้วย) —
-    // เรียกหลัง job จบทุกครั้งไม่ว่าผลจะสำเร็จหรือ error ก็ตาม ไม่มีผลเสีย แค่ได้
-    // ข้อมูลสดล่าสุดกลับมาเฉยๆ
-    const refreshChannelLiveStatus = (shopId: number, platform: string) => {
-        const routes = PLATFORM_ROUTES[platform.toLowerCase()];
-        if (!routes) return;
-
-        fetch(`/catalog/products/${product.id}/${routes.status}/${shopId}`, { headers: { Accept: 'application/json' } })
-            .catch(() => {})
-            .finally(() => router.reload({ only: ['channelGroups'] }));
-    };
-
-    const confirmPush = () => {
-        if (!pushConfirmShop) return;
-        if (isDirty || (pushNeedsReview && !pushReviewReady) || (pushNeedsNewListingConfirm && !pushConfirmNewListing)) return;
-        const { id: shopId, platform } = pushConfirmShop;
-        const routes = PLATFORM_ROUTES[platform.toLowerCase()];
-        if (!routes) return;
-        setPushing(true);
-
-        // แอปนี้ไม่มี <meta name="csrf-token">; แต่ VerifyCsrfToken ของ Laravel
-        // ก็รับ cookie XSRF-TOKEN ที่มันเซ็ตมาให้ทุก response อยู่แล้ว (ส่งกลับมาเป็น
-        // header ด้วย) เลยอ่านจากตรงนั้นแทน
-        const xsrfToken = decodeURIComponent(
-            document.cookie
-                .split('; ')
-                .find((row) => row.startsWith('XSRF-TOKEN='))
-                ?.split('=')[1] ?? '',
-        );
-
-        fetch(`/catalog/products/${product.id}/${routes.push}/${shopId}`, {
-            method: 'POST',
-            headers: {
-                'X-XSRF-TOKEN': xsrfToken,
-                Accept: 'application/json',
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(pushConfirmNewListing ? { confirm_new_listing: true } : {}),
-        })
-            .then(async (res) => {
-                const body = await res.json();
-
-                if (!res.ok || !body.job_id) {
-                    setPushResult({ severity: 'error', message: body.message ?? t('couldNotQueuePush', { platform }) });
-                    setPushing(false);
-                    closePushDialog();
-                    return;
-                }
-
-                pollSyncJobStatus(body.job_id, (result) => {
-                    setPushResult(result);
-                    setPushing(false);
-                    closePushDialog();
-                    refreshChannelLiveStatus(shopId, platform);
-                });
-            })
-            .catch(() => {
-                setPushResult({ severity: 'error', message: t('networkErrorPushingToPlatform', { platform }) });
-                setPushing(false);
-                closePushDialog();
-            });
-    };
-
-    // เหตุผลเดียวกับ push ด้านบนเรื่องเขียนข้อมูลจริง — ต้อง confirm เอง ไม่มี
-    // ทำอัตโนมัติ ใช้ pushResult ตัวเดียวกันสำหรับ snackbar แจ้งผล (ข้อความจาก
-    // response จะบอกเองว่า "Pushed" หรือ "Deactivated")
-    const [deactivateConfirmShop, setDeactivateConfirmShop] = useState<{ id: number; name: string; platform: string } | null>(null);
-    const [deactivating, setDeactivating] = useState(false);
-
-    const confirmDeactivate = () => {
-        if (!deactivateConfirmShop) return;
-        const { id: shopId, platform } = deactivateConfirmShop;
-        const routes = PLATFORM_ROUTES[platform.toLowerCase()];
-        if (!routes) return;
-        setDeactivating(true);
-
-        const xsrfToken = decodeURIComponent(
-            document.cookie
-                .split('; ')
-                .find((row) => row.startsWith('XSRF-TOKEN='))
-                ?.split('=')[1] ?? '',
-        );
-
-        fetch(`/catalog/products/${product.id}/${routes.deactivate}/${shopId}`, {
-            method: 'POST',
-            headers: {
-                'X-XSRF-TOKEN': xsrfToken,
-                Accept: 'application/json',
-            },
-        })
-            .then(async (res) => {
-                const body = await res.json();
-
-                if (!res.ok || !body.job_id) {
-                    setPushResult({ severity: 'error', message: body.message ?? t('couldNotQueueDeactivation', { platform }) });
-                    setDeactivating(false);
-                    setDeactivateConfirmShop(null);
-                    return;
-                }
-
-                pollSyncJobStatus(body.job_id, (result) => {
-                    setPushResult(result);
-                    setDeactivating(false);
-                    setDeactivateConfirmShop(null);
-                    refreshChannelLiveStatus(shopId, platform);
-                });
-            })
-            .catch(() => {
-                setPushResult({ severity: 'error', message: t('networkErrorDeactivatingOnPlatform', { platform }) });
-                setDeactivating(false);
-                setDeactivateConfirmShop(null);
-            });
-    };
-
-    // ลบแบบถาวร — อันตรายกว่าการ deactivate ชัดเจน (ย้อนกลับไม่ได้เลยแม้แต่จะ
-    // push ใหม่) เลยนอกจากต้องผ่าน dialog confirm แบบเดิมแล้ว ยังบังคับให้พิมพ์
-    // SKU ของสินค้าเองก่อนถึงจะกดยืนยันได้ (deleteConfirmText) และจะรีเซ็ตทุกครั้ง
-    // ที่เปิด/ปิด dialog เพื่อไม่ให้ค่าเก่าค้างไปปนกับร้านอื่น
-    const [deleteListingConfirmShop, setDeleteListingConfirmShop] = useState<{ id: number; name: string; platform: string } | null>(null);
-    const [deletingListing, setDeletingListing] = useState(false);
-    const [deleteConfirmText, setDeleteConfirmText] = useState('');
-
-    const closeDeleteListingDialog = () => {
-        setDeleteListingConfirmShop(null);
-        setDeleteConfirmText('');
-    };
-
-    const confirmDeleteListing = () => {
-        if (!deleteListingConfirmShop || deleteConfirmText !== product.sku) return;
-        const { id: shopId, platform } = deleteListingConfirmShop;
-        const routes = PLATFORM_ROUTES[platform.toLowerCase()];
-        if (!routes?.delete) return;
-        setDeletingListing(true);
-
-        const xsrfToken = decodeURIComponent(
-            document.cookie
-                .split('; ')
-                .find((row) => row.startsWith('XSRF-TOKEN='))
-                ?.split('=')[1] ?? '',
-        );
-
-        fetch(`/catalog/products/${product.id}/${routes.delete}/${shopId}`, {
-            method: 'POST',
-            headers: {
-                'X-XSRF-TOKEN': xsrfToken,
-                Accept: 'application/json',
-            },
-        })
-            .then(async (res) => {
-                const body = await res.json();
-
-                if (!res.ok || !body.job_id) {
-                    setPushResult({ severity: 'error', message: body.message ?? t('couldNotQueueDeletion', { platform }) });
-                    setDeletingListing(false);
-                    closeDeleteListingDialog();
-                    return;
-                }
-
-                pollSyncJobStatus(body.job_id, (result) => {
-                    setPushResult(result);
-                    setDeletingListing(false);
-                    closeDeleteListingDialog();
-                    refreshChannelLiveStatus(shopId, platform);
-                });
-            })
-            .catch(() => {
-                setPushResult({ severity: 'error', message: t('networkErrorDeletingFromPlatform', { platform }) });
-                setDeletingListing(false);
-                closeDeleteListingDialog();
-            });
-    };
-
-    // ตัวแปรย่อยของ statusCheck สำหรับแต่ละ dialog — การใช้ `statusCheck &&` แบบตรงๆ
-    // (แทนที่จะเทียบแบบ optional-chain ที่ใช้คำนวณค่านี้) คือสิ่งที่ทำให้ TypeScript
-    // narrow ตัด case `null` ออกได้จริงๆ ทุกจุดที่เอาไปใช้ด้านล่าง
-    const pushStatusCheck = statusCheck && pushConfirmShop && statusCheck.shopId === pushConfirmShop.id ? statusCheck : null;
-    const deactivateStatusCheck = statusCheck && deactivateConfirmShop && statusCheck.shopId === deactivateConfirmShop.id ? statusCheck : null;
-    const deleteListingStatusCheck =
-        statusCheck && deleteListingConfirmShop && statusCheck.shopId === deleteListingConfirmShop.id ? statusCheck : null;
 
     // ตอนสลับ scope จะ re-fetch แค่ฟิลด์ที่เป็น channel/locale-based เท่านั้น
     // ฟิลด์ที่ scope ไม่ได้จะอยู่ใต้ key คงที่ 'global'/'default' เสมอ ไม่มีวันเปลี่ยน
@@ -1994,8 +1625,6 @@ export default function ProductEdit({
     // publishedShopIds prop (ค่าที่ save ไว้แล้ว) เพราะต้องการให้ยิงตามติ๊ก
     // ล่าสุดในหน้าจอ แม้ว่าจะยังไม่เคยกด Save แผง Sales Channels มาก่อนเลยก็ตาม
     const [publishConfirmOpen, setPublishConfirmOpen] = useState(false);
-    // ติ๊ก = push ร้านที่ยังไม่ผ่าน Product Matching ด้วย (สร้างเป็นสินค้าใหม่) ไม่ติ๊ก = server ข้ามร้านเหล่านั้น
-    const [publishConfirmNewListing, setPublishConfirmNewListing] = useState(false);
     const [publishing, setPublishing] = useState(false);
 
     // รายชื่อร้านที่ติ๊กไว้ตอนนี้ — ใช้แสดงในกล่องยืนยันก่อน publish เท่านั้น
@@ -2010,12 +1639,6 @@ export default function ProductEdit({
         });
         return data.published_shop_ids.map((id) => shopMeta.get(id)).filter((meta): meta is { name: string; platform: string } => Boolean(meta));
     }, [channelGroups, data.published_shop_ids]);
-    // ร้านที่ติ๊กไว้แต่ยังไม่ผ่าน Product Matching — Publish จะข้ามร้านเหล่านี้ เว้นแต่ติ๊กยืนยัน
-    const unmatchedShopsForPublish = useMemo(() => {
-        const names = new Map<number, string>();
-        channelGroups.forEach((group) => group.channels.forEach((ch) => ch.shop_id != null && names.set(ch.shop_id, ch.name || ch.code)));
-        return data.published_shop_ids.filter((id) => !marketplaceKnownShopIds.includes(id) && names.has(id)).map((id) => names.get(id) as string);
-    }, [channelGroups, data.published_shop_ids, marketplaceKnownShopIds]);
     // ร้านที่จะถูกยกเลิกการขายอัตโนมัติหลังบันทึกร่าง — ร้านที่ติ๊กไว้ (ชุดเดียวกับที่จะ
     // ถูกบันทึกไปพร้อมกัน) เฉพาะเมื่อเปิด auto-sync ไว้เท่านั้น
     const draftTakedownShops = marketplaceAutoSync ? tickedShopsForPublish : [];
@@ -2029,13 +1652,12 @@ export default function ProductEdit({
         setData('enabled', true);
         router.post(
             `/catalog/products/${product.id}/publish`,
-            { published_shop_ids: data.published_shop_ids, confirm_new_listing: publishConfirmNewListing },
+            { published_shop_ids: data.published_shop_ids },
             {
                 preserveScroll: true,
                 preserveState: true,
                 onSuccess: () => {
                     setPublishConfirmOpen(false);
-                    setPublishReviewOpen(false);
                     // เหตุผลเดียวกับ setDefaults() ใน performSave() ด้านบน — ถ้า
                     // saveAndPublish() เรียกมา (performSave() ก่อนหน้านี้เพิ่งตั้ง
                     // baseline ไว้ตอน enabled ยังเป็นค่าก่อน publish) ไม่ทำตรงนี้ด้วย
@@ -2044,11 +1666,7 @@ export default function ProductEdit({
                     setDefaults();
                     baselineValuesRef.current = data.values;
                 },
-                onFinish: () => {
-                    setPublishing(false);
-                    // ยืนยัน "สร้างเป็นสินค้าใหม่" ใช้ได้ครั้งเดียว — Publish ครั้งถัดไปต้องติ๊กใหม่
-                    setPublishConfirmNewListing(false);
-                },
+                onFinish: () => setPublishing(false),
             },
         );
     };
@@ -2062,35 +1680,10 @@ export default function ProductEdit({
     // publishing state ตัวเดิม — disabled ต้องเช็คทั้ง publishing (คั่นตอน publish)
     // และ processing (คั่นตอน save ฟอร์มก่อนหน้านั้น) ไม่งั้นจะกดซ้ำได้ระหว่างรอ
     // save เสร็จ
-    // ร้าน Lazada/Shopee/TikTok ที่ติ๊กไว้ต้องผ่าน <MarketplacePushReview> ก่อน
-    // (เงื่อนไขเดียวกับปุ่ม Push ทีละร้าน) — ตรวจ "หลัง" save เสร็จ เพราะ endpoint
-    // ตรวจอ่านจากข้อมูลที่บันทึกแล้ว ไม่ใช่ค่าที่ค้างอยู่ในฟอร์ม ถ้ายกเลิกตรงนั้น
-    // สินค้าถูกบันทึกแล้วแต่ไม่ได้ publish/push อะไรเลย
-    const [publishReviewOpen, setPublishReviewOpen] = useState(false);
-    const [publishReviewReady, setPublishReviewReady] = useState<Record<string, boolean>>({});
-    const publishReviewPlatforms = useMemo(
-        () =>
-            [...new Set(tickedShopsForPublish.map((shop) => shop.platform.toLowerCase()).filter(isReviewablePlatform))] as (
-                | 'lazada'
-                | 'shopee'
-                | 'tiktok'
-            )[],
-        [tickedShopsForPublish],
-    );
-    const publishReviewAllReady = publishReviewPlatforms.every((platform) => publishReviewReady[platform] === true);
-
+    // Publish ไม่ push แล้ว (Push ทำที่ step "Push" ของหน้า Map สินค้า) — ไม่ต้องตรวจความพร้อม
+    // ของ marketplace ก่อน: บันทึกฟอร์ม แล้วเปิดการเผยแพร่ + บันทึกร้านที่ติ๊กไว้
     const saveAndPublish = () => {
-        performSave({
-            onSuccess: () => {
-                if (publishReviewPlatforms.length === 0) {
-                    publishProduct();
-                    return;
-                }
-                setPublishConfirmOpen(false);
-                setPublishReviewReady({});
-                setPublishReviewOpen(true);
-            },
-        });
+        performSave({ onSuccess: () => publishProduct() });
     };
 
     const sectionSaveButton = (section: 'channels' | 'master-categories', onClick: () => void) => (
@@ -3267,11 +2860,12 @@ export default function ProductEdit({
                                                                         const canPushOrDeactivate =
                                                                             published &&
                                                                             savedPublished &&
-                                                                            group.platform.toLowerCase() in PLATFORM_ROUTES &&
+                                                                            ['lazada', 'shopee', 'tiktok', 'woocommerce'].includes(
+                                                                                group.platform.toLowerCase(),
+                                                                            ) &&
                                                                             canPushThisPlatform;
                                                                         // ติ๊กแล้วแต่ยังไม่ได้ save = เคสเดียวที่ปุ่ม action ยังใช้ไม่ได้
                                                                         const hasUnsavedPublishChange = published && !savedPublished;
-                                                                        const target = { id: shopId, name: shopName, platform: group.platform };
 
                                                                         return (
                                                                             <ListItemCustom
@@ -3314,72 +2908,14 @@ export default function ProductEdit({
                                                                                         />
                                                                                     )}
                                                                                     {canPushOrDeactivate && (
-                                                                                        // ปิด "การเผยแพร่" (ค่าที่บันทึกแล้ว) = push ไม่ได้ — ดู
-                                                                                        // ProductController::queueMarketplaceSync() (span รับ tooltip
-                                                                                        // แทนปุ่มที่ disabled)
-                                                                                        <span
-                                                                                            title={
-                                                                                                product.enabled
-                                                                                                    ? t('pushToPlatformIconTooltip', {
-                                                                                                          platform: group.platform,
-                                                                                                      })
-                                                                                                    : t('pushDisabledNotPublishing')
-                                                                                            }
+                                                                                        // Push / ปิดการขาย / ลบ listing ย้ายไป step "Push" ของหน้า Map สินค้าแล้ว
+                                                                                        <Link
+                                                                                            href={`/catalog/marketplace/${group.platform.toLowerCase()}/products?search=${encodeURIComponent(product.sku)}&open=${product.id}&section=push`}
+                                                                                            style={{ whiteSpace: 'nowrap' }}
                                                                                         >
-                                                                                            <Button
-                                                                                                design="Transparent"
-                                                                                                icon="upload-to-cloud"
-                                                                                                accessibleName={t('pushToPlatformIconTooltip', {
-                                                                                                    platform: group.platform,
-                                                                                                })}
-                                                                                                disabled={!product.enabled}
-                                                                                                onClick={() => {
-                                                                                                    setPushConfirmShop(target);
-                                                                                                    checkPlatformStatus(shopId, group.platform);
-                                                                                                }}
-                                                                                            />
-                                                                                        </span>
+                                                                                            ไป Push
+                                                                                        </Link>
                                                                                     )}
-                                                                                    {/* Deactivate มีความหมายเฉพาะตอนมีของ live อยู่จริง (ch.is_live)
-                                                                                    — ไม่งั้น backend ตอบ "never been pushed — nothing to deactivate" */}
-                                                                                    {canPushOrDeactivate && ch.is_live && (
-                                                                                        <Button
-                                                                                            design="Transparent"
-                                                                                            icon="hide"
-                                                                                            tooltip={t('deactivateOnPlatformIconTooltip', {
-                                                                                                platform: group.platform,
-                                                                                            })}
-                                                                                            accessibleName={t('deactivateOnPlatformIconTooltip', {
-                                                                                                platform: group.platform,
-                                                                                            })}
-                                                                                            onClick={() => {
-                                                                                                setDeactivateConfirmShop(target);
-                                                                                                checkPlatformStatus(shopId, group.platform);
-                                                                                            }}
-                                                                                        />
-                                                                                    )}
-                                                                                    {/* ลบ listing ถาวร — Shopee เท่านั้น (PLATFORM_ROUTES.delete /
-                                                                                    ShopeeProductSyncService::delete()) ย้อนกลับไม่ได้ เลยแยกเป็น
-                                                                                    ปุ่มสีแดง ใช้เงื่อนไข ch.is_live เดียวกับ Deactivate */}
-                                                                                    {canPushOrDeactivate &&
-                                                                                        ch.is_live &&
-                                                                                        group.platform.toLowerCase() === 'shopee' && (
-                                                                                            <Button
-                                                                                                design="Transparent"
-                                                                                                icon="delete"
-                                                                                                className={styles.negativeIcon}
-                                                                                                tooltip={
-                                                                                                    t('deleteListingButton') + ` — ${group.platform}`
-                                                                                                }
-                                                                                                accessibleName={
-                                                                                                    t('deleteListingButton') + ` — ${group.platform}`
-                                                                                                }
-                                                                                                onClick={() => {
-                                                                                                    setDeleteListingConfirmShop(target);
-                                                                                                    checkPlatformStatus(shopId, group.platform);
-                                                                                                }}
-                                                                                            />
-                                                                                        )}
                                                                                 </div>
                                                                             </ListItemCustom>
                                                                         );
@@ -3461,10 +2997,7 @@ export default function ProductEdit({
                 push ไปร้านไหนบ้าง (หรือไม่ push เลยถ้ายังไม่ได้ติ๊กร้านไหนไว้) */}
             <FioriMessageBox
                 open={publishConfirmOpen}
-                onCancel={() => {
-                    setPublishConfirmOpen(false);
-                    setPublishConfirmNewListing(false);
-                }}
+                onCancel={() => setPublishConfirmOpen(false)}
                 onConfirm={saveAndPublish}
                 title={t('confirmSaveAndPublish')}
                 severity="confirm"
@@ -3484,85 +3017,7 @@ export default function ProductEdit({
                 ) : (
                     <div style={{ marginTop: '0.5rem' }}>{t('confirmPublishNoChannelsTicked')}</div>
                 )}
-                {unmatchedShopsForPublish.length > 0 && (
-                    <div style={{ marginTop: '0.75rem' }}>
-                        <FioriMessageStrip severity="warning">
-                            ยังไม่ได้จับคู่ (Product Matching): {unmatchedShopsForPublish.join(', ')} — ร้านเหล่านี้จะถูกข้าม ไม่ push
-                            เว้นแต่ติ๊กยืนยันด้านล่าง (จะสร้างเป็นสินค้าใหม่บน platform)
-                        </FioriMessageStrip>
-                        <CheckBox
-                            text="ยืนยันว่าเป็นสินค้าใหม่ ยังไม่เคยวางขายบนร้านเหล่านี้"
-                            checked={publishConfirmNewListing}
-                            onChange={(e) => setPublishConfirmNewListing(e.target.checked)}
-                        />
-                    </div>
-                )}
             </FioriMessageBox>
-
-            {/* ตรวจข้อมูลแต่ละ marketplace หลังบันทึก — ดู saveAndPublish() */}
-            <Dialog
-                open={publishReviewOpen}
-                style={{ width: 'min(600px, calc(100vw - 2rem))' }}
-                // ระหว่าง publish ห้ามปิด (รวม ESC) — เหมือน onClose เดิมที่เช็ค !publishing
-                onBeforeClose={(e) => {
-                    if (publishing) e.preventDefault();
-                }}
-                onClose={() => setPublishReviewOpen(false)}
-                header={
-                    <div style={{ padding: '0.5rem 0', width: '100%' }}>
-                        <Title level="H5" size="H5" wrappingType="Normal">
-                            {t('publishReviewTitle')}
-                        </Title>
-                        <div className={styles.caption}>{product.sku}</div>
-                    </div>
-                }
-                footer={
-                    <Bar
-                        design="Footer"
-                        endContent={
-                            <>
-                                <Button
-                                    design="Emphasized"
-                                    icon="upload-to-cloud"
-                                    onClick={publishProduct}
-                                    disabled={publishing || !publishReviewAllReady}
-                                    loading={publishing}
-                                    loadingDelay={0}
-                                >
-                                    {t('confirmPublish')}
-                                </Button>
-                                <Button design="Transparent" onClick={() => setPublishReviewOpen(false)} disabled={publishing}>
-                                    {t('cancel')}
-                                </Button>
-                            </>
-                        }
-                    />
-                }
-            >
-                <FioriMessageStrip severity="information" style={{ marginBottom: '1rem' }}>
-                    {t('publishReviewIntro')}
-                </FioriMessageStrip>
-                {publishReviewPlatforms.map((platform, idx) => (
-                    <div key={platform}>
-                        {idx > 0 && <div className={styles.divider} style={{ margin: '1.25rem 0' }} />}
-                        <Title level="H6" size="H6" style={{ marginBottom: '0.25rem' }}>
-                            {tickedShopsForPublish.find((shop) => shop.platform.toLowerCase() === platform)?.platform ?? platform}
-                        </Title>
-                        <div className={styles.caption} style={{ marginBottom: '0.75rem' }}>
-                            {tickedShopsForPublish
-                                .filter((shop) => shop.platform.toLowerCase() === platform)
-                                .map((shop) => shop.name)
-                                .join(', ')}
-                        </div>
-                        <MarketplacePushReview
-                            productId={product.id}
-                            platform={platform}
-                            showSavedDataNote={false}
-                            onReadyChange={(ready) => setPublishReviewReady((prev) => ({ ...prev, [platform]: ready }))}
-                        />
-                    </div>
-                ))}
-            </Dialog>
 
             {/* ยืนยันการเปลี่ยนหมวดหมู่ — ดู performSave() */}
             <FioriMessageBox
@@ -3665,304 +3120,6 @@ export default function ProductEdit({
                 {t('confirmSaveAsTemplateMessage')}
                 {duplicateSkuField}
             </FioriMessageBox>
-
-            <Dialog
-                open={pushConfirmShop !== null}
-                style={{ width: pushNeedsReview ? 'min(600px, calc(100vw - 2rem))' : 'min(444px, calc(100vw - 2rem))' }}
-                onClose={closePushDialog}
-                header={
-                    <div style={{ padding: '0.5rem 0', width: '100%' }}>
-                        <Title level="H5" size="H5" wrappingType="Normal">
-                            {pushNeedsReview
-                                ? t('pushReviewTitle', { platform: pushConfirmShop?.platform })
-                                : t('pushToChannelTitle', { platform: pushConfirmShop?.platform })}
-                        </Title>
-                        {pushNeedsReview && (
-                            <div className={styles.caption}>
-                                {product.sku} · {pushConfirmShop?.name}
-                            </div>
-                        )}
-                    </div>
-                }
-                footer={
-                    <Bar
-                        design="Footer"
-                        endContent={
-                            <>
-                                <Button
-                                    design="Emphasized"
-                                    icon="upload-to-cloud"
-                                    onClick={confirmPush}
-                                    disabled={
-                                        pushing ||
-                                        isDirty ||
-                                        (pushNeedsReview && !pushReviewReady) ||
-                                        (pushNeedsNewListingConfirm && !pushConfirmNewListing)
-                                    }
-                                    loading={pushing}
-                                    loadingDelay={0}
-                                >
-                                    {pushing ? t('pushingEllipsis') : t('push')}
-                                </Button>
-                                <Button design="Transparent" onClick={closePushDialog} disabled={pushing}>
-                                    {t('cancel')}
-                                </Button>
-                            </>
-                        }
-                    />
-                }
-            >
-                <div className={styles.dialogText}>
-                    {t('pushToChannelWarning', { platform: pushConfirmShop?.platform, name: pushConfirmShop?.name })}
-                </div>
-                {pushNeedsNewListingConfirm && (
-                    <div style={{ marginTop: '1rem' }}>
-                        <FioriMessageStrip severity="warning">
-                            สินค้านี้ยังไม่ได้จับคู่ (Product Matching) กับ listing บน {pushConfirmShop?.name} — ถ้า push จะสร้างเป็นสินค้าใหม่บน{' '}
-                            {pushConfirmShop?.platform} ถ้ามี listing อยู่แล้ว ให้ไปจับคู่ที่หน้า &quot;จับคู่สินค้า (Product Matching)&quot; ก่อน
-                        </FioriMessageStrip>
-                        <CheckBox
-                            text="ยืนยันว่าเป็นสินค้าใหม่ ยังไม่เคยวางขายบนร้านนี้"
-                            checked={pushConfirmNewListing}
-                            onChange={(e) => setPushConfirmNewListing(e.target.checked)}
-                            disabled={pushing}
-                        />
-                    </div>
-                )}
-                {pushStatusCheck && (
-                    <div style={{ marginTop: '1rem' }}>
-                        {pushStatusCheck.loading ? (
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                <BusyIndicator active delay={0} size="S" />
-                                <span className={styles.captionInline}>{t('checkingStatusOn', { platform: pushConfirmShop?.platform })}</span>
-                            </div>
-                        ) : pushStatusCheck.error ? (
-                            <FioriMessageStrip severity="warning">{t('statusCheckFailed', { error: pushStatusCheck.error })}</FioriMessageStrip>
-                        ) : pushStatusCheck.never_pushed ? (
-                            <FioriMessageStrip severity="information">{t('neverPushedCreateNew')}</FioriMessageStrip>
-                        ) : pushStatusCheck.is_live ? (
-                            <FioriMessageStrip severity="success">
-                                {t('currentlyLiveWillUpdate', { platform: pushConfirmShop?.platform })}
-                            </FioriMessageStrip>
-                        ) : (
-                            <FioriMessageStrip severity="information">
-                                {t('existsNotActiveWillUpdate', {
-                                    platform: pushConfirmShop?.platform,
-                                    status: pushStatusCheck.status ?? t('statusUnknown'),
-                                })}
-                            </FioriMessageStrip>
-                        )}
-                    </div>
-                )}
-                {/* Push ส่งค่าที่ "บันทึกแล้ว" เสมอ — มีการแก้ไขค้างอยู่ = ต้องบันทึกก่อน ไม่งั้น
-                    ค่าเก่า (เช่น ราคาก่อนแก้) จะถูกส่งขึ้น marketplace โดยไม่รู้ตัว */}
-                {isDirty && (
-                    <FioriMessageStrip severity="warning" style={{ marginTop: '1rem' }}>
-                        <div style={{ marginBottom: '0.5rem' }}>{t('pushUnsavedChangesWarning')}</div>
-                        <Button design="Emphasized" onClick={() => performSave()} disabled={processing} loading={processing} loadingDelay={0}>
-                            {processing ? t('saving') : t('saveProduct')}
-                        </Button>
-                    </FioriMessageStrip>
-                )}
-                {pushConfirmShop && isReviewablePlatform(pushConfirmShop.platform) && (
-                    <div style={{ marginTop: '1rem' }}>
-                        <MarketplacePushReview
-                            // remount (= ตรวจใหม่) ทุกครั้งที่บันทึกสินค้า จะได้เห็นผลของค่าที่เพิ่งบันทึก
-                            key={product.updated_at}
-                            productId={product.id}
-                            platform={pushConfirmShop.platform.toLowerCase() as 'lazada' | 'shopee' | 'tiktok'}
-                            onReadyChange={setPushReviewReady}
-                        />
-                    </div>
-                )}
-                {pushConfirmShop?.platform.toLowerCase() === 'woocommerce' && (
-                    <>
-                        <div className={styles.divider} style={{ margin: '1rem 0' }} />
-                        <Title level="H6" size="H6" style={{ marginBottom: '0.25rem' }}>
-                            {t('pushTranslationToTranslatePress')}
-                        </Title>
-                        <div className={styles.dialogText} style={{ marginBottom: '0.5rem' }}>
-                            {t('pushTranslationHelp')}
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
-                            <Button
-                                icon="translate"
-                                onClick={confirmFillTranslation}
-                                disabled={!translationComplete || fillingTranslation}
-                                loading={fillingTranslation}
-                                loadingDelay={0}
-                                tooltip={translationComplete ? undefined : translationBlockedReason}
-                            >
-                                {fillingTranslation ? t('pushingEllipsis') : t('pushTranslationButton')}
-                            </Button>
-                            {!translationComplete && <span className={styles.captionInline}>{translationBlockedReason}</span>}
-                        </div>
-                        {fillTranslationResult && (
-                            <FioriMessageStrip
-                                severity={fillTranslationResult.severity === 'info' ? 'information' : fillTranslationResult.severity}
-                                style={{ marginTop: '0.75rem' }}
-                            >
-                                {fillTranslationResult.message}
-                            </FioriMessageStrip>
-                        )}
-                    </>
-                )}
-            </Dialog>
-
-            <Dialog
-                open={deactivateConfirmShop !== null}
-                headerText={t('deactivateOnChannelTitle', { platform: deactivateConfirmShop?.platform })}
-                style={{ width: 'min(444px, calc(100vw - 2rem))' }}
-                onClose={() => setDeactivateConfirmShop(null)}
-                footer={
-                    <Bar
-                        design="Footer"
-                        endContent={
-                            <>
-                                <Button
-                                    design="Negative"
-                                    icon="hide"
-                                    onClick={confirmDeactivate}
-                                    disabled={
-                                        deactivating ||
-                                        !deactivateStatusCheck ||
-                                        deactivateStatusCheck.loading ||
-                                        (!deactivateStatusCheck.error && (deactivateStatusCheck.never_pushed || !deactivateStatusCheck.is_live))
-                                    }
-                                    loading={deactivating}
-                                    loadingDelay={0}
-                                >
-                                    {deactivating ? t('deactivatingEllipsis') : t('deactivate')}
-                                </Button>
-                                <Button design="Transparent" onClick={() => setDeactivateConfirmShop(null)} disabled={deactivating}>
-                                    {t('cancel')}
-                                </Button>
-                            </>
-                        }
-                    />
-                }
-            >
-                <div className={styles.dialogText}>
-                    {t('deactivateWarning', { platform: deactivateConfirmShop?.platform, name: deactivateConfirmShop?.name })}
-                </div>
-                {deactivateStatusCheck && (
-                    <div style={{ marginTop: '1rem' }}>
-                        {deactivateStatusCheck.loading ? (
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                <BusyIndicator active delay={0} size="S" />
-                                <span className={styles.captionInline}>{t('checkingStatusOn', { platform: deactivateConfirmShop?.platform })}</span>
-                            </div>
-                        ) : deactivateStatusCheck.error ? (
-                            <FioriMessageStrip severity="warning">{t('statusCheckFailed', { error: deactivateStatusCheck.error })}</FioriMessageStrip>
-                        ) : deactivateStatusCheck.never_pushed ? (
-                            <FioriMessageStrip severity="error">{t('neverPushedNothingToDeactivate')}</FioriMessageStrip>
-                        ) : !deactivateStatusCheck.is_live ? (
-                            <FioriMessageStrip severity="error">
-                                {t('alreadyNotActiveNothingToDeactivate', {
-                                    platform: deactivateConfirmShop?.platform,
-                                    status: deactivateStatusCheck.status ?? t('statusUnknown'),
-                                })}
-                            </FioriMessageStrip>
-                        ) : (
-                            <FioriMessageStrip severity="success">
-                                {t('confirmedCurrentlyLive', { platform: deactivateConfirmShop?.platform })}
-                            </FioriMessageStrip>
-                        )}
-                    </div>
-                )}
-            </Dialog>
-
-            <Dialog
-                open={deleteListingConfirmShop !== null}
-                state="Negative"
-                headerText={t('deleteListingTitle', { platform: deleteListingConfirmShop?.platform })}
-                style={{ width: 'min(444px, calc(100vw - 2rem))' }}
-                onClose={closeDeleteListingDialog}
-                footer={
-                    <Bar
-                        design="Footer"
-                        endContent={
-                            <>
-                                <Button
-                                    design="Negative"
-                                    icon="delete"
-                                    onClick={confirmDeleteListing}
-                                    disabled={
-                                        deletingListing ||
-                                        !deleteListingStatusCheck ||
-                                        deleteListingStatusCheck.loading ||
-                                        (!deleteListingStatusCheck.error &&
-                                            (deleteListingStatusCheck.never_pushed || !deleteListingStatusCheck.is_live)) ||
-                                        deleteConfirmText !== product.sku
-                                    }
-                                    loading={deletingListing}
-                                    loadingDelay={0}
-                                >
-                                    {deletingListing ? t('deletingListingEllipsis') : t('deleteListingButton')}
-                                </Button>
-                                <Button design="Transparent" onClick={closeDeleteListingDialog} disabled={deletingListing}>
-                                    {t('cancel')}
-                                </Button>
-                            </>
-                        }
-                    />
-                }
-            >
-                <div className={styles.dialogText}>
-                    {t('deleteListingWarning', { platform: deleteListingConfirmShop?.platform, name: deleteListingConfirmShop?.name })}
-                </div>
-                {deleteListingStatusCheck && (
-                    <div style={{ marginTop: '1rem' }}>
-                        {deleteListingStatusCheck.loading ? (
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                <BusyIndicator active delay={0} size="S" />
-                                <span className={styles.captionInline}>
-                                    {t('checkingStatusOn', { platform: deleteListingConfirmShop?.platform })}
-                                </span>
-                            </div>
-                        ) : deleteListingStatusCheck.error ? (
-                            <FioriMessageStrip severity="warning">
-                                {t('statusCheckFailed', { error: deleteListingStatusCheck.error })}
-                            </FioriMessageStrip>
-                        ) : deleteListingStatusCheck.never_pushed ? (
-                            <FioriMessageStrip severity="error">{t('neverPushedNothingToDelete')}</FioriMessageStrip>
-                        ) : !deleteListingStatusCheck.is_live ? (
-                            <FioriMessageStrip severity="error">
-                                {t('alreadyNotActiveNothingToDelete', {
-                                    platform: deleteListingConfirmShop?.platform,
-                                    status: deleteListingStatusCheck.status ?? t('statusUnknown'),
-                                })}
-                            </FioriMessageStrip>
-                        ) : (
-                            <FioriMessageStrip severity="success">
-                                {t('confirmedCurrentlyLive', { platform: deleteListingConfirmShop?.platform })}
-                            </FioriMessageStrip>
-                        )}
-                    </div>
-                )}
-                {deleteListingStatusCheck &&
-                    !deleteListingStatusCheck.loading &&
-                    !deleteListingStatusCheck.error &&
-                    deleteListingStatusCheck.is_live && (
-                        <div style={{ marginTop: '1.25rem' }}>
-                            <Label
-                                for="delete-listing-confirm"
-                                showColon={false}
-                                wrappingType="Normal"
-                                style={{ display: 'block', marginBottom: '0.25rem' }}
-                            >
-                                {t('deleteListingTypeToConfirm', { sku: product.sku })}
-                            </Label>
-                            <Input
-                                id="delete-listing-confirm"
-                                style={{ width: '100%' }}
-                                placeholder={t('deleteListingConfirmPlaceholder')}
-                                value={deleteConfirmText}
-                                onInput={(e) => setDeleteConfirmText(e.target.value)}
-                            />
-                        </div>
-                    )}
-            </Dialog>
 
             <FioriMessageBox
                 open={pendingSimpleConfirm}

@@ -5,7 +5,7 @@ import {
 } from '@/components/catalog/lazada-attribute-option-mapping-dialog';
 import { PimAttributePicker, type PimAttributeOption } from '@/components/catalog/pim-attribute-picker';
 import { FioriMessageStrip } from '@/components/fiori-form';
-import { FioriMessageBox, useFioriConfirm } from '@/components/fiori-message-box';
+import { useFioriConfirm } from '@/components/fiori-message-box';
 import { FioriResponsiveTable, type FioriResponsiveColumn } from '@/components/fiori-responsive-table';
 import { MarketplaceCategoryPicker } from '@/components/marketplace-category-picker';
 import { TimelinePanel } from '@/components/timeline-panel';
@@ -25,20 +25,7 @@ import '@ui5/webcomponents-icons/dist/nav-back.js';
 import '@ui5/webcomponents-icons/dist/slim-arrow-right.js';
 import '@ui5/webcomponents-icons/dist/synchronize.js';
 import '@ui5/webcomponents-icons/dist/upload.js';
-import {
-    Bar,
-    Button,
-    CheckBox,
-    Dialog,
-    Link,
-    Option,
-    SegmentedButton,
-    SegmentedButtonItem,
-    Select,
-    Tab,
-    TabContainer,
-    Title,
-} from '@ui5/webcomponents-react';
+import { Bar, Button, CheckBox, Dialog, Link, SegmentedButton, SegmentedButtonItem, Tab, TabContainer, Title } from '@ui5/webcomponents-react';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -64,6 +51,8 @@ import {
 } from './marketplace-ui';
 import styles from './marketplace.module.css';
 import { MatchedListingCell, type ProductMatching } from './matched-listing-cell';
+import { PlatformEditPanel } from './platform-edit-panel';
+import { PlatformPushPanel } from './platform-push-panel';
 
 type ProductFilter = 'all' | 'mapped' | 'unmapped';
 
@@ -235,7 +224,7 @@ interface PayloadFieldRow {
 // ตาม pattern เดียวกับ GROUP_SECTION_SCROLL_MARGIN ใน products/edit.tsx
 const SECTION_SCROLL_MARGIN = 72;
 
-export default function LazadaProductsMapping({ products, stats, filters, lazadaShops }: Props) {
+export default function LazadaProductsMapping({ products, stats, filters }: Props) {
     const { t: tNav } = useTranslation('nav');
     const { t: tGrid } = useTranslation('grid');
 
@@ -253,15 +242,6 @@ export default function LazadaProductsMapping({ products, stats, filters, lazada
     const [search, setSearch] = useState(filters.search ?? '');
     const [filter, setFilter] = useState<ProductFilter>(filters.filter ?? 'all');
     const [perPage, setPerPage] = useState<number>(products.per_page ?? 25);
-    const [selectedRows, setSelectedRows] = useState<number[]>([]);
-    // Bulk "Push ที่เลือก" — เรียก ProductController::pushBulk() ตัวเดียวกับที่
-    // products/index.tsx's "Share" dialog ใช้ (ดู index.tsx's shareSelectedProducts())
-    // แค่เปิดทางลัดให้กดจากหน้านี้ได้เลย ไม่ต้องสลับไปหน้า list สินค้าทั่วไปก่อน
-    const [bulkPushDialogOpen, setBulkPushDialogOpen] = useState(false);
-    // ยืนยัน "สร้างเป็นสินค้าใหม่" ให้สินค้าที่ยังไม่ผ่าน Product Matching (ไม่ติ๊ก = server ข้ามให้)
-    const [bulkConfirmNewListing, setBulkConfirmNewListing] = useState(false);
-    const [bulkPushShopId, setBulkPushShopId] = useState<number | ''>('');
-    const [bulkPushing, setBulkPushing] = useState(false);
     const firstRender = useRef(true);
 
     // Active product being viewed as an Object Page (null = list view)
@@ -277,28 +257,11 @@ export default function LazadaProductsMapping({ products, stats, filters, lazada
     const [loadingDetail, setLoadingDetail] = useState(false);
     const [detailTab, setDetailTab] = useState(0);
     const [detailPushResult, setDetailPushResult] = useState<{ severity: 'success' | 'error'; message: string } | null>(null);
-    // ร้านที่กำลัง push/deactivate อยู่ตอนนี้ (null = ไม่มี) — ทำได้ทีละร้านเท่านั้น
-    // ต่อ 1 sidebar (ปุ่มร้านอื่นๆ ใน "แท็บร้านค้า" ยัง disabled ไม่ได้ระหว่างนี้)
-    const [actingShopId, setActingShopId] = useState<number | null>(null);
-    // ร้านที่กำลังติ๊ก publish/unpublish อยู่ (แยกจาก actingShopId — คนละ action)
+    // ร้านที่กำลังติ๊ก publish/unpublish อยู่
     const [togglingShopId, setTogglingShopId] = useState<number | null>(null);
-    // confirm dialog ก่อน push/deactivate จริง — เก็บทั้งร้านและ action ไว้ในก้อน
-    // เดียว (ต่างจากเดิมที่ hardcode ไว้แค่ "ร้านเดียว, push อย่างเดียว")
-    const [shopActionConfirm, setShopActionConfirm] = useState<{ shopId: number; shopName: string; action: 'push' | 'deactivate' } | null>(null);
-    // ผลเช็คสถานะ live ล่าสุดของร้านที่กำลังจะ confirm อยู่ — โชว์ในตัว dialog
-    // เดียวกับที่ products/edit.tsx's push-confirm dialog ทำ (เตือน "ยังไม่เคย push"/
-    // "live อยู่แล้ว จะอัปเดต" ก่อนกดยืนยันจริง)
-    const [shopStatusCheck, setShopStatusCheck] = useState<{
-        shopId: number;
-        loading: boolean;
-        is_live?: boolean;
-        never_pushed?: boolean;
-        status?: string | null;
-        error?: string;
-    } | null>(null);
 
     // สินค้าที่ drawer "กำลังเปิดดูอยู่จริง" ตอนนี้ — แยกจาก detailProductId (state)
-    // เพราะ closure ของ pollShopActionStatus/refreshDetail ด้านล่างถูกสร้างไว้
+    // เพราะ closure ของ refreshDetail ด้านล่างถูกสร้างไว้
     // ตอน push ครั้งนั้นๆ (จำ productId เดิมไว้ใน closure) ถ้าผู้ใช้ปิด drawer แล้ว
     // เปิดสินค้าอื่นก่อน poll รอบเก่าจะ resolve, poll รอบเก่าจะยังทำงานต่อและเผลอ
     // เอาผลของสินค้าเก่าไปทับ state ของสินค้าใหม่ที่กำลังโชว์อยู่ — เช็ค ref นี้
@@ -314,10 +277,7 @@ export default function LazadaProductsMapping({ products, stats, filters, lazada
         setDetailPushResult(null);
         // เผื่อสินค้าตัวก่อนหน้ายังมี poll ค้างอยู่ตอนสลับมาที่นี่ — รีเซ็ตสถานะ
         // ปุ่มต่างๆ ของ sidebar ใหม่ให้เริ่มจากปกติเสมอ ไม่ใช่ค้างจากสินค้าเดิม
-        setActingShopId(null);
         setTogglingShopId(null);
-        setShopActionConfirm(null);
-        setShopStatusCheck(null);
         setLoadingDetail(true);
         fetch(`/catalog/marketplace/lazada/products/${productId}/detail`, { headers: { Accept: 'application/json' } })
             .then((res) => (res.ok ? res.json() : null))
@@ -382,134 +342,6 @@ export default function LazadaProductsMapping({ products, stats, filters, lazada
                 if (detailProductIdRef.current === productId) {
                     setTogglingShopId(null);
                 }
-            });
-    };
-
-    // เหมือน checkPlatformStatus() ของ products/edit.tsx — เรียกทันทีที่เปิด
-    // confirm dialog ของร้านหนึ่งๆ เพื่อโชว์สถานะ live สดๆ ก่อนกดยืนยันจริง
-    const checkShopStatus = (productId: number, shopId: number) => {
-        setShopStatusCheck({ shopId, loading: true });
-        fetch(`/catalog/products/${productId}/lazada-status/${shopId}`, { headers: { Accept: 'application/json' } })
-            .then(async (res) => {
-                const body = await res.json();
-                // เช็ค detailProductIdRef ก่อน setState เสมอ เหมือน fetch handler อื่นๆ
-                // ในไฟล์นี้ (openDetail/refreshDetail/toggleShopPublished ด้านบน) — ไม่งั้น
-                // ถ้าปิด drawer แล้วเปิดสินค้าอื่นที่มีร้านเดียวกัน (shopId ซ้ำ) ก่อน
-                // response เก่าจะกลับมา ผลเช็คสถานะของสินค้าเก่าจะทับ state ของสินค้า
-                // ใหม่ที่กำลังเปิด confirm dialog อยู่ (บั๊กที่เจอจาก code review)
-                if (detailProductIdRef.current !== productId) return;
-                setShopStatusCheck(res.ok ? { shopId, loading: false, ...body } : { shopId, loading: false, error: body.message });
-            })
-            .catch(() => {
-                if (detailProductIdRef.current !== productId) return;
-                setShopStatusCheck({ shopId, loading: false, error: 'ตรวจสอบสถานะไม่สำเร็จ' });
-            });
-    };
-
-    const openShopActionConfirm = (shopId: number, shopName: string, action: 'push' | 'deactivate') => {
-        if (!detailProductId) return;
-        setShopActionConfirm({ shopId, shopName, action });
-        checkShopStatus(detailProductId, shopId);
-    };
-
-    // Poll เดียวกับที่ products/edit.tsx ทำ (SyncProductToMarketplaceJob ทำงาน
-    // เป็น background job — ดู ProductController::queueMarketplaceSync()) แค่
-    // เขียนแยกชุดเองที่นี่เพราะหน้านี้ไม่มี state ของ push dialog ชุดเดิมให้ใช้ร่วม
-    const pollShopActionStatus = (productId: number, jobId: number, shopId: number, attempts = 0) => {
-        // drawer ย้ายไปสินค้าอื่น (หรือปิดไปแล้ว) ตั้งแต่ก่อนจะยิง request รอบนี้ด้วยซ้ำ
-        // — หยุดเงียบๆ ไม่ต้อง setState หรือ schedule รอบถัดไปอีกเลย
-        if (detailProductIdRef.current !== productId) return;
-
-        fetch(`/catalog/products/${productId}/sync-jobs/${jobId}`, { headers: { Accept: 'application/json' } })
-            .then(async (res) => {
-                if (detailProductIdRef.current !== productId) return;
-                const body = await res.json();
-
-                if (!res.ok) {
-                    setDetailPushResult({ severity: 'error', message: body.message ?? 'ตรวจสอบสถานะไม่สำเร็จ' });
-                    setActingShopId(null);
-                    return;
-                }
-                if (body.status === 'completed') {
-                    setDetailPushResult({ severity: 'success', message: body.message });
-                    setActingShopId(null);
-                    refreshDetail(productId);
-                    router.reload({ only: ['products'] });
-                    return;
-                }
-                if (body.status === 'failed') {
-                    setDetailPushResult({ severity: 'error', message: body.message ?? 'sync ไม่สำเร็จ' });
-                    setActingShopId(null);
-                    return;
-                }
-                if (attempts >= 40) {
-                    setDetailPushResult({ severity: 'error', message: 'ยังไม่เสร็จภายในเวลาที่กำหนด ตรวจสอบภายหลังที่หน้า Edit Product' });
-                    setActingShopId(null);
-                    return;
-                }
-                setTimeout(() => pollShopActionStatus(productId, jobId, shopId, attempts + 1), 1500);
-            })
-            .catch(() => {
-                if (detailProductIdRef.current !== productId) return;
-                if (attempts >= 40) {
-                    setDetailPushResult({ severity: 'error', message: 'เครือข่ายมีปัญหา ตรวจสอบภายหลัง' });
-                    setActingShopId(null);
-                    return;
-                }
-                setTimeout(() => pollShopActionStatus(productId, jobId, shopId, attempts + 1), 1500);
-            });
-    };
-
-    const confirmShopAction = () => {
-        if (!shopActionConfirm || !detailProductId) return;
-        const { shopId, action } = shopActionConfirm;
-        const productId = detailProductId;
-        const routeSegment = action === 'push' ? 'push-lazada' : 'deactivate-lazada';
-        setShopActionConfirm(null);
-        setActingShopId(shopId);
-        setDetailPushResult(null);
-        sendShopAction(productId, shopId, action, routeSegment, false);
-    };
-
-    // confirmNewListing — สินค้าที่ยังไม่ผ่าน Product Matching บนร้านนี้ server ตอบ
-    // 409 not_matched (ดู ProductController::queueMarketplaceSync()) ถามยืนยันว่าเป็น
-    // สินค้าใหม่จริงก่อน แล้วค่อยส่งซ้ำพร้อม confirm_new_listing
-    const sendShopAction = (productId: number, shopId: number, action: 'push' | 'deactivate', routeSegment: string, confirmNewListing: boolean) => {
-        fetch(`/catalog/products/${productId}/${routeSegment}/${shopId}`, {
-            method: 'POST',
-            headers: { 'X-XSRF-TOKEN': xsrfToken(), Accept: 'application/json', 'Content-Type': 'application/json' },
-            body: JSON.stringify(confirmNewListing ? { confirm_new_listing: true } : {}),
-        })
-            .then(async (res) => {
-                if (detailProductIdRef.current !== productId) return;
-                const body = await res.json();
-                if (res.status === 409 && body.code === 'not_matched') {
-                    const ok = await confirm({
-                        title: 'สินค้านี้ยังไม่ได้จับคู่',
-                        message: `${body.message} — ยืนยันว่าเป็นสินค้าใหม่ที่ยังไม่เคยวางขายบนร้านนี้? (ถ้ามี listing อยู่แล้ว ให้ไปจับคู่ที่หน้า "จับคู่สินค้า (Product Matching)" ก่อน)`,
-                        confirmLabel: 'สร้างเป็นสินค้าใหม่',
-                    });
-                    if (ok && detailProductIdRef.current === productId) {
-                        sendShopAction(productId, shopId, action, routeSegment, true);
-                    } else {
-                        setActingShopId(null);
-                    }
-                    return;
-                }
-                if (!res.ok || !body.job_id) {
-                    setDetailPushResult({
-                        severity: 'error',
-                        message: body.message ?? (action === 'push' ? 'ส่งไป Lazada ไม่สำเร็จ' : 'ปิดการขายบน Lazada ไม่สำเร็จ'),
-                    });
-                    setActingShopId(null);
-                    return;
-                }
-                pollShopActionStatus(productId, body.job_id, shopId);
-            })
-            .catch(() => {
-                if (detailProductIdRef.current !== productId) return;
-                setDetailPushResult({ severity: 'error', message: 'เกิดข้อผิดพลาดในการเชื่อมต่อ' });
-                setActingShopId(null);
             });
     };
 
@@ -631,6 +463,22 @@ export default function LazadaProductsMapping({ products, stats, filters, lazada
             .finally(() => setLoadingPayloadFields(false));
     };
 
+    // step "นำเข้าและแก้ไขข้อมูลจาก Lazada" — ปุ่มดินสอ (แก้ไข) ทั้งในตารางและบนหัวหน้าพามาที่นี่
+    const EDIT_SECTION_INDEX = 3;
+    // step "Push ไป Lazada" — ที่เดียวที่ push / ปิดการขาย / ลบ listing ได้
+    const PUSH_SECTION_INDEX = 4;
+    const [pendingSection, setPendingSection] = useState<number | null>(null);
+    const openProductAt = (product: ProductRow, idx: number) => {
+        openProduct(product);
+        setPendingSection(idx);
+    };
+    useEffect(() => {
+        if (pendingSection === null || !activeProduct) return;
+        const idx = pendingSection;
+        setPendingSection(null);
+        window.setTimeout(() => scrollToSection(idx), 0);
+    }, [pendingSection, activeProduct]);
+
     const scrollToSection = (idx: number) => {
         suppressScrollSpy.current = true;
         setSectionIndex(idx);
@@ -673,6 +521,9 @@ export default function LazadaProductsMapping({ products, stats, filters, lazada
         const row = openId ? products.data.find((p) => p.id === openId) : undefined;
         if (!row) return;
         openProduct(row);
+        // &section=edit|push — เช่นลิงก์ "ไป Push" จากหน้าแก้ไขสินค้า
+        const section = params.get('section');
+        if (section === 'edit' || section === 'push') setPendingSection(section === 'push' ? PUSH_SECTION_INDEX : EDIT_SECTION_INDEX);
         const categoryId = Number(params.get('category'));
         if (categoryId && !row.category_mapped) setSelectedLazadaCatId(categoryId);
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1064,57 +915,10 @@ export default function LazadaProductsMapping({ products, stats, filters, lazada
             .finally(() => setSavingPayloadField(null));
     };
 
-    const toggleSelectAll = () => {
-        if (selectedRows.length === products.data.length) {
-            setSelectedRows([]);
-        } else {
-            setSelectedRows(products.data.map((p) => p.id));
-        }
-    };
-
-    const toggleSelectRow = (id: number) => {
-        setSelectedRows((prev) => (prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]));
-    };
-
-    const confirmBulkPush = () => {
-        if (!bulkPushShopId || selectedRows.length === 0) return;
-        setBulkPushing(true);
-        router.post(
-            '/catalog/products/push-bulk',
-            { product_ids: selectedRows, shop_ids: [bulkPushShopId], confirm_new_listing: bulkConfirmNewListing },
-            {
-                preserveScroll: true,
-                onSuccess: () => {
-                    setBulkPushDialogOpen(false);
-                    setBulkPushShopId('');
-                    setBulkConfirmNewListing(false);
-                    setSelectedRows([]);
-                },
-                onFinish: () => setBulkPushing(false),
-            },
-        );
-    };
-
     // จอแคบ = quick-view panel เต็มจอ (เดิม Drawer width xs:100%)
     const isNarrow = useMediaQuery('(max-width: 599px)');
 
     const columns: FioriResponsiveColumn<ProductRow>[] = [
-        {
-            key: 'selection',
-            header: (
-                <CheckBox
-                    accessibleName="Select all"
-                    checked={products.data.length > 0 && selectedRows.length > 0}
-                    indeterminate={selectedRows.length > 0 && selectedRows.length < products.data.length}
-                    onChange={toggleSelectAll}
-                />
-            ),
-            popinText: 'Select',
-            priority: 'always',
-            width: 48,
-            minWidth: 48,
-            render: (row) => <CheckBox accessibleName={row.sku} checked={selectedRows.includes(row.id)} onChange={() => toggleSelectRow(row.id)} />,
-        },
         {
             key: 'product',
             header: 'สินค้า',
@@ -1132,7 +936,7 @@ export default function LazadaProductsMapping({ products, stats, filters, lazada
                                 icon="edit"
                                 tooltip="แก้ไขสินค้า"
                                 accessibleName="แก้ไขสินค้า"
-                                onClick={() => router.visit(`/catalog/products/${row.id}/edit?platform=lazada`)}
+                                onClick={() => openProductAt(row, EDIT_SECTION_INDEX)}
                             />
                         )}
                     </HStack>
@@ -1282,7 +1086,7 @@ export default function LazadaProductsMapping({ products, stats, filters, lazada
                                         icon="edit"
                                         tooltip="แก้ไขสินค้า"
                                         accessibleName="แก้ไขสินค้า"
-                                        onClick={() => router.visit(`/catalog/products/${activeProduct.id}/edit?platform=lazada`)}
+                                        onClick={() => scrollToSection(EDIT_SECTION_INDEX)}
                                     />
                                 )}
                                 {activeProduct.matching.matched && (
@@ -1326,7 +1130,9 @@ export default function LazadaProductsMapping({ products, stats, filters, lazada
                                 <Tab text="1. Category Mapping" selected={sectionIndex === 0} />
                                 <Tab text="2. Attribute Mapping" disabled={!activeProduct.category_mapped} selected={sectionIndex === 1} />
                                 <Tab text="3. Payload Lazada" selected={sectionIndex === 2} />
-                                <Tab text="4. History" disabled={!activeProduct.master_category} selected={sectionIndex === 3} />
+                                <Tab text="4. นำเข้าและแก้ไขข้อมูลจาก Lazada" selected={sectionIndex === 3} />
+                                <Tab text="5. Push ไป Lazada" selected={sectionIndex === 4} />
+                                <Tab text="6. History" disabled={!activeProduct.master_category} selected={sectionIndex === 5} />
                             </TabContainer>
                         </div>
 
@@ -1700,7 +1506,66 @@ export default function LazadaProductsMapping({ products, stats, filters, lazada
                                 </VStack>
                             </SectionCard>
 
-                            {/* Section 4 — History: audit trail รวมของทุกขั้นตอนการแมพ Lazada
+                            {/* Section 4 — นำเข้าและแก้ไขข้อมูลจาก Lazada: ฟอร์มแก้ค่าใน PIM จัดแท็บย่อยแบบหน้า
+                                seller center ของ Lazada + ค่าจาก listing ที่จับคู่ไว้ — ดู PlatformEditPanel / ListingImportService
+                                (ปุ่มดินสอ "แก้ไข" ในตารางและบนหัวหน้าพามาที่ step นี้) */}
+                            <SectionCard
+                                ref={(el: HTMLDivElement | null) => {
+                                    sectionRefs.current[3] = el;
+                                }}
+                                scrollMarginTop={SECTION_SCROLL_MARGIN}
+                                // พื้นหลังสีแยกให้เห็นว่าเป็น step แก้ไขข้อมูล (ไม่ใช่ step ตั้งค่า mapping)
+                                style={{ background: '#f5f8fe' }}
+                            >
+                                <VStack gap="1.25rem">
+                                    <SectionHeading
+                                        title="นำเข้าและแก้ไขข้อมูลจาก Lazada"
+                                        description='แก้ค่าใน PIM ที่ใช้ส่งขึ้น Lazada — ถ้าจับคู่ listing ไว้ จะเห็นค่าบนร้านใต้แต่ละช่องพร้อมปุ่ม "ใช้ค่านี้"'
+                                    />
+                                    {!canEditProducts ? (
+                                        <LockedNotice>ต้องมีสิทธิ์แก้ไขสินค้าจึงจะแก้ไขข้อมูลได้</LockedNotice>
+                                    ) : (
+                                        <PlatformEditPanel
+                                            key={activeProduct.id}
+                                            active={sectionIndex === 3}
+                                            productId={activeProduct.id}
+                                            platform="lazada"
+                                            platformLabel="Lazada"
+                                            listings={activeProduct.matching.listings}
+                                            platformCategoryId={activeProduct.lazada_category?.id ?? null}
+                                            platformCategoryPath={activeProduct.lazada_category?.path ?? null}
+                                            onSaved={loadPayloadFields}
+                                        />
+                                    )}
+                                </VStack>
+                            </SectionCard>
+
+                            {/* Section 5 — Push ไป Lazada: ที่เดียวที่ส่งข้อมูลขึ้นร้านได้ (Push / ปิดการขาย / ลบ /
+                                เช็คสถานะ ทีละร้าน) — ดู PlatformPushPanel / PlatformPushController */}
+                            <SectionCard
+                                ref={(el: HTMLDivElement | null) => {
+                                    sectionRefs.current[4] = el;
+                                }}
+                                scrollMarginTop={SECTION_SCROLL_MARGIN}
+                                // พื้นหลังเขียวอ่อน — แยกจาก step แก้ไขข้อมูล (ฟ้าอ่อน) ให้เห็นว่าเป็น step ที่ส่งข้อมูลขึ้นร้านจริง
+                                style={{ background: '#f3faf4' }}
+                            >
+                                <VStack gap="1.25rem">
+                                    <SectionHeading
+                                        title="Push ไป Lazada"
+                                        description="ส่งข้อมูลสินค้าจาก PIM ขึ้นร้าน Lazada ทีละร้าน — การ Push / ปิดการขาย / ลบ listing ทำได้จากที่นี่เท่านั้น"
+                                    />
+                                    <PlatformPushPanel
+                                        key={activeProduct.id}
+                                        active={sectionIndex === 4}
+                                        productId={activeProduct.id}
+                                        platform="lazada"
+                                        platformLabel="Lazada"
+                                    />
+                                </VStack>
+                            </SectionCard>
+
+                            {/* Section 6 — History: audit trail รวมของทุกขั้นตอนการแมพ Lazada
                                 ของ master category นี้ (จับคู่ category, จับคู่ attribute,
                                 จับคู่ตัวเลือก, auto-create attribute ใหม่, sync attribute
                                 family) — ดู LazadaMappingTimelineBuilder ฝั่ง backend สำหรับ
@@ -1709,7 +1574,7 @@ export default function LazadaProductsMapping({ products, stats, filters, lazada
                                 timeline UI ใหม่ */}
                             <SectionCard
                                 ref={(el: HTMLDivElement | null) => {
-                                    sectionRefs.current[3] = el;
+                                    sectionRefs.current[5] = el;
                                 }}
                                 scrollMarginTop={SECTION_SCROLL_MARGIN}
                             >
@@ -1817,15 +1682,6 @@ export default function LazadaProductsMapping({ products, stats, filters, lazada
                         />
                     </div>
 
-                    {selectedRows.length > 0 && (
-                        <div className={styles.selectionBar}>
-                            <span>เลือกอยู่ {selectedRows.length} รายการ</span>
-                            <Button design="Emphasized" icon="upload" onClick={() => setBulkPushDialogOpen(true)}>
-                                Push ที่เลือก
-                            </Button>
-                        </div>
-                    )}
-
                     <div className={styles.divider} />
 
                     {/* Data Table */}
@@ -1834,7 +1690,6 @@ export default function LazadaProductsMapping({ products, stats, filters, lazada
                         columns={columns}
                         rows={products.data}
                         getRowKey={(row: ProductRow) => row.id}
-                        rowClassName={(row: ProductRow) => (selectedRows.includes(row.id) ? styles.selectedRow : undefined)}
                         emptyMessage="ไม่พบสินค้าที่ตรงตามเงื่อนไข"
                     />
 
@@ -1946,6 +1801,17 @@ export default function LazadaProductsMapping({ products, stats, filters, lazada
                                 </>
                             ) : detailTab === 2 ? (
                                 <VStack gap="0.5rem">
+                                    <FioriMessageStrip severity="information">
+                                        Push / ปิดการขาย / เช็คสถานะ ย้ายไปอยู่ที่ step &quot;Push ไป Lazada&quot; ของหน้า Map สินค้าแล้ว{' '}
+                                        <Link
+                                            onClick={() => {
+                                                const row = products.data.find((r) => r.id === detailProductId);
+                                                if (row) openProductAt(row, PUSH_SECTION_INDEX);
+                                            }}
+                                        >
+                                            ไปที่ step Push
+                                        </Link>
+                                    </FioriMessageStrip>
                                     {detailData.lazada_shops.map((shop) => (
                                         <div
                                             key={shop.id}
@@ -1963,30 +1829,6 @@ export default function LazadaProductsMapping({ products, stats, filters, lazada
                                                     {shop.name}
                                                 </Body>
                                                 {shop.is_live && <FioriStatus label="Live" tone="success" />}
-                                            </HStack>
-                                            <HStack gap="0.25rem" style={{ flexShrink: 0 }}>
-                                                {shop.published && (
-                                                    <Button
-                                                        design="Transparent"
-                                                        icon="upload"
-                                                        tooltip={`Push to ${shop.name}`}
-                                                        accessibleName={`Push to ${shop.name}`}
-                                                        disabled={actingShopId === shop.id}
-                                                        loading={actingShopId === shop.id}
-                                                        loadingDelay={0}
-                                                        onClick={() => openShopActionConfirm(shop.id, shop.name, 'push')}
-                                                    />
-                                                )}
-                                                {shop.published && shop.is_live && (
-                                                    <Button
-                                                        design="Transparent"
-                                                        icon="hide"
-                                                        tooltip={`Deactivate on ${shop.name}`}
-                                                        accessibleName={`Deactivate on ${shop.name}`}
-                                                        disabled={actingShopId === shop.id}
-                                                        onClick={() => openShopActionConfirm(shop.id, shop.name, 'deactivate')}
-                                                    />
-                                                )}
                                             </HStack>
                                         </div>
                                     ))}
@@ -2059,159 +1901,6 @@ export default function LazadaProductsMapping({ products, stats, filters, lazada
                     </div>
                 )}
             </Dialog>
-
-            {/* Push = เปิดเป็นหน้า "ตรวจสอบข้อมูลก่อนส่ง" เต็มรูปแบบ (เหมือนหน้า view
-            product ย่อยๆ) เพราะกดครั้งเดียวมีผลจริงกับ listing บน Lazada เลย — ใช้
-            ข้อมูลชุดเดียวกับแท็บ Attribute/ข้อมูลสินค้า/รูปสินค้า มาเรียงต่อกันให้เห็น
-            "ทุกอย่างที่กำลังจะส่งไป" ในที่เดียว ไม่ต้องสลับแท็บเอง — Deactivate ไม่มี
-            อะไรให้ตรวจ (แค่ปิดของเดิม) เลยยังคงเป็น dialog สั้นๆ เหมือนเดิม */}
-            <Dialog
-                open={shopActionConfirm !== null}
-                onClose={() => setShopActionConfirm(null)}
-                style={{ width: shopActionConfirm?.action === 'push' ? 'min(600px, calc(100vw - 2rem))' : 'min(444px, calc(100vw - 2rem))' }}
-                header={
-                    <div style={{ width: '100%', padding: '0.5rem 0' }}>
-                        <Title level="H5" size="H5" wrappingType="Normal">
-                            {shopActionConfirm?.action === 'push' ? 'ตรวจสอบข้อมูลก่อนส่งไป Lazada' : 'ปิดการขายบน Lazada?'}
-                        </Title>
-                        {detailData && (
-                            <Body style={{ color: TONE_TEXT.neutral, marginTop: '0.125rem' }}>
-                                {detailData.name} · {detailData.sku} · ร้าน &quot;{shopActionConfirm?.shopName}&quot;
-                            </Body>
-                        )}
-                    </div>
-                }
-                footer={
-                    <Bar
-                        design="Footer"
-                        endContent={
-                            <>
-                                <Button design="Transparent" onClick={() => setShopActionConfirm(null)}>
-                                    ยกเลิก
-                                </Button>
-                                <Button design="Emphasized" onClick={confirmShopAction}>
-                                    {shopActionConfirm?.action === 'push' ? 'ยืนยันส่ง' : 'ปิดการขาย'}
-                                </Button>
-                            </>
-                        }
-                    />
-                }
-            >
-                {shopActionConfirm?.action === 'deactivate' && (
-                    <Body style={{ color: TONE_TEXT.neutral }}>
-                        การดำเนินการนี้จะปิดการขาย (ไม่ลบ) ประกาศขายบน Lazada สำหรับร้าน &quot;{shopActionConfirm?.shopName}&quot;
-                    </Body>
-                )}
-
-                {shopStatusCheck && shopActionConfirm && shopStatusCheck.shopId === shopActionConfirm.shopId && (
-                    <div
-                        style={{
-                            marginBottom: shopActionConfirm.action === 'push' ? '1rem' : 0,
-                            marginTop: shopActionConfirm.action === 'deactivate' ? '1rem' : 0,
-                        }}
-                    >
-                        {shopStatusCheck.loading ? (
-                            <HStack gap="0.5rem">
-                                <Spinner />
-                                <Body style={{ color: TONE_TEXT.neutral }}>กำลังตรวจสอบสถานะบน Lazada...</Body>
-                            </HStack>
-                        ) : shopStatusCheck.error ? (
-                            <FioriMessageStrip severity="warning">ตรวจสอบสถานะไม่สำเร็จ: {shopStatusCheck.error}</FioriMessageStrip>
-                        ) : shopStatusCheck.never_pushed ? (
-                            <FioriMessageStrip severity="information">ยังไม่เคยส่งมาก่อน — การดำเนินการนี้จะสร้างประกาศขายใหม่</FioriMessageStrip>
-                        ) : shopStatusCheck.is_live ? (
-                            <FioriMessageStrip severity="success">กำลังขายอยู่บน Lazada แล้ว — การดำเนินการนี้จะอัปเดตของเดิม</FioriMessageStrip>
-                        ) : (
-                            <FioriMessageStrip severity="information">
-                                มีประกาศขายอยู่แล้วแต่ไม่ active (สถานะ: {shopStatusCheck.status ?? 'ไม่ทราบ'})
-                            </FioriMessageStrip>
-                        )}
-                    </div>
-                )}
-
-                {shopActionConfirm?.action === 'push' &&
-                    detailData &&
-                    (() => {
-                        const missing = detailData.attributes.filter((a) => a.mandatory && !a.value);
-
-                        return (
-                            <>
-                                {missing.length > 0 ? (
-                                    <FioriMessageStrip severity="error" style={{ marginBottom: '1rem' }}>
-                                        <div style={{ fontWeight: 600 }}>
-                                            ยังกรอกข้อมูลที่ Lazada บังคับไม่ครบ {missing.length} รายการ: {missing.map((a) => a.label).join(', ')}
-                                        </div>
-                                        <div style={{ fontSize: 'var(--sapFontSmallSize)', marginTop: '0.25rem' }}>
-                                            ยังกด &quot;ยืนยันส่ง&quot; ต่อได้ แต่ Lazada อาจปฏิเสธถ้าข้อมูลไม่ครบจริง
-                                        </div>
-                                    </FioriMessageStrip>
-                                ) : (
-                                    <FioriMessageStrip severity="success" style={{ marginBottom: '1rem' }}>
-                                        ข้อมูลที่ Lazada บังคับครบถ้วนแล้ว
-                                    </FioriMessageStrip>
-                                )}
-
-                                <SectionHeading title="ข้อมูลสินค้า (Platform)" />
-                                <ValueRows rows={detailData.platform_fields} rowPadding="0.375rem 0" style={{ margin: '0.5rem 0 1rem' }} />
-
-                                <SectionHeading title={`รูปสินค้า (${detailData.platform_images.length})`} />
-                                {detailData.platform_images.length === 0 ? (
-                                    <Body style={{ color: TONE_TEXT.error, margin: '0.5rem 0 1rem' }}>— ยังไม่มีรูปสินค้าให้ส่งไป Lazada —</Body>
-                                ) : (
-                                    <ImageThumbs
-                                        urls={detailData.platform_images}
-                                        size={64}
-                                        alt={(idx) => `รูปสินค้า ${idx + 1}`}
-                                        style={{ margin: '0.5rem 0 1rem' }}
-                                    />
-                                )}
-
-                                <SectionHeading title="Attribute" />
-                                <ValueRows rows={detailData.attributes} showRequired rowPadding="0.375rem 0" style={{ marginTop: '0.5rem' }} />
-                            </>
-                        );
-                    })()}
-            </Dialog>
-
-            <FioriMessageBox
-                open={bulkPushDialogOpen}
-                onCancel={() => setBulkPushDialogOpen(false)}
-                onConfirm={confirmBulkPush}
-                title={`Push ${selectedRows.length} รายการที่เลือกไป Lazada?`}
-                severity="confirm"
-                confirmLabel={bulkPushing ? 'กำลังส่ง...' : 'Push'}
-                cancelLabel="ยกเลิก"
-                confirmLoading={bulkPushing}
-                confirmDisabled={!bulkPushShopId}
-            >
-                เลือกร้าน Lazada ที่จะ push สินค้าทั้ง {selectedRows.length} รายการไปด้วยกัน — สินค้าที่ยังไม่ได้ publish ไว้กับร้านนี้จะถูก publish
-                ให้อัตโนมัติก่อน push
-                <Select
-                    value={bulkPushShopId === '' ? '' : String(bulkPushShopId)}
-                    onChange={(e) => {
-                        const v = e.detail.selectedOption.value ?? '';
-                        setBulkPushShopId(v === '' ? '' : Number(v));
-                    }}
-                    style={{ width: '100%', marginTop: '1rem' }}
-                    accessibleName="เลือกร้าน..."
-                >
-                    <Option value="">เลือกร้าน...</Option>
-                    {lazadaShops.map((shop) => (
-                        <Option key={shop.id} value={String(shop.id)}>
-                            {shop.name}
-                        </Option>
-                    ))}
-                </Select>
-                <CheckBox
-                    text="สร้างเป็นสินค้าใหม่สำหรับรายการที่ยังไม่ได้จับคู่"
-                    checked={bulkConfirmNewListing}
-                    onChange={(e) => setBulkConfirmNewListing(e.target.checked)}
-                    style={{ marginTop: '0.75rem' }}
-                />
-                <Caption>
-                    ไม่ติ๊ก = ข้ามสินค้าที่ยังไม่ได้จับคู่ (Product Matching) กับร้านนี้ — ติ๊กเฉพาะเมื่อแน่ใจว่าเป็นสินค้าใหม่ที่ยังไม่เคยวางขาย
-                </Caption>
-            </FioriMessageBox>
         </AppLayout>
     );
 }

@@ -26,6 +26,8 @@ use App\Http\Controllers\Catalog\RawMaterialController;
 use App\Http\Controllers\Catalog\SubcategoryController;
 use App\Http\Controllers\Catalog\SalesPlatformController;
 use App\Http\Controllers\Catalog\LazadaAttributeMappingController;
+use App\Http\Controllers\Catalog\ListingImportController;
+use App\Http\Controllers\Catalog\PlatformPushController;
 use App\Http\Controllers\Catalog\LazadaMasterProductsController;
 use App\Http\Controllers\Catalog\MarketplaceAttributeMappingController;
 use App\Http\Controllers\Catalog\TikTokAttributeMappingController;
@@ -195,6 +197,12 @@ Route::middleware(['auth'])->prefix('catalog')->name('catalog.')->group(function
     // demand into marketplace_listing_details — ดู ProductMatchingDetailController
     Route::get('marketplace/product-matching/listings/{listing}/detail', [ProductMatchingDetailController::class, 'show'])->name('marketplace.productMatching.detail')->middleware('permission:products,list_products');
     Route::post('marketplace/product-matching/listings/{listing}/detail/refresh', [ProductMatchingDetailController::class, 'refresh'])->name('marketplace.productMatching.detail.refresh')->middleware('permission:products,edit_products');
+    // "นำเข้าและแก้ไขข้อมูลจาก {platform}" (Product Mapping object page) — ดู ListingImportController
+    Route::get('marketplace/products/{product}/platform-edit/{platform}', [ListingImportController::class, 'form'])->name('marketplace.platformEdit.form')->middleware('permission:products,edit_products');
+    Route::post('marketplace/products/{product}/platform-edit/{platform}', [ListingImportController::class, 'save'])->name('marketplace.platformEdit.save')->middleware('permission:products,edit_products');
+    Route::post('marketplace/products/{product}/listing-import/{listing}/images', [ListingImportController::class, 'applyImages'])->name('marketplace.listingImport.images')->middleware('permission:products,edit_products');
+    // step "Push ไป {platform}" ของหน้า Map สินค้า — ที่เดียวที่ push/ปิดการขาย/ลบ ได้ (ดู PlatformPushController)
+    Route::get('marketplace/products/{product}/push/{platform}', [PlatformPushController::class, 'status'])->name('marketplace.platformPush.status')->middleware('permission:products,list_products');
     Route::post('marketplace/product-matching/listings/{listing}/unignore', [ProductMatchingActionsController::class, 'unignore'])->name('marketplace.productMatching.unignore')->middleware('permission:products,edit_products');
     Route::get('marketplace/shopee/products', [ShopeeAttributeMappingController::class, 'shopeeProducts'])->name('marketplace.shopee.products')->middleware('permission:products,list_products');
     Route::get('marketplace/shopee/products/{product}/detail', [ShopeeAttributeMappingController::class, 'productDetail'])->name('marketplace.shopee.products.detail')->middleware('permission:products,list_products');

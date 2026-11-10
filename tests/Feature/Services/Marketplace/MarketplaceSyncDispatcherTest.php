@@ -23,7 +23,7 @@ test('queue creates a ProductMarketplaceSyncJob tracking row with the given attr
 
     $user = User::factory()->create();
 
-    $dispatcher = new MarketplaceSyncDispatcher();
+    $dispatcher = new MarketplaceSyncDispatcher;
     $syncJob = $dispatcher->queue($product, $shop, 'shopee', 'push', $user->id);
 
     expect($syncJob)->toBeInstanceOf(ProductMarketplaceSyncJob::class);
@@ -41,7 +41,7 @@ test('queue defaults user_id to null for system-initiated (auto-sync) calls', fu
     $product = Product::create(['sku' => 'SKU-1']);
     $shop = makeShop();
 
-    $syncJob = (new MarketplaceSyncDispatcher())->queue($product, $shop, 'lazada', 'deactivate');
+    $syncJob = (new MarketplaceSyncDispatcher)->queue($product, $shop, 'lazada', 'deactivate');
 
     expect($syncJob->user_id)->toBeNull();
 });
@@ -52,7 +52,7 @@ test('queue dispatches a SyncProductToMarketplaceJob carrying the new tracking r
     $shop = makeShop();
 
     $user = User::factory()->create();
-    $syncJob = (new MarketplaceSyncDispatcher())->queue($product, $shop, 'shopee', 'push', $user->id);
+    $syncJob = (new MarketplaceSyncDispatcher)->queue($product, $shop, 'shopee', 'push', $user->id);
 
     Queue::assertPushed(SyncProductToMarketplaceJob::class, function ($job) use ($syncJob) {
         return $job->syncJobId === $syncJob->id;

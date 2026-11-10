@@ -55,7 +55,7 @@ class QueueAutoMarketplaceSync implements ShouldQueue
 
     public function handle(ProductDataChanged $event): void
     {
-        if (! config('services.marketplace_sync.auto_enabled')) {
+        if (! config('services.marketplace_sync.auto_enabled') || $event->skipMarketplaceAutoSync) {
             return;
         }
 
@@ -71,7 +71,12 @@ class QueueAutoMarketplaceSync implements ShouldQueue
             return;
         }
 
-        $action = $product->enabled ? 'push' : 'deactivate';
+        // Push happens only from the Product Mapping page's "Push" step now
+        // (PlatformPushController) — saving never pushes. Auto-sync is left with
+        // the safety half only: switching publishing off still takes the listing
+        // down; switching it back on cancels a takedown still waiting out the
+        // debounce (the job then finds no pending action and skips).
+        $action = $product->enabled ? null : 'deactivate';
 
         foreach ($product->platformShops as $shop) {
             if (! $shop->platform) {
@@ -80,6 +85,12 @@ class QueueAutoMarketplaceSync implements ShouldQueue
 
             $lockKey = "marketplace_autosync:lock:{$product->id}:{$shop->id}";
             $actionKey = "marketplace_autosync:action:{$product->id}:{$shop->id}";
+
+            if ($action === null) {
+                Cache::forget($actionKey);
+
+                continue;
+            }
 
             // Always refresh the intended action — a later edit in the same
             // window (e.g. enabled toggled back on) should win over an

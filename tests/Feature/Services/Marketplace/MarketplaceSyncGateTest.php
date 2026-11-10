@@ -17,7 +17,7 @@ function makeSyncProduct(array $attributes = []): Product
 }
 
 beforeEach(function () {
-    $this->gate = new MarketplaceSyncGate();
+    $this->gate = new MarketplaceSyncGate;
 });
 
 // --- categoryMapped ---

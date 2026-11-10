@@ -9,6 +9,8 @@ import { ProductMatchingDetailDialog, type DetailDialogListing } from './product
 /** listing ที่ผูก (Product Matching) กับสินค้า — ดู ProductMatchStatus::matchedListingsByProduct() */
 export interface MatchedListing extends DetailDialogListing {
     shop: string;
+    /** linked to the product itself (not as a bundle component) — importable (ListingImportPanel) */
+    direct: boolean;
 }
 
 export interface ProductMatching {

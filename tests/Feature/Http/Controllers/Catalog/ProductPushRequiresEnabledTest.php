@@ -52,39 +52,6 @@ test('single-shop deactivate still works when the product is not enabled', funct
     Queue::assertPushed(SyncProductToMarketplaceJob::class);
 });
 
-test('bulk push skips products that are not enabled and does not tick their shops', function () {
-    $on = Product::create(['sku' => 'PUSH-BULK-ON', 'type' => 'simple', 'enabled' => true]);
-    $off = Product::create(['sku' => 'PUSH-BULK-OFF', 'type' => 'simple', 'enabled' => false]);
-    $shop = pushGuardShop();
-
-    $request = Request::create('/catalog/products/push-bulk', 'POST', [
-        'product_ids' => [$on->id, $off->id],
-        'shop_ids' => [$shop->id],
-        'confirm_new_listing' => true, // not about Product Matching — see ProductPushRequiresMatchingTest
-    ]);
-    $request->setUserResolver(fn () => auth()->user());
-    $response = app(ProductController::class)->pushBulk($request);
-
-    expect(ProductMarketplaceSyncJob::pluck('product_id')->all())->toBe([$on->id]);
-    expect($off->platformShops()->count())->toBe(0);
-    expect($response->getSession()?->get('success') ?? session('success'))->toContain('Skipped 1 product(s)');
-});
-
-test('bulk push with only disabled products queues nothing', function () {
-    $off = Product::create(['sku' => 'PUSH-BULK-OFF-2', 'type' => 'simple', 'enabled' => false]);
-    $shop = pushGuardShop();
-
-    $request = Request::create('/catalog/products/push-bulk', 'POST', [
-        'product_ids' => [$off->id],
-        'shop_ids' => [$shop->id],
-    ]);
-    $request->setUserResolver(fn () => auth()->user());
-    app(ProductController::class)->pushBulk($request);
-
-    expect(ProductMarketplaceSyncJob::count())->toBe(0);
-    expect(session('error'))->toContain('enabled for publishing');
-});
-
 test('queued push job fails without calling the marketplace if the product was disabled while queued', function () {
     $product = Product::create(['sku' => 'PUSH-JOB-OFF', 'type' => 'simple', 'enabled' => false]);
     $shop = pushGuardShop();
@@ -112,4 +79,21 @@ test('the rejection message is translated to Thai', function () {
     $response = app(ProductController::class)->pushToShopee($product, $shop);
 
     expect($response->getData(true)['message'])->toContain('ปิดการเผยแพร่');
+});
+
+test('bulk push and bulk deactivate are closed — marketplace writes happen only on the Product Mapping "Push" step', function () {
+    $product = Product::create(['sku' => 'PUSH-BULK-CLOSED', 'type' => 'simple', 'enabled' => true]);
+    $shop = pushGuardShop();
+
+    foreach (['pushBulk', 'deactivateBulk'] as $method) {
+        $request = Request::create('/catalog/products/push-bulk', 'POST', ['product_ids' => [$product->id], 'shop_ids' => [$shop->id]]);
+        $request->setUserResolver(fn () => auth()->user());
+        app(ProductController::class)->{$method}($request);
+
+        expect(session('error'))->toContain('Push');
+    }
+
+    expect(ProductMarketplaceSyncJob::count())->toBe(0)
+        ->and($product->platformShops()->count())->toBe(0);
+    Queue::assertNothingPushed();
 });
