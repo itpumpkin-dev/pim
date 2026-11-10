@@ -275,6 +275,7 @@ export function AppSidebar({ slot }: { slot?: string }) {
     return (
         <SideNavigation
             slot={slot}
+            data-ui5-compact-size
             onItemToggle={onItemToggle}
             accessibleName={t('mainNavigation')}
             // Build version pinned at the bottom of the rail; disabled = greyed, not clickable.

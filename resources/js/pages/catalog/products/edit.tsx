@@ -1873,7 +1873,14 @@ export default function ProductEdit({
             {
                 preserveScroll: true,
                 preserveState: true,
-                onSuccess: () => options?.onSuccess?.(),
+                onSuccess: () => {
+                    // baseline ของคำเตือน "เปลี่ยนหมวดหมู่" ต้องขยับตามค่าที่เพิ่งบันทึกด้วย
+                    // ไม่งั้นหลังเลือกกลุ่มสินค้าผ่าน dialog/แผงนี้ จะยังเตือนค้างว่ายังไม่บันทึก
+                    if (section === 'master-categories') {
+                        setSavedMasterCodes(masterCategoryAttributes.map((attr) => String(payload[attr.code] ?? '')));
+                    }
+                    options?.onSuccess?.();
+                },
                 onError: (errs) => {
                     if (errs.conflict) {
                         setConflictMessage(errs.conflict);
@@ -4260,6 +4267,11 @@ const SelectControl = memo(function SelectControl({
             loading={loading}
             showClearIcon
             placeholder={loading ? t('loadingOptions') : t('selectOption')}
+            // ต้องส่ง value (ข้อความที่โชว์) คู่กับ selectedValue เสมอ — UI5 ComboBox
+            // แปลง selectedValue เป็นข้อความให้เองแค่ตอน render ครั้งแรกเท่านั้น ถ้าค่าถูก
+            // ตั้งทีหลังจากโค้ด (เช่น เลือกกลุ่มสินค้าใน dialog แล้วแผงด้านข้างได้ค่าตาม หรือ
+            // options ของหมวดหมู่ย่อย/กลุ่มสินค้าเพิ่ง fetch มาถึง) ช่องจะว่างทั้งที่มีค่าอยู่
+            value={selectedOption ? selectedOption.admin_label || selectedOption.code || '' : ''}
             selectedValue={selectedOption ? optionValue(selectedOption) : ''}
             onSelectionChange={(e) => {
                 const item = e.detail.item;
