@@ -44,6 +44,7 @@ use App\Services\CodeGenerator;
 use App\Services\GridManager;
 use App\Services\ImportExport\Importers\ProductRowImporter;
 use App\Services\Lazada\LazadaProductSyncService;
+use App\Services\Marketplace\Listings\ProductMatchStatus;
 use App\Services\Marketplace\MarketplaceSyncDispatcher;
 use App\Services\Marketplace\MarketplaceSyncGate;
 use App\Services\Shopee\ShopeeProductSyncService;
@@ -2915,6 +2916,14 @@ class ProductController extends Controller
             // บอกหน้าแก้ไขว่าบันทึกแล้วระบบจะส่ง/ยกเลิกบน marketplace ให้อัตโนมัติหรือไม่
             // (QueueAutoMarketplaceSync) — ใช้เตือนในกล่องยืนยัน "บันทึกร่าง"
             'marketplaceAutoSync' => (bool) config('services.marketplace_sync.auto_enabled'),
+            // ร้านที่สินค้านี้ผ่าน Product Matching แล้ว (หรือเคย push สำเร็จ) — ร้านอื่น push
+            // ได้ก็ต่อเมื่อยืนยัน "สร้างเป็นสินค้าใหม่" (ดู MarketplaceSyncGate::knownShopIds())
+            'marketplaceKnownShopIds' => $product->exists ? (new MarketplaceSyncGate)->knownShopIds($product) : [],
+            // ✓ ข้างหัวข้อ "แก้ไขสินค้า | SKU" — ร้านที่สินค้านี้ (หรือ variant) ผูกไว้ใน
+            // Product Matching แล้ว ทุก platform (กฎเดียวกับคอลัมน์ Matching ของหน้า Product Mapping)
+            'matchedShopNames' => $product->exists
+                ? (ProductMatchStatus::matchedShopsByProduct(collect([$product->loadMissing('variants:id,parent_id')]), null, auth()->user())[$product->id] ?? [])
+                : [],
             // ให้ frontend แปล attribute.master_source (โค้ดดิบ เช่น 'brands')
             // เป็นชื่อที่อ่านง่ายสำหรับ chip "Master: ..." บน field ของ attribute
             // นั้นๆ — รูปแบบเดียวกับที่ AttributeController ส่งให้หน้าแก้ไข
@@ -3349,6 +3358,16 @@ class ProductController extends Controller
             ], 422);
         }
 
+        // ต้องผ่าน Product Matching ก่อน (ดู MarketplaceSyncGate::knownShopIds()) — ยังไม่
+        // รู้จักบนร้านนี้ = จะกลายเป็นการสร้าง listing ใหม่ ต้องให้ผู้ใช้ยืนยันเอง
+        // (frontend เห็น code not_matched แล้วถามยืนยัน → ส่งซ้ำพร้อม confirm_new_listing)
+        if ($action === 'push' && ! request()->boolean('confirm_new_listing') && ! (new MarketplaceSyncGate)->knownOnShop($product, $shop)) {
+            return response()->json([
+                'code' => 'not_matched',
+                'message' => "สินค้านี้ยังไม่ได้จับคู่ (Product Matching) กับ listing บน '{$shop->name}' — ถ้า push จะสร้างเป็นสินค้าใหม่บน platform",
+            ], 409);
+        }
+
         $syncJob = $this->dispatchMarketplaceSyncJob($product, $shop, $platform, $action);
 
         $message = match ($action) {
@@ -3421,6 +3440,7 @@ class ProductController extends Controller
             'product_ids.*' => ['integer', 'exists:products,id'],
             'shop_ids' => ['required', 'array', 'min:1'],
             'shop_ids.*' => ['integer', 'exists:sales_platform_shops,id'],
+            'confirm_new_listing' => ['sometimes', 'boolean'],
         ]);
 
         $products = Product::whereIn('id', $validated['product_ids'])->get();
@@ -3442,18 +3462,40 @@ class ProductController extends Controller
         }
 
         $shopIds = $shops->pluck('id')->all();
+        // คู่ สินค้า×ร้าน ที่ยังไม่ผ่าน Product Matching จะถูกข้าม (ไม่ติ๊ก published ให้ด้วย)
+        // เว้นแต่ผู้ใช้ติ๊กยืนยัน "สร้างเป็นสินค้าใหม่" ใน dialog — ดู queueMarketplaceSync()
+        $confirmNew = (bool) ($validated['confirm_new_listing'] ?? false);
+        $gate = new MarketplaceSyncGate;
+        $queued = 0;
+        $notMatched = 0;
 
         foreach ($products as $product) {
-            $product->platformShops()->syncWithoutDetaching($shopIds);
+            $knownShopIds = $confirmNew ? $shopIds : $gate->knownShopIds($product, $shops);
+            $pushShops = $shops->filter(fn (SalesPlatformShop $shop) => in_array($shop->id, $knownShopIds, true));
+            $notMatched += $shops->count() - $pushShops->count();
+            if ($pushShops->isEmpty()) {
+                continue;
+            }
 
-            foreach ($shops as $shop) {
+            $product->platformShops()->syncWithoutDetaching($pushShops->pluck('id')->all());
+
+            foreach ($pushShops as $shop) {
                 $this->dispatchMarketplaceSyncJob($product, $shop, $shop->platform->code, 'push');
+                $queued++;
             }
         }
 
         $message = __('Queued push for :products product(s) across :shops channel(s).', ['products' => $products->count(), 'shops' => $shops->count()]);
         if ($skippedCount > 0) {
             $message .= ' '.__('Skipped :count product(s) not enabled for publishing.', ['count' => $skippedCount]);
+        }
+        if ($notMatched > 0) {
+            $message = "Queued {$queued} push job(s). ข้าม {$notMatched} รายการ (สินค้า×ร้าน) ที่ยังไม่ได้จับคู่ (Product Matching) — จับคู่ก่อน หรือติ๊กยืนยัน \"สร้างเป็นสินค้าใหม่\"";
+            if ($skippedCount > 0) {
+                $message .= ' '.__('Skipped :count product(s) not enabled for publishing.', ['count' => $skippedCount]);
+            }
+
+            return back()->with($queued === 0 ? 'error' : 'warning', $message);
         }
 
         return back()->with('success', $message);
@@ -4553,6 +4595,7 @@ class ProductController extends Controller
         $validated = $request->validate([
             'published_shop_ids' => ['nullable', 'array'],
             'published_shop_ids.*' => ['integer', 'exists:sales_platform_shops,id'],
+            'confirm_new_listing' => ['sometimes', 'boolean'],
         ]);
 
         $shopIds = collect($validated['published_shop_ids'] ?? [])->map(fn ($id) => (int) $id)->sort()->values()->all();
@@ -4583,8 +4626,16 @@ class ProductController extends Controller
         }
 
         $shops = SalesPlatformShop::with('platform:id,code')->whereIn('id', $shopIds)->get();
+        // ร้านที่ยังไม่ผ่าน Product Matching ข้ามไป (ยังติ๊ก published ไว้ตามเดิม) เว้นแต่
+        // ผู้ใช้ยืนยัน "สร้างเป็นสินค้าใหม่" แล้ว — edit.tsx ถามก่อนเรียก (ดู knownShopIds prop)
+        $knownShopIds = $request->boolean('confirm_new_listing') ? $shopIds : (new MarketplaceSyncGate)->knownShopIds($product, $shops);
+        [$shops, $skipped] = $shops->partition(fn (SalesPlatformShop $shop) => in_array($shop->id, $knownShopIds, true));
         foreach ($shops as $shop) {
             $this->dispatchMarketplaceSyncJob($product, $shop, $shop->platform->code, 'push');
+        }
+
+        if ($skipped->isNotEmpty()) {
+            return back()->with('warning', "Product enabled and push queued to {$shops->count()} channel(s). ไม่ได้ push: {$skipped->pluck('name')->join(', ')} — ยังไม่ได้จับคู่ (Product Matching)");
         }
 
         return back()->with('success', "Product enabled and push queued to {$shops->count()} channel(s).");

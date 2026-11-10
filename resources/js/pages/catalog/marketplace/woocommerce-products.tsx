@@ -38,6 +38,7 @@ import {
     VStack,
 } from './marketplace-ui';
 import styles from './marketplace.module.css';
+import { MatchedListingCell, type ProductMatching } from './matched-listing-cell';
 
 type ProductFilter = 'all' | 'mapped' | 'unmapped';
 
@@ -59,6 +60,9 @@ interface ProductRow {
     sku: string;
     name: string;
     variants_count: number;
+    /** มี listing บนร้าน WooCommerce ผูก (Product Matching) กับสินค้านี้ (หรือ variant) แล้ว
+     * — ดู ProductMatchStatus */
+    matching: ProductMatching;
     master_category: MasterCategoryInfo | null;
     woocommerce_category: WooCommerceCategoryInfo | null;
     category_mapped: boolean;
@@ -329,6 +333,21 @@ export default function WooCommerceProductsMapping({ products, stats, filters }:
         loadAttributes();
         loadPayloadFields();
     };
+
+    // Deep link จากหน้า "จับคู่สินค้า (Product Matching)" (ปุ่ม "ไปหน้าแมพ" ของ
+    // listing ที่ผูกแล้ว): ?search=<sku>&open=<product id> — เปิดสินค้านั้นทันที
+    // &category=<id> = หมวดหมู่จริงของ listing บน platform — ตั้งเป็นค่าเริ่มต้นใน
+    // picker ให้เฉพาะสินค้าที่ยังไม่ได้แมพหมวดหมู่ (ยังต้องกดบันทึกเองเหมือนเดิม)
+    useEffect(() => {
+        const params = new URLSearchParams(window.location.search);
+        const openId = Number(params.get('open'));
+        const row = openId ? products.data.find((p) => p.id === openId) : undefined;
+        if (!row) return;
+        openProduct(row);
+        const categoryId = Number(params.get('category'));
+        if (categoryId && !row.category_mapped) setSelectedWooCatId(categoryId);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     // Scroll-spy: เปิดทำงานเฉพาะตอนอยู่ใน Object Page (มี activeProduct)
     useEffect(() => {
@@ -632,6 +651,16 @@ export default function WooCommerceProductsMapping({ products, stats, filters }:
             ),
         },
         {
+            key: 'matching',
+            header: 'Matching',
+            popinText: 'Matching',
+            priority: 'high',
+            align: 'center',
+            width: 96,
+            minWidth: 96,
+            render: (row) => <MatchedListingCell matching={row.matching} canRefresh={canEditProducts} canOpenProduct={canEditProducts} />,
+        },
+        {
             key: 'master_category',
             header: 'Master Category',
             priority: 'medium',
@@ -704,6 +733,13 @@ export default function WooCommerceProductsMapping({ products, stats, filters }:
                                         tooltip="แก้ไขสินค้า"
                                         accessibleName="แก้ไขสินค้า"
                                         onClick={() => router.visit(`/catalog/products/${activeProduct.id}/edit?platform=woocommerce`)}
+                                    />
+                                )}
+                                {activeProduct.matching.matched && (
+                                    <MatchedListingCell
+                                        matching={activeProduct.matching}
+                                        canRefresh={canEditProducts}
+                                        canOpenProduct={canEditProducts}
                                     />
                                 )}
                             </HStack>

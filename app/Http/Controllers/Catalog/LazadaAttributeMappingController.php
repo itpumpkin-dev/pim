@@ -23,6 +23,7 @@ use App\Services\Catalog\LazadaAttributeFamilyGenerator;
 use App\Services\Catalog\LazadaMappedAttributeCreator;
 use App\Services\Catalog\LazadaMappingTimelineBuilder;
 use App\Services\Lazada\LazadaClient;
+use App\Services\Marketplace\Listings\ProductMatchStatus;
 use App\Services\Marketplace\ResolvesProductAttributeValues;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -246,7 +247,11 @@ class LazadaAttributeMappingController extends Controller
             ])
             ->groupBy('product_id');
 
-        $rows = $paginated->getCollection()->map(function (Product $product) use ($pnames, $pimCategoryPathOf, $allLazadaCategories, $lazadaCategoryPathOf, $lazadaCategoryStats, $allPimCategories, $lazadaShopSyncByProduct) {
+        // "จับคู่แล้ว" (Product Matching) — มี listing บนร้าน Lazada ที่ผูกกับสินค้านี้
+        // (หรือ variant ของมัน) แล้ว — ดู ProductMatchStatus
+        $matchedListingsByProduct = ProductMatchStatus::matchedListingsByProduct($paginated->getCollection(), 'lazada', $request->user());
+
+        $rows = $paginated->getCollection()->map(function (Product $product) use ($matchedListingsByProduct, $pnames, $pimCategoryPathOf, $allLazadaCategories, $lazadaCategoryPathOf, $lazadaCategoryStats, $allPimCategories, $lazadaShopSyncByProduct) {
             $masterCat = $this->resolveMasterCategory($product, $allPimCategories, 'lazada_category_id');
 
             // $masterCat คือหมวดหมู่ที่ "ลึกที่สุด" สำหรับแสดงผล (path เต็ม) —
@@ -266,6 +271,11 @@ class LazadaAttributeMappingController extends Controller
                 'sku' => $product->sku,
                 'name' => $pnames[$product->id] ?? $product->sku,
                 'variants_count' => $product->variants->count(),
+                'matching' => [
+                    'matched' => isset($matchedListingsByProduct[$product->id]),
+                    'shops' => ProductMatchStatus::shopNames($matchedListingsByProduct[$product->id] ?? []),
+                    'listings' => $matchedListingsByProduct[$product->id] ?? [],
+                ],
                 'master_category' => $masterCat ? [
                     'id' => $masterCat->id,
                     'name' => $masterCat->name,

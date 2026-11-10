@@ -60,6 +60,7 @@ test('bulk push skips products that are not enabled and does not tick their shop
     $request = Request::create('/catalog/products/push-bulk', 'POST', [
         'product_ids' => [$on->id, $off->id],
         'shop_ids' => [$shop->id],
+        'confirm_new_listing' => true, // not about Product Matching — see ProductPushRequiresMatchingTest
     ]);
     $request->setUserResolver(fn () => auth()->user());
     $response = app(ProductController::class)->pushBulk($request);

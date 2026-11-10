@@ -22,6 +22,7 @@ use App\Models\TikTokSellerAccount;
 use App\Services\Catalog\TikTokAttributeFamilyGenerator;
 use App\Services\Catalog\TikTokMappedAttributeCreator;
 use App\Services\Catalog\TikTokMappingTimelineBuilder;
+use App\Services\Marketplace\Listings\ProductMatchStatus;
 use App\Services\Marketplace\ResolvesProductAttributeValues;
 use App\Services\TikTok\TikTokClient;
 use Illuminate\Http\JsonResponse;
@@ -711,7 +712,11 @@ class TikTokAttributeMappingController extends Controller
             ])
             ->groupBy('product_id');
 
-        $rows = $paginated->getCollection()->map(function (Product $product) use ($pnames, $pimCategoryPathOf, $allTikTokCategories, $tiktokCategoryPathOf, $tiktokCategoryStats, $allPimCategories, $tiktokShopSyncByProduct) {
+        // "จับคู่แล้ว" (Product Matching) — มี listing บนร้าน TikTok ที่ผูกกับสินค้านี้
+        // (หรือ variant ของมัน) แล้ว — ดู ProductMatchStatus
+        $matchedListingsByProduct = ProductMatchStatus::matchedListingsByProduct($paginated->getCollection(), 'tiktok', $request->user());
+
+        $rows = $paginated->getCollection()->map(function (Product $product) use ($matchedListingsByProduct, $pnames, $pimCategoryPathOf, $allTikTokCategories, $tiktokCategoryPathOf, $tiktokCategoryStats, $allPimCategories, $tiktokShopSyncByProduct) {
             $masterCat = $this->resolveMasterCategory($product, $allPimCategories, 'tiktok_category_id');
 
             // เหตุผลเดียวกับ ShopeeAttributeMappingController — $masterCat คือ
@@ -730,6 +735,11 @@ class TikTokAttributeMappingController extends Controller
                 'sku' => $product->sku,
                 'name' => $pnames[$product->id] ?? $product->sku,
                 'variants_count' => $product->variants->count(),
+                'matching' => [
+                    'matched' => isset($matchedListingsByProduct[$product->id]),
+                    'shops' => ProductMatchStatus::shopNames($matchedListingsByProduct[$product->id] ?? []),
+                    'listings' => $matchedListingsByProduct[$product->id] ?? [],
+                ],
                 'master_category' => $masterCat ? [
                     'id' => $masterCat->id,
                     'name' => $masterCat->name,
