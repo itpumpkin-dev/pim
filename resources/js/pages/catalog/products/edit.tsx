@@ -38,6 +38,7 @@ import '@ui5/webcomponents-icons/dist/search.js';
 import '@ui5/webcomponents-icons/dist/show.js';
 import '@ui5/webcomponents-icons/dist/slim-arrow-down.js';
 import '@ui5/webcomponents-icons/dist/slim-arrow-right.js';
+import '@ui5/webcomponents-icons/dist/status-positive.js';
 import '@ui5/webcomponents-icons/dist/translate.js';
 import '@ui5/webcomponents-icons/dist/upload-to-cloud.js';
 import '@ui5/webcomponents-icons/dist/write-new-document.js';
@@ -54,6 +55,8 @@ import {
     Icon,
     Input,
     Label,
+    List,
+    ListItemCustom,
     Menu,
     MenuItem,
     MenuSeparator,
@@ -61,6 +64,7 @@ import {
     MultiComboBoxItem,
     Option,
     OptionGroup,
+    Panel,
     SegmentedButton,
     SegmentedButtonItem,
     Select,
@@ -68,6 +72,7 @@ import {
     Tab,
     TabContainer,
     Tag,
+    Text,
     Title,
 } from '@ui5/webcomponents-react';
 import { FormEvent, memo, useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react';
@@ -259,6 +264,10 @@ interface Props {
     canEditMasterCategories?: boolean;
     /** config('services.marketplace_sync.auto_enabled') — บันทึกแล้วระบบส่ง/ยกเลิกบน marketplace ให้อัตโนมัติ */
     marketplaceAutoSync?: boolean;
+    /** ร้านที่สินค้านี้ผ่าน Product Matching แล้ว (หรือเคย push สำเร็จ) — ร้านอื่นต้องยืนยัน "สร้างเป็นสินค้าใหม่" ก่อน push (ดู MarketplaceSyncGate::knownShopIds()) */
+    marketplaceKnownShopIds?: number[];
+    /** ร้านที่สินค้านี้ผูกไว้ใน Product Matching แล้ว (ทุก platform) — โชว์ ✓ ข้างหัวข้อ */
+    matchedShopNames?: string[];
     /** ให้แปล attribute.master_source (เช่น 'brands') เป็นชื่ออ่านง่ายสำหรับ chip "Master: ..." — ดู ProductController::buildProductFormProps() */
     masterSources?: MasterSourceOption[];
     /** มาจาก query param ?platform= ตอนกดปุ่มแก้ไขจากหน้า Products Mapping ของ
@@ -349,6 +358,8 @@ export default function ProductEdit({
     canPushProducts = { lazada: false, shopee: false, tiktok: false, woocommerce: false },
     canEditMasterCategories = false,
     marketplaceAutoSync = false,
+    marketplaceKnownShopIds = [],
+    matchedShopNames = [],
     masterSources = [],
     platformContext = null,
 }: Props) {
@@ -638,11 +649,6 @@ export default function ProductEdit({
             };
         });
     }, []);
-
-    const toggleShopPublished = (shopId: number) => {
-        const current = data.published_shop_ids;
-        setData('published_shop_ids', current.includes(shopId) ? current.filter((id) => id !== shopId) : [...current, shopId]);
-    };
 
     // จำกัดตัวเลือกใน variant-attribute picker ให้เหลือแค่ attribute ที่ผูกกับ
     // family ของสินค้านี้จริงๆ — เหตุผลเดียวกับ picker ในหน้า Create
@@ -1195,6 +1201,9 @@ export default function ProductEdit({
 
     const [pushConfirmShop, setPushConfirmShop] = useState<{ id: number; name: string; platform: string } | null>(null);
     const [pushing, setPushing] = useState(false);
+    // ร้านที่สินค้านี้ยังไม่ผ่าน Product Matching — push = สร้างสินค้าใหม่บน platform ต้องติ๊กยืนยันก่อน
+    const pushNeedsNewListingConfirm = pushConfirmShop !== null && !marketplaceKnownShopIds.includes(pushConfirmShop.id);
+    const [pushConfirmNewListing, setPushConfirmNewListing] = useState(false);
     // Lazada/Shopee/TikTok: ปุ่ม Push กดได้ก็ต่อเมื่อ <MarketplacePushReview> ตรวจผ่านทุกข้อ
     const [pushReviewReady, setPushReviewReady] = useState(false);
     const pushNeedsReview = pushConfirmShop !== null && isReviewablePlatform(pushConfirmShop.platform);
@@ -1225,6 +1234,7 @@ export default function ProductEdit({
 
     const closePushDialog = () => {
         setPushConfirmShop(null);
+        setPushConfirmNewListing(false);
         setFillTranslationResult(null);
     };
 
@@ -1385,7 +1395,7 @@ export default function ProductEdit({
 
     const confirmPush = () => {
         if (!pushConfirmShop) return;
-        if (isDirty || (pushNeedsReview && !pushReviewReady)) return;
+        if (isDirty || (pushNeedsReview && !pushReviewReady) || (pushNeedsNewListingConfirm && !pushConfirmNewListing)) return;
         const { id: shopId, platform } = pushConfirmShop;
         const routes = PLATFORM_ROUTES[platform.toLowerCase()];
         if (!routes) return;
@@ -1406,7 +1416,9 @@ export default function ProductEdit({
             headers: {
                 'X-XSRF-TOKEN': xsrfToken,
                 Accept: 'application/json',
+                'Content-Type': 'application/json',
             },
+            body: JSON.stringify(pushConfirmNewListing ? { confirm_new_listing: true } : {}),
         })
             .then(async (res) => {
                 const body = await res.json();
@@ -1861,7 +1873,14 @@ export default function ProductEdit({
             {
                 preserveScroll: true,
                 preserveState: true,
-                onSuccess: () => options?.onSuccess?.(),
+                onSuccess: () => {
+                    // baseline ของคำเตือน "เปลี่ยนหมวดหมู่" ต้องขยับตามค่าที่เพิ่งบันทึกด้วย
+                    // ไม่งั้นหลังเลือกกลุ่มสินค้าผ่าน dialog/แผงนี้ จะยังเตือนค้างว่ายังไม่บันทึก
+                    if (section === 'master-categories') {
+                        setSavedMasterCodes(masterCategoryAttributes.map((attr) => String(payload[attr.code] ?? '')));
+                    }
+                    options?.onSuccess?.();
+                },
                 onError: (errs) => {
                     if (errs.conflict) {
                         setConflictMessage(errs.conflict);
@@ -1975,6 +1994,8 @@ export default function ProductEdit({
     // publishedShopIds prop (ค่าที่ save ไว้แล้ว) เพราะต้องการให้ยิงตามติ๊ก
     // ล่าสุดในหน้าจอ แม้ว่าจะยังไม่เคยกด Save แผง Sales Channels มาก่อนเลยก็ตาม
     const [publishConfirmOpen, setPublishConfirmOpen] = useState(false);
+    // ติ๊ก = push ร้านที่ยังไม่ผ่าน Product Matching ด้วย (สร้างเป็นสินค้าใหม่) ไม่ติ๊ก = server ข้ามร้านเหล่านั้น
+    const [publishConfirmNewListing, setPublishConfirmNewListing] = useState(false);
     const [publishing, setPublishing] = useState(false);
 
     // รายชื่อร้านที่ติ๊กไว้ตอนนี้ — ใช้แสดงในกล่องยืนยันก่อน publish เท่านั้น
@@ -1989,6 +2010,12 @@ export default function ProductEdit({
         });
         return data.published_shop_ids.map((id) => shopMeta.get(id)).filter((meta): meta is { name: string; platform: string } => Boolean(meta));
     }, [channelGroups, data.published_shop_ids]);
+    // ร้านที่ติ๊กไว้แต่ยังไม่ผ่าน Product Matching — Publish จะข้ามร้านเหล่านี้ เว้นแต่ติ๊กยืนยัน
+    const unmatchedShopsForPublish = useMemo(() => {
+        const names = new Map<number, string>();
+        channelGroups.forEach((group) => group.channels.forEach((ch) => ch.shop_id != null && names.set(ch.shop_id, ch.name || ch.code)));
+        return data.published_shop_ids.filter((id) => !marketplaceKnownShopIds.includes(id) && names.has(id)).map((id) => names.get(id) as string);
+    }, [channelGroups, data.published_shop_ids, marketplaceKnownShopIds]);
     // ร้านที่จะถูกยกเลิกการขายอัตโนมัติหลังบันทึกร่าง — ร้านที่ติ๊กไว้ (ชุดเดียวกับที่จะ
     // ถูกบันทึกไปพร้อมกัน) เฉพาะเมื่อเปิด auto-sync ไว้เท่านั้น
     const draftTakedownShops = marketplaceAutoSync ? tickedShopsForPublish : [];
@@ -2002,7 +2029,7 @@ export default function ProductEdit({
         setData('enabled', true);
         router.post(
             `/catalog/products/${product.id}/publish`,
-            { published_shop_ids: data.published_shop_ids },
+            { published_shop_ids: data.published_shop_ids, confirm_new_listing: publishConfirmNewListing },
             {
                 preserveScroll: true,
                 preserveState: true,
@@ -2017,7 +2044,11 @@ export default function ProductEdit({
                     setDefaults();
                     baselineValuesRef.current = data.values;
                 },
-                onFinish: () => setPublishing(false),
+                onFinish: () => {
+                    setPublishing(false);
+                    // ยืนยัน "สร้างเป็นสินค้าใหม่" ใช้ได้ครั้งเดียว — Publish ครั้งถัดไปต้องติ๊กใหม่
+                    setPublishConfirmNewListing(false);
+                },
             },
         );
     };
@@ -2121,6 +2152,15 @@ export default function ProductEdit({
                             <Title level="H3" size="H4" wrappingType="Normal">
                                 {t('editProductHeading', { sku: data.sku })}
                             </Title>
+                            {matchedShopNames.length > 0 && (
+                                <span style={{ display: 'inline-flex' }} title={`จับคู่แล้ว (Product Matching): ${matchedShopNames.join(', ')}`}>
+                                    <Icon
+                                        name="status-positive"
+                                        accessibleName="จับคู่แล้ว"
+                                        style={{ width: 22, height: 22, color: 'var(--sapPositiveColor)' }}
+                                    />
+                                </span>
+                            )}
                         </div>
 
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
@@ -3099,14 +3139,14 @@ export default function ProductEdit({
                                         ไล่แก้ทีละ onClick เพราะแผงนี้มีปุ่ม/checkbox ซ้อนกันหลายชั้นมาก) */}
                                         {canViewSalesChannels && (
                                             <div className={styles.card}>
-                                                <div style={{ display: 'flex', alignItems: 'center', marginBottom: '1rem' }}>
-                                                    <div style={{ flex: 1 }}>
+                                                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem', marginBottom: '0.75rem' }}>
+                                                    <div style={{ flex: 1, minWidth: 0 }}>
                                                         <Title level="H4" size="H5" wrappingType="Normal">
                                                             {t('salesChannels')}
                                                         </Title>
-                                                        <div className={styles.caption}>
+                                                        <Label wrappingType="Normal" style={{ color: 'var(--sapContent_LabelColor)' }}>
                                                             {canEditProducts ? t('salesChannelsHelp') : t('salesChannelsHelpSectionSave')}
-                                                        </div>
+                                                        </Label>
                                                     </div>
                                                     {canEditSalesChannels &&
                                                         !canEditProducts &&
@@ -3114,19 +3154,21 @@ export default function ProductEdit({
                                                             saveSection('channels', { published_shop_ids: data.published_shop_ids }),
                                                         )}
                                                 </div>
+                                                {/* Fiori: แต่ละ platform = Panel พับได้ (header มี checkbox เลือกทั้งหมด +
+                                                ตัวนับ) ร้านในนั้น = List แบบ Multiple selection — checkbox ของแต่ละแถว
+                                                คือ "published" ปุ่ม Push/ปิดการขาย/ลบ อยู่ท้ายแถว */}
                                                 <div
                                                     style={{
                                                         display: 'flex',
                                                         flexDirection: 'column',
-                                                        gap: '0.25rem',
+                                                        gap: '0.5rem',
                                                         ...(!canEditSalesChannels ? { pointerEvents: 'none', opacity: 0.6 } : {}),
                                                     }}
                                                 >
                                                     {channelGroups.map((group) => {
                                                         const isExpanded = expandedPlatforms.has(group.platform);
-                                                        const groupShopIds = group.channels
-                                                            .map((c) => c.shop_id)
-                                                            .filter((id): id is number => id != null);
+                                                        const shops = group.channels.filter((ch) => ch.shop_id != null);
+                                                        const groupShopIds = shops.map((ch) => ch.shop_id as number);
                                                         const checkedInGroup = groupShopIds.filter((id) =>
                                                             data.published_shop_ids.includes(id),
                                                         ).length;
@@ -3137,25 +3179,32 @@ export default function ProductEdit({
                                                         if (groupShopIds.length === 0) return null;
 
                                                         return (
-                                                            <div key={group.platform}>
-                                                                <div
-                                                                    className={styles.hoverRow}
-                                                                    onClick={() => togglePlatform(group.platform)}
-                                                                    style={{
-                                                                        display: 'flex',
-                                                                        alignItems: 'center',
-                                                                        gap: '0.25rem',
-                                                                        padding: '0.375rem 0.5rem',
-                                                                    }}
-                                                                >
-                                                                    <Icon name={isExpanded ? 'slim-arrow-down' : 'slim-arrow-right'} />
-                                                                    {groupShopIds.length > 0 && (
+                                                            <Panel
+                                                                key={group.platform}
+                                                                collapsed={!isExpanded}
+                                                                onToggle={() => togglePlatform(group.platform)}
+                                                                accessibleName={group.platform}
+                                                                noAnimation
+                                                                style={{
+                                                                    border: '1px solid var(--sapGroup_ContentBorderColor)',
+                                                                    borderRadius: 'var(--sapElement_BorderCornerRadius)',
+                                                                    overflow: 'hidden',
+                                                                }}
+                                                                header={
+                                                                    <div
+                                                                        style={{
+                                                                            display: 'flex',
+                                                                            alignItems: 'center',
+                                                                            gap: '0.25rem',
+                                                                            width: '100%',
+                                                                            minWidth: 0,
+                                                                        }}
+                                                                    >
                                                                         <CheckBox
                                                                             checked={allInGroupChecked}
                                                                             indeterminate={someInGroupChecked}
                                                                             accessibleName={group.platform}
-                                                                            onClick={(e) => e.stopPropagation()}
-                                                                            onChange={() => {
+                                                                            onChange={() =>
                                                                                 setData(
                                                                                     'published_shop_ids',
                                                                                     allInGroupChecked
@@ -3165,91 +3214,94 @@ export default function ProductEdit({
                                                                                         : Array.from(
                                                                                               new Set([...data.published_shop_ids, ...groupShopIds]),
                                                                                           ),
-                                                                                );
-                                                                            }}
+                                                                                )
+                                                                            }
                                                                         />
-                                                                    )}
-                                                                    <span style={{ fontWeight: 700 }}>{group.platform}</span>
-                                                                    <Tag design="Neutral" hideStateIcon size="S">
-                                                                        {groupShopIds.length}
-                                                                    </Tag>
-                                                                    {groupShopIds.length > 0 && (
-                                                                        <span className={styles.captionInline}>
-                                                                            (
+                                                                        <Title level="H5" size="H6" style={{ flex: 1, minWidth: 0 }}>
+                                                                            {group.platform}
+                                                                        </Title>
+                                                                        <Tag
+                                                                            design={checkedInGroup > 0 ? 'Information' : 'Neutral'}
+                                                                            hideStateIcon
+                                                                            size="S"
+                                                                        >
                                                                             {t('publishedCountLabel', {
                                                                                 checked: checkedInGroup,
                                                                                 total: groupShopIds.length,
                                                                             })}
-                                                                            )
-                                                                        </span>
-                                                                    )}
-                                                                </div>
-                                                                {isExpanded && (
-                                                                    <div style={{ display: 'flex', flexDirection: 'column', paddingLeft: '2rem' }}>
-                                                                        {group.channels.map((ch) => {
-                                                                            const isShop = ch.shop_id != null;
-                                                                            if (!isShop) return null;
-                                                                            const published =
-                                                                                isShop && data.published_shop_ids.includes(ch.shop_id as number);
-                                                                            // Push/Deactivate จะไปดู published_shop_ids ที่ *บันทึกไว้จริงๆ*
-                                                                            // ฝั่ง backend (product->platformShops() จะอัปเดตก็ต่อเมื่อกด Save
-                                                                            // Product เท่านั้น) — แต่ `published` ด้านบนสะท้อนสถานะ checkbox
-                                                                            // ที่ยังไม่ได้ save ในเครื่อง ถ้าโชว์ปุ่ม action ทันทีที่ติ๊กเสร็จ
-                                                                            // ก่อน save ผู้ใช้จะติ๊กร้านแล้วกด Push ได้ทันที ซึ่ง backend จะ
-                                                                            // ปฏิเสธด้วย "not marked as published" เพราะยังไม่ได้บันทึกอะไร
-                                                                            // เลย เลยต้องโชว์ action ก็ต่อเมื่อสถานะ checkbox ตรงกับที่บันทึก
-                                                                            // ไว้จริงเท่านั้น
-                                                                            const savedPublished =
-                                                                                isShop && publishedShopIds.includes(ch.shop_id as number);
-                                                                            // เฉพาะ platform ที่เชื่อมต่อจริง (มีอยู่ใน PLATFORM_ROUTES)
-                                                                            // เท่านั้นถึงจะมี Push/Deactivate — ร้านบน platform ที่ยังไม่ได้
-                                                                            // เชื่อมต่อ (หรือจะเชื่อมในอนาคต) ก็ยังตั้ง "published" ได้
-                                                                            // (แค่ติ๊ก checkbox) โดยไม่มี API จริงให้ push
-                                                                            // แยกสิทธิ์ push/deactivate ต่อแพลตฟอร์มแล้ว (marketplace_{platform}.
-                                                                            // push_products_{platform} — ดู ProductController::buildProductFormProps())
-                                                                            // คนละสิทธิ์กับ canEditSalesChannels ที่คุมแค่การติ๊ก/บันทึก published
-                                                                            // ข้างบน — role ที่แก้ published_shop_ids ได้ อาจ push ได้แค่บาง
-                                                                            // แพลตฟอร์มเท่านั้นก็ได้
-                                                                            const canPushThisPlatform = Boolean(
-                                                                                canPushProducts[
-                                                                                    group.platform.toLowerCase() as keyof typeof canPushProducts
-                                                                                ],
-                                                                            );
-                                                                            const canPushOrDeactivate =
-                                                                                published &&
-                                                                                savedPublished &&
-                                                                                group.platform.toLowerCase() in PLATFORM_ROUTES &&
-                                                                                canPushThisPlatform;
-                                                                            // มีแค่ทิศทาง "ติ๊กแล้วแต่ยังไม่ได้ save" เท่านั้นที่ควรมี hint เตือน
-                                                                            // — เพราะเป็นเคสเดียวที่ปุ่ม push/deactivate จะดูเหมือนใช้ได้แต่จริงๆ
-                                                                            // ยังใช้ไม่ได้ ส่วนทิศทางตรงข้าม (ติ๊กออก) ไม่มี action ไหนถูกบล็อก
-                                                                            // อยู่ แค่รอ save เฉยๆ
-                                                                            const hasUnsavedPublishChange = published && !savedPublished;
-                                                                            return (
-                                                                                // คลิกที่ไหนในแถวก็ได้ = ติ๊ก/เอาติ๊กออก (ปุ่ม action ในแถว stopPropagation เอง)
+                                                                        </Tag>
+                                                                    </div>
+                                                                }
+                                                            >
+                                                                <List
+                                                                    selectionMode="Multiple"
+                                                                    separators="Inner"
+                                                                    accessibleName={group.platform}
+                                                                    onSelectionChange={(e) => {
+                                                                        const selected = e.detail.selectedItems.map((item) =>
+                                                                            Number((item as HTMLElement).dataset.shopId),
+                                                                        );
+                                                                        setData('published_shop_ids', [
+                                                                            ...data.published_shop_ids.filter((id) => !groupShopIds.includes(id)),
+                                                                            ...selected,
+                                                                        ]);
+                                                                    }}
+                                                                >
+                                                                    {shops.map((ch) => {
+                                                                        const shopId = ch.shop_id as number;
+                                                                        const shopName = ch.name || ch.code;
+                                                                        const published = data.published_shop_ids.includes(shopId);
+                                                                        // Push/Deactivate จะไปดู published_shop_ids ที่ *บันทึกไว้จริงๆ*
+                                                                        // ฝั่ง backend — `published` สะท้อน checkbox ที่ยังไม่ได้ save เลย
+                                                                        // โชว์ action ก็ต่อเมื่อสถานะ checkbox ตรงกับที่บันทึกไว้จริงเท่านั้น
+                                                                        // (ไม่งั้น backend ปฏิเสธด้วย "not marked as published")
+                                                                        const savedPublished = publishedShopIds.includes(shopId);
+                                                                        // เฉพาะ platform ที่เชื่อมต่อจริง (PLATFORM_ROUTES) และ role มีสิทธิ์
+                                                                        // push ของ platform นั้น (marketplace_{platform}.push_products_{platform}
+                                                                        // — คนละสิทธิ์กับ canEditSalesChannels ที่คุมแค่การติ๊ก/บันทึก)
+                                                                        const canPushThisPlatform = Boolean(
+                                                                            canPushProducts[
+                                                                                group.platform.toLowerCase() as keyof typeof canPushProducts
+                                                                            ],
+                                                                        );
+                                                                        const canPushOrDeactivate =
+                                                                            published &&
+                                                                            savedPublished &&
+                                                                            group.platform.toLowerCase() in PLATFORM_ROUTES &&
+                                                                            canPushThisPlatform;
+                                                                        // ติ๊กแล้วแต่ยังไม่ได้ save = เคสเดียวที่ปุ่ม action ยังใช้ไม่ได้
+                                                                        const hasUnsavedPublishChange = published && !savedPublished;
+                                                                        const target = { id: shopId, name: shopName, platform: group.platform };
+
+                                                                        return (
+                                                                            <ListItemCustom
+                                                                                key={ch.id}
+                                                                                data-shop-id={shopId}
+                                                                                selected={published}
+                                                                                accessibleName={shopName}
+                                                                            >
                                                                                 <div
-                                                                                    key={ch.id}
-                                                                                    className={styles.hoverRow}
-                                                                                    onClick={() => toggleShopPublished(ch.shop_id as number)}
                                                                                     style={{
                                                                                         display: 'flex',
                                                                                         alignItems: 'center',
-                                                                                        padding: '0.125rem 0.75rem 0.125rem 0.25rem',
+                                                                                        gap: '0.25rem',
+                                                                                        width: '100%',
+                                                                                        minWidth: 0,
                                                                                     }}
                                                                                 >
-                                                                                    <CheckBox
-                                                                                        checked={published}
-                                                                                        accessibleName={ch.name || ch.code}
-                                                                                        onClick={(e) => e.stopPropagation()}
-                                                                                        onChange={() => toggleShopPublished(ch.shop_id as number)}
-                                                                                    />
-                                                                                    <span style={{ flex: 1 }}>{ch.name || ch.code}</span>
+                                                                                    <div style={{ flex: 1, minWidth: 0 }}>
+                                                                                        <Text maxLines={1}>{shopName}</Text>
+                                                                                        {hasUnsavedPublishChange && (
+                                                                                            <Label style={{ fontStyle: 'italic' }}>
+                                                                                                {t('saveFirstHint')}
+                                                                                            </Label>
+                                                                                        )}
+                                                                                    </div>
                                                                                     {ch.is_live && (
-                                                                                        <Tag
-                                                                                            design="Positive"
-                                                                                            hideStateIcon
-                                                                                            size="S"
-                                                                                            style={{ marginRight: '0.5rem' }}
+                                                                                        <FioriStatus
+                                                                                            label={t('liveLabel')}
+                                                                                            tone="success"
+                                                                                            showIcon
                                                                                             title={
                                                                                                 ch.live_synced_at
                                                                                                     ? t('confirmedLiveAsOf', {
@@ -3259,24 +3311,13 @@ export default function ProductEdit({
                                                                                                       })
                                                                                                     : t('confirmedLiveOnLastSync')
                                                                                             }
-                                                                                        >
-                                                                                            {t('liveLabel')}
-                                                                                        </Tag>
-                                                                                    )}
-                                                                                    {hasUnsavedPublishChange && (
-                                                                                        <span
-                                                                                            className={styles.captionInline}
-                                                                                            style={{ fontStyle: 'italic', whiteSpace: 'nowrap' }}
-                                                                                        >
-                                                                                            {t('saveFirstHint')}
-                                                                                        </span>
+                                                                                        />
                                                                                     )}
                                                                                     {canPushOrDeactivate && (
-                                                                                        // ปิด "การเผยแพร่" (ค่าที่บันทึกแล้ว — backend เช็คจาก DB) = push ไม่ได้
-                                                                                        // ดู ProductController::queueMarketplaceSync()
+                                                                                        // ปิด "การเผยแพร่" (ค่าที่บันทึกแล้ว) = push ไม่ได้ — ดู
+                                                                                        // ProductController::queueMarketplaceSync() (span รับ tooltip
+                                                                                        // แทนปุ่มที่ disabled)
                                                                                         <span
-                                                                                            // ปุ่มที่ disabled ไม่รับ click — กันไม่ให้ click ทะลุไปติ๊กแถว
-                                                                                            onClick={(e) => e.stopPropagation()}
                                                                                             title={
                                                                                                 product.enabled
                                                                                                     ? t('pushToPlatformIconTooltip', {
@@ -3292,28 +3333,15 @@ export default function ProductEdit({
                                                                                                     platform: group.platform,
                                                                                                 })}
                                                                                                 disabled={!product.enabled}
-                                                                                                onClick={(e) => {
-                                                                                                    e.stopPropagation();
-                                                                                                    setPushConfirmShop({
-                                                                                                        id: ch.shop_id as number,
-                                                                                                        name: ch.name || ch.code,
-                                                                                                        platform: group.platform,
-                                                                                                    });
-                                                                                                    checkPlatformStatus(
-                                                                                                        ch.shop_id as number,
-                                                                                                        group.platform,
-                                                                                                    );
+                                                                                                onClick={() => {
+                                                                                                    setPushConfirmShop(target);
+                                                                                                    checkPlatformStatus(shopId, group.platform);
                                                                                                 }}
                                                                                             />
                                                                                         </span>
                                                                                     )}
-                                                                                    {/* ต่างจาก Push (โชว์ได้ตลอดอย่างปลอดภัย — เพราะมันแค่สร้าง
-                                                                            หรืออัปเดต) ปุ่ม Deactivate จะมีความหมายก็ต่อเมื่อมีของ
-                                                                            live อยู่จริงให้เอาลงเท่านั้น ถ้าไม่มีเช็ค ch.is_live
-                                                                            ปุ่มนี้จะโผล่มาแค่เพราะ "ติ๊กว่าจะ publish" เฉยๆ พอกดกับ
-                                                                            ร้านที่ติ๊กไว้แต่ไม่เคย push สำเร็จจริง ก็จะไปเจอ error
-                                                                            "never been pushed — nothing to deactivate" จาก
-                                                                            backend แทนที่จะไม่โชว์ปุ่มไปเลยตั้งแต่แรก */}
+                                                                                    {/* Deactivate มีความหมายเฉพาะตอนมีของ live อยู่จริง (ch.is_live)
+                                                                                    — ไม่งั้น backend ตอบ "never been pushed — nothing to deactivate" */}
                                                                                     {canPushOrDeactivate && ch.is_live && (
                                                                                         <Button
                                                                                             design="Transparent"
@@ -3324,27 +3352,15 @@ export default function ProductEdit({
                                                                                             accessibleName={t('deactivateOnPlatformIconTooltip', {
                                                                                                 platform: group.platform,
                                                                                             })}
-                                                                                            onClick={(e) => {
-                                                                                                e.stopPropagation();
-                                                                                                setDeactivateConfirmShop({
-                                                                                                    id: ch.shop_id as number,
-                                                                                                    name: ch.name || ch.code,
-                                                                                                    platform: group.platform,
-                                                                                                });
-                                                                                                checkPlatformStatus(
-                                                                                                    ch.shop_id as number,
-                                                                                                    group.platform,
-                                                                                                );
+                                                                                            onClick={() => {
+                                                                                                setDeactivateConfirmShop(target);
+                                                                                                checkPlatformStatus(shopId, group.platform);
                                                                                             }}
                                                                                         />
                                                                                     )}
-                                                                                    {/* ตอนนี้รองรับแค่ Shopee เท่านั้น (ดู key `delete` ใน
-                                                                            PLATFORM_ROUTES กับ ShopeeProductSyncService::delete()) —
-                                                                            แยกให้ดูต่างจาก Push/Deactivate ชัดๆ (สีแดง ไอคอนคนละแบบ)
-                                                                            เพราะเป็น action ที่อันตรายกว่าชัดเจน: ต่างจาก Deactivate
-                                                                            ตรงที่ย้อนกลับไม่ได้เลยแม้จะ push ใหม่ก็ตาม ต้องสร้าง
-                                                                            listing ใหม่ทั้งหมดเท่านั้น ใช้เงื่อนไข ch.is_live เดียวกับ
-                                                                            Deactivate ด้วยเหตุผลเดียวกัน (ไม่มีของ live ก็ไม่มีอะไรให้ลบ) */}
+                                                                                    {/* ลบ listing ถาวร — Shopee เท่านั้น (PLATFORM_ROUTES.delete /
+                                                                                    ShopeeProductSyncService::delete()) ย้อนกลับไม่ได้ เลยแยกเป็น
+                                                                                    ปุ่มสีแดง ใช้เงื่อนไข ch.is_live เดียวกับ Deactivate */}
                                                                                     {canPushOrDeactivate &&
                                                                                         ch.is_live &&
                                                                                         group.platform.toLowerCase() === 'shopee' && (
@@ -3358,26 +3374,18 @@ export default function ProductEdit({
                                                                                                 accessibleName={
                                                                                                     t('deleteListingButton') + ` — ${group.platform}`
                                                                                                 }
-                                                                                                onClick={(e) => {
-                                                                                                    e.stopPropagation();
-                                                                                                    setDeleteListingConfirmShop({
-                                                                                                        id: ch.shop_id as number,
-                                                                                                        name: ch.name || ch.code,
-                                                                                                        platform: group.platform,
-                                                                                                    });
-                                                                                                    checkPlatformStatus(
-                                                                                                        ch.shop_id as number,
-                                                                                                        group.platform,
-                                                                                                    );
+                                                                                                onClick={() => {
+                                                                                                    setDeleteListingConfirmShop(target);
+                                                                                                    checkPlatformStatus(shopId, group.platform);
                                                                                                 }}
                                                                                             />
                                                                                         )}
                                                                                 </div>
-                                                                            );
-                                                                        })}
-                                                                    </div>
-                                                                )}
-                                                            </div>
+                                                                            </ListItemCustom>
+                                                                        );
+                                                                    })}
+                                                                </List>
+                                                            </Panel>
                                                         );
                                                     })}
                                                     {channelGroups.length === 0 && (
@@ -3453,7 +3461,10 @@ export default function ProductEdit({
                 push ไปร้านไหนบ้าง (หรือไม่ push เลยถ้ายังไม่ได้ติ๊กร้านไหนไว้) */}
             <FioriMessageBox
                 open={publishConfirmOpen}
-                onCancel={() => setPublishConfirmOpen(false)}
+                onCancel={() => {
+                    setPublishConfirmOpen(false);
+                    setPublishConfirmNewListing(false);
+                }}
                 onConfirm={saveAndPublish}
                 title={t('confirmSaveAndPublish')}
                 severity="confirm"
@@ -3472,6 +3483,19 @@ export default function ProductEdit({
                     </ul>
                 ) : (
                     <div style={{ marginTop: '0.5rem' }}>{t('confirmPublishNoChannelsTicked')}</div>
+                )}
+                {unmatchedShopsForPublish.length > 0 && (
+                    <div style={{ marginTop: '0.75rem' }}>
+                        <FioriMessageStrip severity="warning">
+                            ยังไม่ได้จับคู่ (Product Matching): {unmatchedShopsForPublish.join(', ')} — ร้านเหล่านี้จะถูกข้าม ไม่ push
+                            เว้นแต่ติ๊กยืนยันด้านล่าง (จะสร้างเป็นสินค้าใหม่บน platform)
+                        </FioriMessageStrip>
+                        <CheckBox
+                            text="ยืนยันว่าเป็นสินค้าใหม่ ยังไม่เคยวางขายบนร้านเหล่านี้"
+                            checked={publishConfirmNewListing}
+                            onChange={(e) => setPublishConfirmNewListing(e.target.checked)}
+                        />
+                    </div>
                 )}
             </FioriMessageBox>
 
@@ -3669,7 +3693,12 @@ export default function ProductEdit({
                                     design="Emphasized"
                                     icon="upload-to-cloud"
                                     onClick={confirmPush}
-                                    disabled={pushing || isDirty || (pushNeedsReview && !pushReviewReady)}
+                                    disabled={
+                                        pushing ||
+                                        isDirty ||
+                                        (pushNeedsReview && !pushReviewReady) ||
+                                        (pushNeedsNewListingConfirm && !pushConfirmNewListing)
+                                    }
                                     loading={pushing}
                                     loadingDelay={0}
                                 >
@@ -3686,6 +3715,20 @@ export default function ProductEdit({
                 <div className={styles.dialogText}>
                     {t('pushToChannelWarning', { platform: pushConfirmShop?.platform, name: pushConfirmShop?.name })}
                 </div>
+                {pushNeedsNewListingConfirm && (
+                    <div style={{ marginTop: '1rem' }}>
+                        <FioriMessageStrip severity="warning">
+                            สินค้านี้ยังไม่ได้จับคู่ (Product Matching) กับ listing บน {pushConfirmShop?.name} — ถ้า push จะสร้างเป็นสินค้าใหม่บน{' '}
+                            {pushConfirmShop?.platform} ถ้ามี listing อยู่แล้ว ให้ไปจับคู่ที่หน้า &quot;จับคู่สินค้า (Product Matching)&quot; ก่อน
+                        </FioriMessageStrip>
+                        <CheckBox
+                            text="ยืนยันว่าเป็นสินค้าใหม่ ยังไม่เคยวางขายบนร้านนี้"
+                            checked={pushConfirmNewListing}
+                            onChange={(e) => setPushConfirmNewListing(e.target.checked)}
+                            disabled={pushing}
+                        />
+                    </div>
+                )}
                 {pushStatusCheck && (
                     <div style={{ marginTop: '1rem' }}>
                         {pushStatusCheck.loading ? (
@@ -4224,6 +4267,11 @@ const SelectControl = memo(function SelectControl({
             loading={loading}
             showClearIcon
             placeholder={loading ? t('loadingOptions') : t('selectOption')}
+            // ต้องส่ง value (ข้อความที่โชว์) คู่กับ selectedValue เสมอ — UI5 ComboBox
+            // แปลง selectedValue เป็นข้อความให้เองแค่ตอน render ครั้งแรกเท่านั้น ถ้าค่าถูก
+            // ตั้งทีหลังจากโค้ด (เช่น เลือกกลุ่มสินค้าใน dialog แล้วแผงด้านข้างได้ค่าตาม หรือ
+            // options ของหมวดหมู่ย่อย/กลุ่มสินค้าเพิ่ง fetch มาถึง) ช่องจะว่างทั้งที่มีค่าอยู่
+            value={selectedOption ? selectedOption.admin_label || selectedOption.code || '' : ''}
             selectedValue={selectedOption ? optionValue(selectedOption) : ''}
             onSelectionChange={(e) => {
                 const item = e.detail.item;

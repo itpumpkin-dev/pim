@@ -11,6 +11,8 @@ import '@ui5/webcomponents-icons/dist/detail-view.js';
 import '@ui5/webcomponents-icons/dist/disconnected.js';
 import '@ui5/webcomponents-icons/dist/hide.js';
 import '@ui5/webcomponents-icons/dist/history.js';
+import '@ui5/webcomponents-icons/dist/map-2.js';
+import '@ui5/webcomponents-icons/dist/overflow.js';
 import '@ui5/webcomponents-icons/dist/show.js';
 import '@ui5/webcomponents-icons/dist/synchronize.js';
 import {
@@ -21,6 +23,8 @@ import {
     Input,
     Label,
     Link,
+    Menu,
+    MenuItem,
     Option,
     OptionGroup,
     Select,
@@ -75,6 +79,8 @@ interface ProductRef {
     id: number;
     sku: string;
     name: string | null;
+    /** top-level product (a variant's parent) — the row shown in the platform's Product Mapping table */
+    mapping_product?: { id: number; sku: string };
 }
 
 interface SuggestionItem {
@@ -110,6 +116,8 @@ interface ListingRow {
     match_method: 'auto_sku' | 'manual' | 'suggested' | 'bundle' | 'pushed' | null;
     matched_at: string | null;
     pack_quantity: number | null;
+    /** the listing's category on the platform (matched tab, from the cached item detail) */
+    listing_category_id?: number | null;
     product: ProductRef | null;
     components: SuggestionItem[];
     sku_drift: boolean;
@@ -507,24 +515,47 @@ export default function ProductMatching({ shopGroups, filters, summary, rows, sy
             </div>
         ) : null;
 
-    const matchedActions = (row: ListingRow) =>
-        canMatch ? (
-            <div className={pm.actions}>
-                <Button design="Default" icon="chain-link" disabled={busyId === row.id} onClick={() => setLinkTarget(row)}>
-                    เปลี่ยน
-                </Button>
+    // ไปหน้า "สินค้า (Product Mapping)" ของ platform นี้ แล้วเปิดสินค้าที่ผูกไว้ทันที
+    // (ดู deep link ?open= ใน lazada/shopee/tiktok/woocommerce-products.tsx) —
+    // เฉพาะการผูกแบบสินค้าเดียว (bundle มีหลายสินค้า เลยไม่มีปุ่มนี้)
+    const mappingButton = (row: ListingRow) => {
+        const target = row.product?.mapping_product;
+        if (!target || !shop) return null;
+        const url = `/catalog/marketplace/${shop.platform}/products?search=${encodeURIComponent(target.sku)}&open=${target.id}${row.listing_category_id ? `&category=${row.listing_category_id}` : ''}`;
+
+        return (
+            <Button
+                design="Transparent"
+                icon="map-2"
+                tooltip={`ไปหน้าแมพสินค้า (Product Mapping) บน ${platformLabel}`}
+                accessibleName="ไปหน้าแมพสินค้า"
+                onClick={() => router.visit(url)}
+            />
+        );
+    };
+
+    // แท็บ "ผูกแล้ว": ปุ่มทั้งหมดรวมไว้ท้ายแถว — ไปหน้าแมพ + รายละเอียด/เปิดบน platform
+    // เป็นไอคอน ส่วน "เปลี่ยน"/"ยกเลิกการผูก" ย้ายเข้าเมนู "เพิ่มเติม" (⋯) ด้านท้าย
+    const [rowMenu, setRowMenu] = useState<{ row: ListingRow; opener: HTMLElement } | null>(null);
+
+    const matchedRowActions = (row: ListingRow) => (
+        <div className={pm.actions} style={{ flexWrap: 'nowrap' }}>
+            {mappingButton(row)}
+            {openCell(row)}
+            {canMatch && (
                 <Button
                     design="Transparent"
-                    icon="disconnected"
+                    icon="overflow"
+                    tooltip="เพิ่มเติม"
+                    accessibleName="เพิ่มเติม"
                     disabled={busyId === row.id}
                     loading={busyId === row.id}
                     loadingDelay={0}
-                    onClick={() => unlink(row)}
-                >
-                    ยกเลิกการผูก
-                </Button>
-            </div>
-        ) : null;
+                    onClick={(e) => setRowMenu({ row, opener: e.currentTarget as HTMLElement })}
+                />
+            )}
+        </div>
+    );
 
     const ignoredActions = (row: ListingRow) =>
         canMatch ? (
@@ -572,8 +603,8 @@ export default function ProductMatching({ shopGroups, filters, summary, rows, sy
                 </HStack>
             ),
         },
-        { key: 'actions', header: '', popinText: 'จัดการ', priority: 'high', minWidth: 200, render: matchedActions },
-        ...commonListingColumns,
+        ...commonListingColumns.filter((col) => col.key !== 'open'),
+        { key: 'actions', header: '', popinText: 'จัดการ', priority: 'always', align: 'right', minWidth: 176, render: matchedRowActions },
     ];
 
     const unmatchedColumns: FioriResponsiveColumn<ListingRow>[] = [
@@ -823,6 +854,25 @@ export default function ProductMatching({ shopGroups, filters, summary, rows, sy
                     </>
                 )}
             </div>
+
+            {/* เมนู "เพิ่มเติม" (⋯) ท้ายแถวของแท็บ "ผูกแล้ว" — ดู matchedRowActions() */}
+            <Menu
+                open={rowMenu !== null}
+                opener={rowMenu?.opener}
+                horizontalAlign="End"
+                onClose={() => setRowMenu(null)}
+                onItemClick={(e) => {
+                    const row = rowMenu?.row;
+                    const action = (e.detail.item as HTMLElement).dataset.action;
+                    setRowMenu(null);
+                    if (!row) return;
+                    if (action === 'change') setLinkTarget(row);
+                    if (action === 'unlink') unlink(row);
+                }}
+            >
+                <MenuItem data-action="change" icon="chain-link" text="เปลี่ยนสินค้าที่ผูก" />
+                <MenuItem data-action="unlink" icon="disconnected" text="ยกเลิกการผูก" />
+            </Menu>
 
             <ProductMatchingLinkDialog listing={linkTarget} pageUrl={PAGE_URL} onClose={() => setLinkTarget(null)} />
 

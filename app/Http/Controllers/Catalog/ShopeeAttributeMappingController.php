@@ -22,6 +22,7 @@ use App\Models\ShopeeSellerAccount;
 use App\Services\Catalog\ShopeeAttributeFamilyGenerator;
 use App\Services\Catalog\ShopeeMappedAttributeCreator;
 use App\Services\Catalog\ShopeeMappingTimelineBuilder;
+use App\Services\Marketplace\Listings\ProductMatchStatus;
 use App\Services\Marketplace\ResolvesProductAttributeValues;
 use App\Services\Shopee\ShopeeClient;
 use Illuminate\Http\JsonResponse;
@@ -347,7 +348,11 @@ class ShopeeAttributeMappingController extends Controller
             ])
             ->groupBy('product_id');
 
-        $rows = $paginated->getCollection()->map(function (Product $product) use ($pnames, $pimCategoryPathOf, $allShopeeCategories, $shopeeCategoryPathOf, $shopeeCategoryStats, $allPimCategories, $shopeeShopSyncByProduct) {
+        // "จับคู่แล้ว" (Product Matching) — มี listing บนร้าน Shopee ที่ผูกกับสินค้านี้
+        // (หรือ variant ของมัน) แล้ว — ดู ProductMatchStatus
+        $matchedListingsByProduct = ProductMatchStatus::matchedListingsByProduct($paginated->getCollection(), 'shopee', $request->user());
+
+        $rows = $paginated->getCollection()->map(function (Product $product) use ($matchedListingsByProduct, $pnames, $pimCategoryPathOf, $allShopeeCategories, $shopeeCategoryPathOf, $shopeeCategoryStats, $allPimCategories, $shopeeShopSyncByProduct) {
             $masterCat = $this->resolveMasterCategory($product, $allPimCategories, 'shopee_category_id');
 
             // เหตุผลเดียวกับ LazadaAttributeMappingController — $masterCat คือ
@@ -366,6 +371,11 @@ class ShopeeAttributeMappingController extends Controller
                 'sku' => $product->sku,
                 'name' => $pnames[$product->id] ?? $product->sku,
                 'variants_count' => $product->variants->count(),
+                'matching' => [
+                    'matched' => isset($matchedListingsByProduct[$product->id]),
+                    'shops' => ProductMatchStatus::shopNames($matchedListingsByProduct[$product->id] ?? []),
+                    'listings' => $matchedListingsByProduct[$product->id] ?? [],
+                ],
                 'master_category' => $masterCat ? [
                     'id' => $masterCat->id,
                     'name' => $masterCat->name,

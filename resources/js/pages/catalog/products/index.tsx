@@ -308,6 +308,8 @@ export default function ProductIndex({ gridConfig, gridData, filters, attributes
     const [shareDialogOpen, setShareDialogOpen] = useState(false);
     const [selectedShopIds, setSelectedShopIds] = useState<number[]>([]);
     const [sharing, setSharing] = useState(false);
+    // ยืนยัน "สร้างเป็นสินค้าใหม่" ให้คู่ สินค้า×ร้าน ที่ยังไม่ผ่าน Product Matching (ไม่ติ๊ก = server ข้ามให้)
+    const [shareConfirmNewListing, setShareConfirmNewListing] = useState(false);
     const [deactivating, setDeactivating] = useState(false);
 
     // 'all' = สินค้าที่เลือกทั้งหมด publish ไปที่ร้านนี้แล้ว, 'some' = publish ไปแค่
@@ -339,13 +341,14 @@ export default function ProductIndex({ gridConfig, gridData, filters, attributes
         setSharing(true);
         router.post(
             '/catalog/products/push-bulk',
-            { product_ids: selectedIds, shop_ids: selectedShopIds },
+            { product_ids: selectedIds, shop_ids: selectedShopIds, confirm_new_listing: shareConfirmNewListing },
             {
                 preserveScroll: true,
                 onSuccess: () => {
                     setShareDialogOpen(false);
                     setSelectedShopIds([]);
                     setSelectedIds([]);
+                    setShareConfirmNewListing(false);
                 },
                 onFinish: () => setSharing(false),
             },
@@ -1182,6 +1185,21 @@ export default function ProductIndex({ gridConfig, gridData, filters, attributes
                                 </div>
                             </div>
                         ))}
+
+                        {salesChannels.length > 0 && (
+                            <div>
+                                <CheckBox
+                                    text="สร้างเป็นสินค้าใหม่สำหรับรายการที่ยังไม่ได้จับคู่"
+                                    checked={shareConfirmNewListing}
+                                    onChange={(e) => setShareConfirmNewListing(e.target.checked)}
+                                    disabled={shareBusy}
+                                />
+                                <div className={styles.caption}>
+                                    ไม่ติ๊ก = ข้ามสินค้าที่ยังไม่ได้จับคู่ (Product Matching) กับร้านนี้ —
+                                    ติ๊กเฉพาะเมื่อแน่ใจว่าเป็นสินค้าใหม่ที่ยังไม่เคยวางขาย (มีผลกับปุ่ม Share เท่านั้น)
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </Dialog>
 

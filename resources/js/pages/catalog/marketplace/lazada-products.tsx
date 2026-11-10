@@ -63,6 +63,7 @@ import {
     VStack,
 } from './marketplace-ui';
 import styles from './marketplace.module.css';
+import { MatchedListingCell, type ProductMatching } from './matched-listing-cell';
 
 type ProductFilter = 'all' | 'mapped' | 'unmapped';
 
@@ -102,6 +103,9 @@ interface ProductRow {
     sku: string;
     name: string;
     variants_count: number;
+    /** มี listing บนร้าน Lazada ผูก (Product Matching) กับสินค้านี้ (หรือ variant) แล้ว
+     * — ดู ProductMatchStatus */
+    matching: ProductMatching;
     master_category: MasterCategoryInfo | null;
     lazada_category: LazadaCategoryInfo | null;
     category_mapped: boolean;
@@ -254,6 +258,8 @@ export default function LazadaProductsMapping({ products, stats, filters, lazada
     // products/index.tsx's "Share" dialog ใช้ (ดู index.tsx's shareSelectedProducts())
     // แค่เปิดทางลัดให้กดจากหน้านี้ได้เลย ไม่ต้องสลับไปหน้า list สินค้าทั่วไปก่อน
     const [bulkPushDialogOpen, setBulkPushDialogOpen] = useState(false);
+    // ยืนยัน "สร้างเป็นสินค้าใหม่" ให้สินค้าที่ยังไม่ผ่าน Product Matching (ไม่ติ๊ก = server ข้ามให้)
+    const [bulkConfirmNewListing, setBulkConfirmNewListing] = useState(false);
     const [bulkPushShopId, setBulkPushShopId] = useState<number | ''>('');
     const [bulkPushing, setBulkPushing] = useState(false);
     const firstRender = useRef(true);
@@ -462,14 +468,34 @@ export default function LazadaProductsMapping({ products, stats, filters, lazada
         setShopActionConfirm(null);
         setActingShopId(shopId);
         setDetailPushResult(null);
+        sendShopAction(productId, shopId, action, routeSegment, false);
+    };
 
+    // confirmNewListing — สินค้าที่ยังไม่ผ่าน Product Matching บนร้านนี้ server ตอบ
+    // 409 not_matched (ดู ProductController::queueMarketplaceSync()) ถามยืนยันว่าเป็น
+    // สินค้าใหม่จริงก่อน แล้วค่อยส่งซ้ำพร้อม confirm_new_listing
+    const sendShopAction = (productId: number, shopId: number, action: 'push' | 'deactivate', routeSegment: string, confirmNewListing: boolean) => {
         fetch(`/catalog/products/${productId}/${routeSegment}/${shopId}`, {
             method: 'POST',
-            headers: { 'X-XSRF-TOKEN': xsrfToken(), Accept: 'application/json' },
+            headers: { 'X-XSRF-TOKEN': xsrfToken(), Accept: 'application/json', 'Content-Type': 'application/json' },
+            body: JSON.stringify(confirmNewListing ? { confirm_new_listing: true } : {}),
         })
             .then(async (res) => {
                 if (detailProductIdRef.current !== productId) return;
                 const body = await res.json();
+                if (res.status === 409 && body.code === 'not_matched') {
+                    const ok = await confirm({
+                        title: 'สินค้านี้ยังไม่ได้จับคู่',
+                        message: `${body.message} — ยืนยันว่าเป็นสินค้าใหม่ที่ยังไม่เคยวางขายบนร้านนี้? (ถ้ามี listing อยู่แล้ว ให้ไปจับคู่ที่หน้า "จับคู่สินค้า (Product Matching)" ก่อน)`,
+                        confirmLabel: 'สร้างเป็นสินค้าใหม่',
+                    });
+                    if (ok && detailProductIdRef.current === productId) {
+                        sendShopAction(productId, shopId, action, routeSegment, true);
+                    } else {
+                        setActingShopId(null);
+                    }
+                    return;
+                }
                 if (!res.ok || !body.job_id) {
                     setDetailPushResult({
                         severity: 'error',
@@ -636,6 +662,21 @@ export default function LazadaProductsMapping({ products, stats, filters, lazada
 
         loadPayloadFields();
     };
+
+    // Deep link จากหน้า "จับคู่สินค้า (Product Matching)" (ปุ่ม "ไปหน้าแมพ" ของ
+    // listing ที่ผูกแล้ว): ?search=<sku>&open=<product id> — เปิดสินค้านั้นทันที
+    // &category=<id> = หมวดหมู่จริงของ listing บน platform — ตั้งเป็นค่าเริ่มต้นใน
+    // picker ให้เฉพาะสินค้าที่ยังไม่ได้แมพหมวดหมู่ (ยังต้องกดบันทึกเองเหมือนเดิม)
+    useEffect(() => {
+        const params = new URLSearchParams(window.location.search);
+        const openId = Number(params.get('open'));
+        const row = openId ? products.data.find((p) => p.id === openId) : undefined;
+        if (!row) return;
+        openProduct(row);
+        const categoryId = Number(params.get('category'));
+        if (categoryId && !row.category_mapped) setSelectedLazadaCatId(categoryId);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     // Scroll-spy: เปิดทำงานเฉพาะตอนอยู่ใน Object Page (มี activeProduct) — ไฮไลต์แท็บ
     // ตาม section ที่อยู่ใต้แถบ anchor ที่ sticky อยู่ตอนนั้น เหมือนกับที่ products/edit.tsx ทำ
@@ -1040,12 +1081,13 @@ export default function LazadaProductsMapping({ products, stats, filters, lazada
         setBulkPushing(true);
         router.post(
             '/catalog/products/push-bulk',
-            { product_ids: selectedRows, shop_ids: [bulkPushShopId] },
+            { product_ids: selectedRows, shop_ids: [bulkPushShopId], confirm_new_listing: bulkConfirmNewListing },
             {
                 preserveScroll: true,
                 onSuccess: () => {
                     setBulkPushDialogOpen(false);
                     setBulkPushShopId('');
+                    setBulkConfirmNewListing(false);
                     setSelectedRows([]);
                 },
                 onFinish: () => setBulkPushing(false),
@@ -1100,6 +1142,16 @@ export default function LazadaProductsMapping({ products, stats, filters, lazada
                     </HStack>
                 </div>
             ),
+        },
+        {
+            key: 'matching',
+            header: 'Matching',
+            popinText: 'Matching',
+            priority: 'high',
+            align: 'center',
+            width: 96,
+            minWidth: 96,
+            render: (row) => <MatchedListingCell matching={row.matching} canRefresh={canEditProducts} canOpenProduct={canEditProducts} />,
         },
         {
             key: 'master_category',
@@ -1231,6 +1283,13 @@ export default function LazadaProductsMapping({ products, stats, filters, lazada
                                         tooltip="แก้ไขสินค้า"
                                         accessibleName="แก้ไขสินค้า"
                                         onClick={() => router.visit(`/catalog/products/${activeProduct.id}/edit?platform=lazada`)}
+                                    />
+                                )}
+                                {activeProduct.matching.matched && (
+                                    <MatchedListingCell
+                                        matching={activeProduct.matching}
+                                        canRefresh={canEditProducts}
+                                        canOpenProduct={canEditProducts}
                                     />
                                 )}
                             </HStack>
@@ -2143,6 +2202,15 @@ export default function LazadaProductsMapping({ products, stats, filters, lazada
                         </Option>
                     ))}
                 </Select>
+                <CheckBox
+                    text="สร้างเป็นสินค้าใหม่สำหรับรายการที่ยังไม่ได้จับคู่"
+                    checked={bulkConfirmNewListing}
+                    onChange={(e) => setBulkConfirmNewListing(e.target.checked)}
+                    style={{ marginTop: '0.75rem' }}
+                />
+                <Caption>
+                    ไม่ติ๊ก = ข้ามสินค้าที่ยังไม่ได้จับคู่ (Product Matching) กับร้านนี้ — ติ๊กเฉพาะเมื่อแน่ใจว่าเป็นสินค้าใหม่ที่ยังไม่เคยวางขาย
+                </Caption>
             </FioriMessageBox>
         </AppLayout>
     );

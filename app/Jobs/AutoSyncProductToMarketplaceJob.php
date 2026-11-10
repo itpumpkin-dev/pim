@@ -77,6 +77,13 @@ class AutoSyncProductToMarketplaceJob implements ShouldQueue
             return;
         }
 
+        // Auto-sync never creates a new listing — without Product Matching (or a
+        // previous push) that needs a person's explicit "สร้างเป็นสินค้าใหม่"
+        // confirmation (see ProductController::queueMarketplaceSync()).
+        if ($action === 'push' && ! $gate->knownOnShop($product, $shop)) {
+            return;
+        }
+
         $dispatcher->queue($product, $shop, $platform, $action);
     }
 }

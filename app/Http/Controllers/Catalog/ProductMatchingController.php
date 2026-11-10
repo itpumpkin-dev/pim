@@ -7,6 +7,7 @@ use App\Jobs\SyncMarketplaceListingsJob;
 use App\Models\Attribute;
 use App\Models\Locale;
 use App\Models\MarketplaceListing;
+use App\Models\MarketplaceListingDetail;
 use App\Models\MarketplaceListingSyncRun;
 use App\Models\Product;
 use App\Models\ProductValue;
@@ -104,7 +105,7 @@ class ProductMatchingController extends Controller
             $platform = (string) $request->input('platform', '');
             $shopId = (int) ($shopRows->firstWhere('platform', $platform)['id'] ?? $shopRows->first()['id'] ?? 0);
         }
-        $tab = in_array($request->input('tab'), self::TABS, true) ? $request->input('tab') : 'unmatched';
+        $tab = in_array($request->input('tab'), self::TABS, true) ? $request->input('tab') : 'matched';
         $search = trim((string) $request->input('search', ''));
         $activeOnly = $request->has('active_only') ? $request->boolean('active_only') : true;
         $minScore = (int) $request->input('min_score', 0);
@@ -244,7 +245,7 @@ class ProductMatchingController extends Controller
     private function listingRows(int $shopId, string $tab, bool $activeOnly, string $search, int $perPage, array $suggestions)
     {
         $query = $this->listingQuery($shopId, $activeOnly, $search)
-            ->with(['product:id,sku', 'components.product:id,sku', 'ignoredBy:id,name'])
+            ->with(['product:id,sku,parent_id', 'product.parent:id,sku', 'components.product:id,sku', 'ignoredBy:id,name'])
             ->when($tab === 'matched', fn ($q) => $q->linked())
             ->when($tab === 'unmatched', fn ($q) => $q->unlinked())
             ->when($tab === 'suggested', fn ($q) => $q->unlinked()->whereIn('marketplace_listings.id', array_keys($suggestions) ?: [0]))
@@ -259,6 +260,17 @@ class ProductMatchingController extends Controller
             ->merge($page->flatMap(fn (MarketplaceListing $l) => collect($suggestions[$l->id] ?? [])->flatMap(fn ($s) => array_column($s['items'], 'product_id'))))
             ->filter()->unique()->values();
         $names = $this->productNames($productIds);
+
+        // the listing's real category on the platform (cached item detail, may not be fetched
+        // yet) — passed by the matched tab's "ไปหน้าแมพ" link so the Product Mapping page can
+        // preselect it; platform category tables are keyed by the platform's own id
+        $categoryByItem = $tab === 'matched'
+            ? MarketplaceListingDetail::query()
+                ->where('sales_platform_shop_id', $shopId)
+                ->whereIn('item_id', $page->pluck('item_id')->unique()->values())
+                ->whereNotNull('category_id')
+                ->pluck('category_id', 'item_id')
+            : collect();
 
         return $paginator->through(fn (MarketplaceListing $l) => [
             'id' => $l->id,
@@ -278,8 +290,16 @@ class ProductMatchingController extends Controller
                 'id' => $l->product->id,
                 'sku' => $l->product->sku,
                 'name' => $names[$l->product->id] ?? null,
+                // the top-level product (a variant's parent) — what the per-platform
+                // "สินค้า (Product Mapping)" table lists; target of the matched tab's
+                // "ไปหน้าแมพ" link
+                'mapping_product' => [
+                    'id' => $l->product->parent?->id ?? $l->product->id,
+                    'sku' => $l->product->parent?->sku ?? $l->product->sku,
+                ],
             ] : null,
             'pack_quantity' => $l->pack_quantity,
+            'listing_category_id' => ctype_digit((string) $categoryByItem->get($l->item_id)) ? (int) $categoryByItem->get($l->item_id) : null,
             'components' => $l->components->filter(fn ($c) => $c->product !== null)->map(fn ($c) => [
                 'product_id' => $c->product_id,
                 'sku' => $c->product->sku,

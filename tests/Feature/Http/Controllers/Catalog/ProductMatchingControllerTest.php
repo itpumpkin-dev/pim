@@ -3,6 +3,7 @@
 use App\Http\Controllers\Catalog\ProductMatchingController;
 use App\Jobs\SyncMarketplaceListingsJob;
 use App\Models\MarketplaceListing;
+use App\Models\MarketplaceListingDetail;
 use App\Models\Product;
 use App\Models\SalesPlatform;
 use App\Models\SalesPlatformShop;
@@ -86,4 +87,23 @@ test('sync queues one job for the requested shop', function () {
     expect($response->getStatusCode())->toBe(302);
     Queue::assertPushed(SyncMarketplaceListingsJob::class, 1);
     Queue::assertPushed(SyncMarketplaceListingsJob::class, fn ($job) => $job->shopId === $shop->id);
+});
+
+test('matched rows carry the parent product and the cached listing category for the Product Mapping link', function () {
+    $user = User::factory()->create();
+    $shop = pmcShop();
+    $parent = Product::create(['sku' => 'PMC-PARENT']);
+    $variant = Product::create(['sku' => 'PMC-VARIANT', 'parent_id' => $parent->id]);
+    $plain = Product::create(['sku' => 'PMC-PLAIN']);
+
+    pmcListing($shop, ['item_id' => '10', 'seller_sku' => 'PMC-VARIANT', 'product_id' => $variant->id, 'match_method' => 'manual']);
+    pmcListing($shop, ['item_id' => '11', 'seller_sku' => 'PMC-PLAIN', 'product_id' => $plain->id, 'match_method' => 'manual']);
+    MarketplaceListingDetail::create(['sales_platform_shop_id' => $shop->id, 'platform' => 'shopee', 'item_id' => '10', 'category_id' => '100123']);
+
+    $rows = collect(pmcProps($user, ['shop_id' => $shop->id, 'tab' => 'matched'])['rows']->items())->keyBy('item_id');
+
+    expect($rows['10']['product']['mapping_product'])->toBe(['id' => $parent->id, 'sku' => 'PMC-PARENT'])
+        ->and($rows['10']['listing_category_id'])->toBe(100123)
+        ->and($rows['11']['product']['mapping_product'])->toBe(['id' => $plain->id, 'sku' => 'PMC-PLAIN'])
+        ->and($rows['11']['listing_category_id'])->toBeNull();
 });

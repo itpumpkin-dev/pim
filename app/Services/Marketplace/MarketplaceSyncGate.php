@@ -5,8 +5,12 @@ namespace App\Services\Marketplace;
 use App\Models\Attribute;
 use App\Models\Brand;
 use App\Models\LazadaAttributeMapping;
+use App\Models\MarketplaceListing;
 use App\Models\Product;
+use App\Models\ProductMarketplaceSyncJob;
 use App\Models\ProductValue;
+use App\Models\SalesPlatformShop;
+use Illuminate\Support\Facades\DB;
 
 /**
  * The "is this product actually ready to push to {platform}?" checks, shared
@@ -114,5 +118,43 @@ class MarketplaceSyncGate
         }
 
         return false;
+    }
+
+    /**
+     * กติกา "push ต้องผ่าน Product Matching ก่อน": สินค้านี้รู้จักบนร้านนี้แล้ว
+     * หรือยัง — ถ้ายัง การ push จะไปสร้าง listing ใหม่บน platform ซึ่งต้องให้
+     * ผู้ใช้ยืนยันเองว่า "เป็นสินค้าใหม่จริง" (confirm_new_listing) ไม่งั้นเสี่ยง
+     * สร้างซ้ำกับ listing เดิมที่แค่ยังไม่ได้จับคู่ (Lazada/WooCommerce หา
+     * listing เดิมด้วย SKU เท่านั้น — seller SKU ไม่ตรงก็สร้างใหม่ทันที)
+     *
+     * "รู้จักแล้ว" = อย่างใดอย่างหนึ่ง:
+     *  - มี listing บนร้านนี้ผูกตรงกับสินค้า/variant ของมัน (product_id —
+     *    ไม่นับการเป็นส่วนหนึ่งของ bundle เพราะ bundle เป็นคนละ item กัน)
+     *  - PIM มี platform_item_id ของร้านนี้ cache ไว้แล้ว
+     *  - เคย push จาก PIM ไปร้านนี้สำเร็จมาแล้ว (ProductMarketplaceSyncJob
+     *    completed) — Lazada/WooCommerce ไม่ cache platform_item_id ตอน push
+     *
+     * @param  iterable<SalesPlatformShop>|null  $shops  null = ทุกร้าน
+     * @return list<int> ids ของร้าน (ใน $shops) ที่สินค้านี้รู้จักแล้ว
+     */
+    public function knownShopIds(Product $product, ?iterable $shops = null): array
+    {
+        $productIds = Product::where('id', $product->id)->orWhere('parent_id', $product->id)->pluck('id')->all();
+        $shopIds = $shops === null ? null : collect($shops)->map(fn ($s) => (int) ($s instanceof SalesPlatformShop ? $s->id : $s))->all();
+        $scope = fn ($q, string $column) => $shopIds === null ? $q : $q->whereIn($column, $shopIds);
+
+        return collect()
+            ->merge($scope(MarketplaceListing::query(), 'sales_platform_shop_id')
+                ->whereIn('product_id', $productIds)->whereNull('ignored_at')->pluck('sales_platform_shop_id'))
+            ->merge($scope(DB::table('product_platform_shops'), 'sales_platform_shop_id')
+                ->where('product_id', $product->id)->whereNotNull('platform_item_id')->pluck('sales_platform_shop_id'))
+            ->merge($scope(ProductMarketplaceSyncJob::query(), 'sales_platform_shop_id')
+                ->where('product_id', $product->id)->where('action', 'push')->where('status', 'completed')->pluck('sales_platform_shop_id'))
+            ->map(fn ($id) => (int) $id)->unique()->sort()->values()->all();
+    }
+
+    public function knownOnShop(Product $product, SalesPlatformShop $shop): bool
+    {
+        return $this->knownShopIds($product, [$shop]) !== [];
     }
 }

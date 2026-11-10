@@ -15,6 +15,7 @@ use App\Models\WooCommerceCategory;
 use App\Services\Catalog\WooCommerceAttributeFamilyGenerator;
 use App\Services\Catalog\WooCommerceMappedAttributeCreator;
 use App\Services\Catalog\WooCommerceMappingTimelineBuilder;
+use App\Services\Marketplace\Listings\ProductMatchStatus;
 use App\Services\WooCommerce\WooCommerceClient;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -224,7 +225,11 @@ class WooCommerceAttributeMappingController extends Controller
             }
         }
 
-        $rows = $paginated->getCollection()->map(function (Product $product) use ($pnames, $pimCategoryPathOf, $allWooCategories, $wooCategoryPathOf, $allPimCategories) {
+        // "จับคู่แล้ว" (Product Matching) — มี listing บนร้าน WooCommerce ที่ผูกกับสินค้านี้
+        // (หรือ variant ของมัน) แล้ว — ดู ProductMatchStatus
+        $matchedListingsByProduct = ProductMatchStatus::matchedListingsByProduct($paginated->getCollection(), 'woocommerce', $request->user());
+
+        $rows = $paginated->getCollection()->map(function (Product $product) use ($matchedListingsByProduct, $pnames, $pimCategoryPathOf, $allWooCategories, $wooCategoryPathOf, $allPimCategories) {
             $masterCat = $this->resolveMasterCategory($product, $allPimCategories, 'woocommerce_category_id');
             $mappedCategory = $this->resolveMappedCategory($product, $allPimCategories, 'woocommerce_category_id') ?? $masterCat;
 
@@ -236,6 +241,11 @@ class WooCommerceAttributeMappingController extends Controller
                 'sku' => $product->sku,
                 'name' => $pnames[$product->id] ?? $product->sku,
                 'variants_count' => $product->variants->count(),
+                'matching' => [
+                    'matched' => isset($matchedListingsByProduct[$product->id]),
+                    'shops' => ProductMatchStatus::shopNames($matchedListingsByProduct[$product->id] ?? []),
+                    'listings' => $matchedListingsByProduct[$product->id] ?? [],
+                ],
                 'master_category' => $masterCat ? [
                     'id' => $masterCat->id,
                     'name' => $masterCat->name,
