@@ -5,6 +5,7 @@ namespace App\Services\Marketplace\Listings;
 use App\Models\Product;
 use App\Models\SalesPlatformShop;
 use App\Models\User;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
@@ -28,6 +29,49 @@ class ProductMatchStatus
     public static function matchedShopsByProduct(Collection $products, ?string $platform, ?User $user): array
     {
         return array_map(fn (array $listings) => self::shopNames($listings), self::matchedListingsByProduct($products, $platform, $user));
+    }
+
+    /**
+     * "Matching" filter of the Product Mapping tables — same rule as
+     * matchedListingsByProduct() (a listing on one of the platform's accessible
+     * shops links the product or one of its variants, directly or as a bundle
+     * component), as SQL so it filters before pagination. $query is on `products`.
+     */
+    public static function applyMatchingFilter(Builder $query, string $platform, ?User $user, bool $matched): Builder
+    {
+        $shopIds = SalesPlatformShop::whereHas('platform', fn ($q) => $q->where('code', $platform))
+            ->get(['id', 'sales_platform_id'])
+            ->filter(fn (SalesPlatformShop $shop) => $user?->canAccessShop($shop))
+            ->pluck('id')->all() ?: [0];
+
+        return $matched
+            ? $query->whereIn('products.id', self::matchedParentIdsQuery($shopIds))
+            : $query->whereNotIn('products.id', self::matchedParentIdsQuery($shopIds));
+    }
+
+    /**
+     * Top-level product ids linked on these shops, as ONE set-based subquery
+     * (listing / bundle component → its product → that product's parent, or
+     * itself) — the earlier per-product correlated EXISTS (with an OR and a
+     * nested variant lookup) took 4-7 s per query over ~23k products; this is
+     * a single hash semi-join. COALESCE never yields NULL, so NOT IN is safe.
+     *
+     * @param  list<int>  $shopIds
+     */
+    private static function matchedParentIdsQuery(array $shopIds): \Illuminate\Database\Query\Builder
+    {
+        $direct = DB::table('marketplace_listings as ml')
+            ->join('products as lp', 'lp.id', '=', 'ml.product_id')
+            ->whereIn('ml.sales_platform_shop_id', $shopIds)
+            ->selectRaw('COALESCE(lp.parent_id, lp.id) as id');
+
+        $components = DB::table('marketplace_listing_components as mc')
+            ->join('marketplace_listings as mlc', 'mlc.id', '=', 'mc.marketplace_listing_id')
+            ->join('products as cp', 'cp.id', '=', 'mc.product_id')
+            ->whereIn('mlc.sales_platform_shop_id', $shopIds)
+            ->selectRaw('COALESCE(cp.parent_id, cp.id) as id');
+
+        return $direct->union($components);
     }
 
     /**

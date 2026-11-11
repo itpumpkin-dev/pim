@@ -221,7 +221,8 @@ export const SectionCard = forwardRef<HTMLDivElement, { children: ReactNode; scr
     return (
         <div
             ref={ref}
-            className={styles.card}
+            // sectionCard = hover tint per step (see marketplace.module.css)
+            className={`${styles.card} ${styles.sectionCard}`}
             style={{ padding: '1.5rem', scrollMarginTop: scrollMarginTop ? `${scrollMarginTop}px` : undefined, ...style }}
         >
             {children}

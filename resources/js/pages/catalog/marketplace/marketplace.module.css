@@ -348,3 +348,33 @@
     color: var(--sapTextColor);
     font-size: var(--sapFontSmallSize);
 }
+
+/* table reloading in place (filters / search / paging) — overlay instead of the
+   app-wide route skeleton, which preserveState visits skip */
+.busyArea {
+    position: relative;
+}
+
+.busyLayer {
+    position: absolute;
+    inset: 0;
+    z-index: 3;
+    display: flex;
+    justify-content: center;
+    padding-top: 4rem;
+    background: color-mix(in srgb, var(--sapBackgroundColor) 60%, transparent);
+    border-radius: var(--sapElement_BorderCornerRadius);
+}
+
+/* step sections of the Product Mapping object page (SectionCard) — hovering a
+   step tints its content so it's clear which step you are working in. Colours
+   come from CSS variables so a step with its own tint (edit / push) gets a
+   darker shade of that tint instead of the generic hover colour. */
+.sectionCard {
+    background: var(--section-bg, var(--sapGroup_ContentBackground));
+    transition: background-color 0.15s ease;
+}
+
+.sectionCard:hover {
+    background: var(--section-hover-bg, var(--sapList_Hover_Background));
+}

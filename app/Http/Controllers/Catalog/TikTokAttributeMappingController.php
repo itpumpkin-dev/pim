@@ -653,6 +653,15 @@ class TikTokAttributeMappingController extends Controller
                 ->whereDoesntHave('categories', fn ($cq) => $cq->whereNotNull('categories.tiktok_category_id'));
         }
 
+        // ตัวกรอง "Matching" (Product Matching) — กฎเดียวกับคอลัมน์ ✓ (ดู ProductMatchStatus)
+        $matching = $request->input('matching', 'all');
+        if (! in_array($matching, ['all', 'matched', 'unmatched'], true)) {
+            $matching = 'all';
+        }
+        if ($matching !== 'all') {
+            ProductMatchStatus::applyMatchingFilter($query, 'tiktok', $request->user(), $matching === 'matched');
+        }
+
         $paginated = $query->orderBy('id', 'desc')->paginate($perPage)->withQueryString();
 
         $pageProductIds = $paginated->getCollection()->pluck('id');
@@ -784,17 +793,22 @@ class TikTokAttributeMappingController extends Controller
             ->filter(fn (SalesPlatformShop $shop) => $request->user()?->canAccessShop($shop))
             ->values();
 
+        $matchedProductsCount = ProductMatchStatus::applyMatchingFilter(Product::query()->whereNull('parent_id'), 'tiktok', $request->user(), true)->count();
+
         return Inertia::render('catalog/marketplace/tiktok-products', [
             'products' => $paginated,
             'stats' => [
                 'total' => $totalProductsCount,
                 'mapped' => $mappedProductsCount,
                 'unmapped' => $totalProductsCount - $mappedProductsCount,
+                'matched' => $matchedProductsCount,
+                'not_matched' => $totalProductsCount - $matchedProductsCount,
             ],
             'filters' => [
                 'search' => $search,
                 'filter' => $filter,
                 'per_page' => $perPage,
+                'matching' => $matching,
             ],
             'tiktokShops' => $tiktokShops,
         ]);

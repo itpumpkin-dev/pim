@@ -7,7 +7,7 @@ import { MarketplaceCategoryPicker } from '@/components/marketplace-category-pic
 import { TimelinePanel } from '@/components/timeline-panel';
 import AppLayout from '@/layouts/app-layout';
 import { xsrfToken } from '@/lib/csrf';
-import { FioriStatus } from '@/lib/fiori-style';
+import { FioriBusyIndicator, FioriStatus, useFioriBusy } from '@/lib/fiori-style';
 import { type BreadcrumbItem, type SharedData } from '@/types';
 import { Head, router, usePage } from '@inertiajs/react';
 import '@ui5/webcomponents-icons/dist/accept.js';
@@ -43,6 +43,8 @@ import { PlatformEditPanel } from './platform-edit-panel';
 import { PlatformPushPanel } from './platform-push-panel';
 
 type ProductFilter = 'all' | 'mapped' | 'unmapped';
+/** ตัวกรอง Product Matching — ดู ProductMatchStatus::applyMatchingFilter() */
+type MatchingFilter = 'all' | 'matched' | 'unmatched';
 
 interface MasterCategoryInfo {
     id: number;
@@ -84,8 +86,8 @@ interface PaginatedData<T> {
 
 interface Props {
     products: PaginatedData<ProductRow>;
-    stats: { total: number; mapped: number; unmapped: number };
-    filters: { filter: ProductFilter; search: string; per_page: number };
+    stats: { total: number; mapped: number; unmapped: number; matched: number; not_matched: number };
+    filters: { filter: ProductFilter; search: string; per_page: number; matching?: MatchingFilter };
 }
 
 interface WooCommerceAttributeRow {
@@ -155,6 +157,12 @@ export default function WooCommerceProductsMapping({ products, stats, filters }:
 
     const [search, setSearch] = useState(filters.search ?? '');
     const [filter, setFilter] = useState<ProductFilter>(filters.filter ?? 'all');
+    const [matching, setMatching] = useState<MatchingFilter>(filters.matching ?? 'all');
+    // ตาราง reload แบบ preserveState (กรอง / ค้นหา / เปลี่ยนหน้า) ไม่มี skeleton ของทั้งแอป
+    // — โชว์ busy ทับตารางเอง เฉพาะเมื่อโหลดนานกว่า 150ms (โหลดเร็วไม่กระพริบ)
+    const [navigating, setNavigating] = useState(false);
+    const showNavBusy = useFioriBusy(navigating, 150);
+    const navEvents = { onStart: () => setNavigating(true), onFinish: () => setNavigating(false) };
     const [perPage, setPerPage] = useState<number>(products.per_page ?? 25);
     const [selectedRows, setSelectedRows] = useState<number[]>([]);
     const firstRender = useRef(true);
@@ -223,7 +231,11 @@ export default function WooCommerceProductsMapping({ products, stats, filters }:
         }
 
         const timeout = setTimeout(() => {
-            router.get('/catalog/marketplace/woocommerce/products', { search, filter, per_page: perPage }, { preserveState: true, replace: true });
+            router.get(
+                '/catalog/marketplace/woocommerce/products',
+                { search, matching, filter, per_page: perPage },
+                { preserveState: true, replace: true, ...navEvents },
+            );
         }, 300);
 
         return () => clearTimeout(timeout);
@@ -231,16 +243,33 @@ export default function WooCommerceProductsMapping({ products, stats, filters }:
 
     const applyFilter = (value: ProductFilter) => {
         setFilter(value);
-        router.get('/catalog/marketplace/woocommerce/products', { search, filter: value, per_page: perPage }, { preserveState: true });
+        router.get(
+            '/catalog/marketplace/woocommerce/products',
+            { search, matching, filter: value, per_page: perPage },
+            { preserveState: true, ...navEvents },
+        );
+    };
+
+    const applyMatching = (value: MatchingFilter) => {
+        setMatching(value);
+        router.get(
+            '/catalog/marketplace/woocommerce/products',
+            { search, matching: value, filter, per_page: perPage },
+            { preserveState: true, ...navEvents },
+        );
     };
 
     const handlePerPageChange = (value: number) => {
         setPerPage(value);
-        router.get('/catalog/marketplace/woocommerce/products', { search, filter, per_page: value }, { preserveState: true });
+        router.get('/catalog/marketplace/woocommerce/products', { search, matching, filter, per_page: value }, { preserveState: true, ...navEvents });
     };
 
     const goToPage = (page: number) => {
-        router.get('/catalog/marketplace/woocommerce/products', { search, filter, per_page: perPage, page }, { preserveState: true });
+        router.get(
+            '/catalog/marketplace/woocommerce/products',
+            { search, matching, filter, per_page: perPage, page },
+            { preserveState: true, ...navEvents },
+        );
     };
 
     // ต่างจาก Lazada/Shopee/TikTok ตรงที่โหลด "list กลาง" ของ WooCommerce
@@ -329,10 +358,27 @@ export default function WooCommerceProductsMapping({ products, stats, filters }:
         window.setTimeout(() => scrollToSection(idx), 0);
     }, [pendingSection, activeProduct]);
 
+    // เปิด object page ของสินค้า → รีเซ็ตการเลื่อนของ container ชั้นนอก (ค้างมาจากตอนเลื่อนตาราง
+    // สินค้ายาวๆ) ไม่งั้น object page จะเปิดมาแบบเลื่อนเกินไปแล้ว header หลุดจอ / body ถูกตัด
+    useEffect(() => {
+        if (!activeProduct) return;
+        for (let node = scrollBodyRef.current?.parentElement ?? null; node; node = node.parentElement) {
+            if (node.scrollTop > 0) node.scrollTop = 0;
+        }
+        window.scrollTo(0, 0);
+    }, [activeProduct?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
     const scrollToSection = (idx: number) => {
         suppressScrollSpy.current = true;
         setSectionIndex(idx);
-        sectionRefs.current[idx]?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        // เลื่อนเฉพาะ body ของ object page เอง — scrollIntoView() เลื่อน container ชั้นนอกของแอป
+        // ไปด้วย ทำให้ header หลุดจอและเนื้อหาถูกตัดเหลือพื้นเทาด้านล่าง (overflow)
+        const body = scrollBodyRef.current;
+        const section = sectionRefs.current[idx];
+        if (body && section) {
+            const top = section.getBoundingClientRect().top - body.getBoundingClientRect().top + body.scrollTop - SECTION_SCROLL_MARGIN;
+            body.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
+        }
         window.setTimeout(() => {
             suppressScrollSpy.current = false;
         }, 700);
@@ -1078,7 +1124,10 @@ export default function WooCommerceProductsMapping({ products, stats, filters }:
                                 }}
                                 scrollMarginTop={SECTION_SCROLL_MARGIN}
                                 // พื้นหลังสีแยกให้เห็นว่าเป็น step แก้ไขข้อมูล (ไม่ใช่ step ตั้งค่า mapping)
-                                style={{ background: '#f5f8fe' }}
+                                style={{
+                                    ['--section-bg' as string]: '#f5f8fe',
+                                    ['--section-hover-bg' as string]: '#e8effd',
+                                }}
                             >
                                 <VStack gap="1.25rem">
                                     <SectionHeading
@@ -1111,7 +1160,10 @@ export default function WooCommerceProductsMapping({ products, stats, filters }:
                                 }}
                                 scrollMarginTop={SECTION_SCROLL_MARGIN}
                                 // พื้นหลังเขียวอ่อน — แยกจาก step แก้ไขข้อมูล (ฟ้าอ่อน) ให้เห็นว่าเป็น step ที่ส่งข้อมูลขึ้นร้านจริง
-                                style={{ background: '#f3faf4' }}
+                                style={{
+                                    ['--section-bg' as string]: '#f3faf4',
+                                    ['--section-hover-bg' as string]: '#e3f3e6',
+                                }}
                             >
                                 <VStack gap="1.25rem">
                                     <SectionHeading
@@ -1210,6 +1262,25 @@ export default function WooCommerceProductsMapping({ products, stats, filters }:
                                     ยังไม่ได้แมป ({stats.unmapped})
                                 </SegmentedButtonItem>
                             </SegmentedButton>
+                            <SegmentedButton
+                                accessibleName="Matching"
+                                onSelectionChange={(e) => {
+                                    const val = (e.detail.selectedItems[0] as HTMLElement | undefined)?.dataset.matching as
+                                        | MatchingFilter
+                                        | undefined;
+                                    if (val) applyMatching(val);
+                                }}
+                            >
+                                <SegmentedButtonItem data-matching="all" selected={matching === 'all'} tooltip="Product Matching: ทั้งหมด">
+                                    Matching: ทั้งหมด
+                                </SegmentedButtonItem>
+                                <SegmentedButtonItem data-matching="matched" selected={matching === 'matched'}>
+                                    จับคู่แล้ว ({stats.matched})
+                                </SegmentedButtonItem>
+                                <SegmentedButtonItem data-matching="unmatched" selected={matching === 'unmatched'}>
+                                    ยังไม่จับคู่ ({stats.not_matched})
+                                </SegmentedButtonItem>
+                            </SegmentedButton>
                         </div>
 
                         {/* Pagination controls — same pattern as products/index.tsx */}
@@ -1225,15 +1296,22 @@ export default function WooCommerceProductsMapping({ products, stats, filters }:
 
                     <div className={styles.divider} />
 
-                    {/* Data Table */}
-                    <FioriResponsiveTable
-                        variant="plain"
-                        columns={columns}
-                        rows={products.data}
-                        getRowKey={(row: ProductRow) => row.id}
-                        rowClassName={(row: ProductRow) => (selectedRows.includes(row.id) ? styles.selectedRow : undefined)}
-                        emptyMessage="ไม่พบสินค้าที่ตรงตามเงื่อนไข"
-                    />
+                    {/* Data Table — busy layer ทับระหว่างโหลดแบบ in-place */}
+                    <div className={styles.busyArea} aria-busy={navigating}>
+                        {showNavBusy && (
+                            <div className={styles.busyLayer}>
+                                <FioriBusyIndicator size="M" />
+                            </div>
+                        )}
+                        <FioriResponsiveTable
+                            variant="plain"
+                            columns={columns}
+                            rows={products.data}
+                            getRowKey={(row: ProductRow) => row.id}
+                            rowClassName={(row: ProductRow) => (selectedRows.includes(row.id) ? styles.selectedRow : undefined)}
+                            emptyMessage="ไม่พบสินค้าที่ตรงตามเงื่อนไข"
+                        />
+                    </div>
 
                     {/* Footer info */}
                     <div className={styles.footer}>

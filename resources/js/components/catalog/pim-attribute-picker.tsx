@@ -1,5 +1,7 @@
+import '@ui5/webcomponents-icons/dist/accept.js';
 import '@ui5/webcomponents-icons/dist/decline.js';
 import '@ui5/webcomponents-icons/dist/search.js';
+import '@ui5/webcomponents-icons/dist/value-help.js';
 import {
     Bar,
     BusyIndicator,
@@ -16,8 +18,6 @@ import {
     Title,
 } from '@ui5/webcomponents-react';
 import { useEffect, useMemo, useState } from 'react';
-
-import { AsyncSearchComboBox } from '@/components/catalog/async-search-combo-box';
 
 export interface PimAttributeOption {
     id: number;
@@ -59,8 +59,8 @@ const SOURCE_FILTERS: { value: SourceFilter; label: string }[] = [
 ];
 
 /**
- * หน้าต่าง "ดู attributes ทั้งหมด" — ทางเลือกแทนการค้นหาทีละคำใน Autocomplete
- * ด้านล่าง สำหรับตอนที่ผู้ใช้อยากไล่ดู/กรองทั้งรายการเพื่อหา attribute ที่
+ * หน้าต่าง "Attributes ทั้งหมด" — ทางเลือก PIM attribute ทางเดียวของ <PimAttributePicker>
+ * (กดปุ่ม value help แล้วเปิดหน้าต่างนี้) ไล่ดู/ค้นหา/กรองทั้งรายการเพื่อหา attribute ที่
  * เหมาะสม (เช่น กรองดูเฉพาะที่ระบบสร้างอัตโนมัติให้ Shopee ไว้ก่อนหน้านี้)
  * โหลดทั้งหมดครั้งเดียวตอนเปิด (จำนวน attribute ทั้งระบบหลักร้อยเท่านั้น —
  * ดู ShopeeAttributeMappingController::listAllPimAttributes()'s docblock)
@@ -71,11 +71,14 @@ function PimAttributeBrowserDialog({
     onClose,
     onSelect,
     typeFilter,
+    selectedId = null,
 }: {
     open: boolean;
     onClose: () => void;
     onSelect: (attr: PimAttributeOption) => void;
     typeFilter?: string[];
+    /** attribute ที่เลือกอยู่ตอนนี้ — มีเครื่องหมาย ✓ ในรายการ */
+    selectedId?: number | null;
 }) {
     const [loading, setLoading] = useState(false);
     const [attributes, setAttributes] = useState<PimAttributeRow[]>([]);
@@ -172,6 +175,7 @@ function PimAttributeBrowserDialog({
                                     <ListItemStandard
                                         key={attr.id}
                                         text={attr.name}
+                                        icon={attr.id === selectedId ? 'accept' : undefined}
                                         description={`${attr.code} · ${attr.type}`}
                                         additionalText={attr.auto_created_platform === undefined ? undefined : meta ? meta.label : 'PIM'}
                                         additionalTextState={meta ? meta.state : 'None'}
@@ -191,20 +195,11 @@ function PimAttributeBrowserDialog({
 }
 
 /**
- * ตัว picker ค้นหาด้วยชื่อ บนแอตทริบิวต์ของ PIM (ดู
- * ShopeeAttributeMappingController::searchPimAttributes) — เป็นเวอร์ชัน
- * attribute ของ PimBrandPicker ใช้รองรับคอลัมน์ "เลือกแอตทริบิวต์ PIM ให้
- * แอตทริบิวต์ Shopee ตัวนี้" บนตาราง Shopee Attributes ที่
- * categories/shopee-mapping.tsx ซึ่งจะแสดงเฉพาะแถวที่เป็น FREE_TEXT_FILED
- * เท่านั้น (ดู column definition ของตารางนั้น) เพราะ
- * ShopeeAttributeMappingController::update() จะปฏิเสธ input_type แบบอื่น
- * ทั้งหมด
- *
- * ใช้วิธี fetch แบบมีเงื่อนไขต้องเปิด dropdown ก่อนเหมือนกับ PimBrandPicker
- * ด้วยเหตุผลเดียวกัน คือตารางนี้ก็ render ตัวนี้หนึ่งตัวต่อหนึ่งแถวแอตทริบิวต์
- * พร้อมกันได้เหมือนกัน — ปุ่ม "ดู attributes ทั้งหมด" ด้านล่างเปิด
- * <PimAttributeBrowserDialog> เป็นทางเลือกสำหรับตอนที่อยากไล่ดู/กรองทั้ง
- * รายการแทนการพิมพ์ค้นหาทีละคำ
+ * ตัวเลือก PIM attribute (ต้นทาง) ของตาราง mapping — เป็นปุ่มเดียว (Fiori value help):
+ * โชว์ชื่อ attribute ที่เลือกอยู่ กดแล้วเปิดหน้าต่าง "Attributes ทั้งหมด"
+ * (<PimAttributeBrowserDialog>) ให้ค้นหา/กรองตามแหล่งที่มาแล้วคลิกเลือก — เดิมเป็น
+ * dropdown ค้นหา (AsyncSearchComboBox) + ลิงก์ "ดู attributes ทั้งหมด" แยกกัน
+ * ปุ่ม ✕ ข้างๆ ใช้ล้างการแมพ (เหมือนปุ่ม clear ของ dropdown เดิม)
  */
 export function PimAttributePicker({
     value,
@@ -217,60 +212,43 @@ export function PimAttributePicker({
     onChange: (next: PimAttributeOption | null) => void;
     placeholder?: string;
     disabled?: boolean;
-    // จำกัดผลค้นหาให้เหลือแค่ PIM attribute type ที่ระบุ (เช่น ['image','file']
+    // จำกัดรายการให้เหลือแค่ PIM attribute type ที่ระบุ (เช่น ['image','file']
     // สำหรับ Lazada `img`-type attribute — ดู LazadaAttributeMappingController's
-    // update() ที่บังคับเงื่อนไขเดียวกันฝั่ง backend) ไม่ระบุ = ค้นหาได้ทุก type เหมือนเดิม
+    // update() ที่บังคับเงื่อนไขเดียวกันฝั่ง backend) ไม่ระบุ = ทุก type
     typeFilter?: string[];
 }) {
-    const [open, setOpen] = useState(false);
-    const [query, setQuery] = useState('');
-    const [results, setResults] = useState<PimAttributeOption[]>([]);
-    const [loading, setLoading] = useState(false);
     const [browserOpen, setBrowserOpen] = useState(false);
 
-    useEffect(() => {
-        if (!open) return;
-
-        setLoading(true);
-        const timer = setTimeout(() => {
-            const params = new URLSearchParams({ q: query });
-            if (typeFilter && typeFilter.length > 0) {
-                params.set('type', typeFilter.join(','));
-            }
-
-            fetch(`/catalog/attributes/search-pim?${params.toString()}`, { headers: { Accept: 'application/json' } })
-                .then((res) => (res.ok ? res.json() : { data: [] }))
-                .then((body: { data: PimAttributeOption[] }) => setResults(body.data))
-                .finally(() => setLoading(false));
-        }, 300);
-
-        return () => clearTimeout(timer);
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [query, open, typeFilter?.join(',')]);
-
     return (
-        <div>
-            <AsyncSearchComboBox
-                value={value}
-                onChange={onChange}
-                results={results}
-                loading={loading}
-                getKey={(opt) => opt.id}
-                getLabel={(opt) => opt.name}
-                onQueryChange={setQuery}
-                onActivate={() => setOpen(true)}
-                placeholder={placeholder}
-                disabled={disabled}
-            />
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', minWidth: 0 }}>
             <Button
-                design="Transparent"
+                design="Default"
+                icon="value-help"
                 disabled={disabled}
+                tooltip={value ? `${value.name} — คลิกเพื่อเปลี่ยน` : 'คลิกเพื่อเลือก PIM attribute'}
+                accessibleName={value ? `PIM attribute: ${value.name}` : (placeholder ?? 'เลือก PIM attribute')}
                 onClick={() => setBrowserOpen(true)}
-                style={{ marginTop: '0.125rem', fontSize: 'var(--sapFontSmallSize)' }}
+                style={{ flex: 1, minWidth: 0, justifyContent: 'flex-start', textAlign: 'start', fontStyle: value ? 'normal' : 'italic' }}
             >
-                ดู attributes ทั้งหมด
+                {value ? value.name : (placeholder ?? 'เลือก PIM attribute...')}
             </Button>
-            <PimAttributeBrowserDialog open={browserOpen} onClose={() => setBrowserOpen(false)} onSelect={onChange} typeFilter={typeFilter} />
+            {value && (
+                <Button
+                    design="Transparent"
+                    icon="decline"
+                    disabled={disabled}
+                    tooltip="ล้างการแมพ"
+                    accessibleName="ล้างการแมพ"
+                    onClick={() => onChange(null)}
+                />
+            )}
+            <PimAttributeBrowserDialog
+                open={browserOpen}
+                onClose={() => setBrowserOpen(false)}
+                onSelect={onChange}
+                typeFilter={typeFilter}
+                selectedId={value?.id ?? null}
+            />
         </div>
     );
 }

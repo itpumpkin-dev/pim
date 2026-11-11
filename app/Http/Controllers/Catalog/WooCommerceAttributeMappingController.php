@@ -202,6 +202,15 @@ class WooCommerceAttributeMappingController extends Controller
                 ->whereDoesntHave('categories', fn ($cq) => $cq->whereNotNull('categories.woocommerce_category_id'));
         }
 
+        // ตัวกรอง "Matching" (Product Matching) — กฎเดียวกับคอลัมน์ ✓ (ดู ProductMatchStatus)
+        $matching = $request->input('matching', 'all');
+        if (! in_array($matching, ['all', 'matched', 'unmatched'], true)) {
+            $matching = 'all';
+        }
+        if ($matching !== 'all') {
+            ProductMatchStatus::applyMatchingFilter($query, 'woocommerce', $request->user(), $matching === 'matched');
+        }
+
         $paginated = $query->orderBy('id', 'desc')->paginate($perPage)->withQueryString();
 
         $pageProductIds = $paginated->getCollection()->pluck('id');
@@ -273,17 +282,22 @@ class WooCommerceAttributeMappingController extends Controller
                 ->orWhereHas('categories', fn ($cq) => $cq->whereNotNull('categories.woocommerce_category_id'));
         })->count();
 
+        $matchedProductsCount = ProductMatchStatus::applyMatchingFilter(Product::query()->whereNull('parent_id'), 'woocommerce', $request->user(), true)->count();
+
         return Inertia::render('catalog/marketplace/woocommerce-products', [
             'products' => $paginated,
             'stats' => [
                 'total' => $totalProductsCount,
                 'mapped' => $mappedProductsCount,
                 'unmapped' => $totalProductsCount - $mappedProductsCount,
+                'matched' => $matchedProductsCount,
+                'not_matched' => $totalProductsCount - $matchedProductsCount,
             ],
             'filters' => [
                 'search' => $search,
                 'filter' => $filter,
                 'per_page' => $perPage,
+                'matching' => $matching,
             ],
         ]);
     }

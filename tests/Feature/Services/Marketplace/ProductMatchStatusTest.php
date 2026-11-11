@@ -96,3 +96,33 @@ test('matchedListingsByProduct returns one entry per (shop, item) for the detail
     expect($listings)->toHaveCount(1)
         ->and($listings[0])->toMatchArray(['id' => $first->id, 'item_id' => '555', 'seller_sku' => 'PMS-DETAIL-1', 'shop' => 'PMS Detail']);
 });
+
+test('applyMatchingFilter (the Product Mapping "Matching" filter) agrees with matchedShopsByProduct', function () {
+    $user = User::factory()->create();
+    $shop = pmsShop('shopee', 'PMS Filter');
+    $lazada = pmsShop('lazada', 'PMS Filter Lazada');
+
+    $direct = Product::create(['sku' => 'PMF-DIRECT']);
+    $parent = Product::create(['sku' => 'PMF-PARENT']);
+    $variant = Product::create(['sku' => 'PMF-VARIANT', 'parent_id' => $parent->id]);
+    $bundled = Product::create(['sku' => 'PMF-BUNDLED']);
+    $lazadaOnly = Product::create(['sku' => 'PMF-LAZADA']);
+    $none = Product::create(['sku' => 'PMF-NONE']);
+
+    pmsListing($shop, ['product_id' => $direct->id, 'match_method' => 'manual']);
+    pmsListing($shop, ['product_id' => $variant->id, 'match_method' => 'manual']);
+    $bundle = pmsListing($shop, ['match_method' => 'bundle']);
+    MarketplaceListingComponent::create(['marketplace_listing_id' => $bundle->id, 'product_id' => $bundled->id, 'quantity' => 1]);
+    pmsListing($lazada, ['platform' => 'lazada', 'product_id' => $lazadaOnly->id, 'match_method' => 'manual']);
+
+    $skus = fn (bool $matched) => ProductMatchStatus::applyMatchingFilter(
+        Product::query()->whereNull('parent_id')->where('sku', 'like', 'PMF-%'), 'shopee', $user, $matched
+    )->orderBy('sku')->pluck('sku')->all();
+
+    expect($skus(true))->toBe(['PMF-BUNDLED', 'PMF-DIRECT', 'PMF-PARENT'])
+        ->and($skus(false))->toBe(['PMF-LAZADA', 'PMF-NONE']);
+
+    $all = Product::whereNull('parent_id')->where('sku', 'like', 'PMF-%')->with('variants:id,parent_id')->get();
+    expect(array_keys(ProductMatchStatus::matchedShopsByProduct($all, 'shopee', $user)))
+        ->toEqualCanonicalizing([$direct->id, $parent->id, $bundled->id]);
+});
