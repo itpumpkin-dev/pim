@@ -100,8 +100,8 @@ export default function TikTokCategoryMapping({ categories, stats, lastSyncedAt,
     const breadcrumbs: BreadcrumbItem[] = [
         { title: tNav('catalog'), href: '#' },
         { title: tNav('master'), href: '#' },
-        { title: tNav('marketplace'), href: '#' },
-        { title: 'TikTok', href: '/catalog/marketplace/tiktok' },
+        { title: tNav('marketplace'), href: '/catalog/marketplace' },
+        { title: 'TikTok', href: '/catalog/marketplace/product-master?platform=tiktok' },
         { title: t('tiktokMappingTitle'), href: '#' },
     ];
 
@@ -461,7 +461,7 @@ export default function TikTokCategoryMapping({ categories, stats, lastSyncedAt,
             <MappingPage>
                 <MappingPageHeader
                     backLabel="TikTok"
-                    onBack={() => router.visit('/catalog/marketplace/tiktok')}
+                    onBack={() => router.visit('/catalog/marketplace/product-master?platform=tiktok')}
                     title={t('tiktokMappingTitle')}
                     subtitle={
                         <>

@@ -26,8 +26,8 @@ export default function WoocommerceAttributeMapping({ attributes, wooCommerceAtt
     const breadcrumbs: BreadcrumbItem[] = [
         { title: tNav('catalog'), href: '#' },
         { title: tNav('master'), href: '#' },
-        { title: tNav('marketplace'), href: '#' },
-        { title: 'WooCommerce', href: '/catalog/marketplace/woocommerce' },
+        { title: tNav('marketplace'), href: '/catalog/marketplace' },
+        { title: 'WooCommerce', href: '/catalog/marketplace/product-master?platform=woocommerce' },
         { title: tNav('mapPushData'), href: '#' },
     ];
 

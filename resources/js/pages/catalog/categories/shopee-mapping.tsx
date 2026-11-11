@@ -104,8 +104,8 @@ export default function ShopeeCategoryMapping({ categories, stats, lastSyncedAt,
     const breadcrumbs: BreadcrumbItem[] = [
         { title: tNav('catalog'), href: '#' },
         { title: tNav('master'), href: '#' },
-        { title: tNav('marketplace'), href: '#' },
-        { title: 'Shopee', href: '/catalog/marketplace/shopee' },
+        { title: tNav('marketplace'), href: '/catalog/marketplace' },
+        { title: 'Shopee', href: '/catalog/marketplace/product-master?platform=shopee' },
         { title: t('shopeeMappingTitle'), href: '#' },
     ];
 
@@ -499,7 +499,7 @@ export default function ShopeeCategoryMapping({ categories, stats, lastSyncedAt,
             <MappingPage>
                 <MappingPageHeader
                     backLabel="Shopee"
-                    onBack={() => router.visit('/catalog/marketplace/shopee')}
+                    onBack={() => router.visit('/catalog/marketplace/product-master?platform=shopee')}
                     title={t('shopeeMappingTitle')}
                     subtitle={
                         <>

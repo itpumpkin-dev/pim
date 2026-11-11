@@ -202,6 +202,12 @@ class WooCommerceAttributeMappingController extends Controller
                 ->whereDoesntHave('categories', fn ($cq) => $cq->whereNotNull('categories.woocommerce_category_id'));
         }
 
+        // ?ids= — สินค้า (PIM) ที่เลือกมาจากหน้า Marketplace Product Master: แสดงเฉพาะตัวเหล่านั้น
+        $ids = collect(explode(',', (string) $request->input('ids', '')))->map(fn ($v) => (int) trim($v))->filter()->unique()->take(500)->values()->all();
+        if ($ids !== []) {
+            $query->whereIn('products.id', $ids);
+        }
+
         // ตัวกรอง "Matching" (Product Matching) — กฎเดียวกับคอลัมน์ ✓ (ดู ProductMatchStatus)
         $matching = $request->input('matching', 'all');
         if (! in_array($matching, ['all', 'matched', 'unmatched'], true)) {
@@ -298,6 +304,7 @@ class WooCommerceAttributeMappingController extends Controller
                 'filter' => $filter,
                 'per_page' => $perPage,
                 'matching' => $matching,
+                'ids' => $ids,
             ],
         ]);
     }

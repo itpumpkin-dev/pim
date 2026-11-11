@@ -49,6 +49,9 @@ class ProductMatchingController extends Controller
 
     private const PLATFORM_LABEL = ['lazada' => 'Lazada', 'shopee' => 'Shopee', 'tiktok' => 'TikTok', 'woocommerce' => 'WooCommerce'];
 
+    /** ?ids= from Marketplace Product Master's selection — every listing query is limited to these (null = no limit) */
+    private ?array $onlyIds = null;
+
     public function index(Request $request): Response
     {
         $shops = $this->accessibleShops($request);
@@ -99,15 +102,30 @@ class ProductMatchingController extends Controller
             ->filter(fn (array $group) => $group['shops'] !== [])
             ->values();
 
+        // ?ids= — listings picked on the Marketplace Product Master page: show only those
+        // (in every tab / count), open their shop and the tab they're in unless asked otherwise
+        $selection = collect(explode(',', (string) $request->input('ids', '')))->map(fn ($v) => (int) trim($v))->filter()->unique()->take(500);
+        $selected = $selection->isEmpty() ? collect() : MarketplaceListing::query()
+            ->whereIn('id', $selection)->whereIn('sales_platform_shop_id', $shops->pluck('id'))
+            ->get(['id', 'sales_platform_shop_id']);
+        $this->onlyIds = $selected->isEmpty() ? null : $selected->pluck('id')->all();
+
         // Filters
         $shopId = (int) $request->input('shop_id', 0);
+        if ($this->onlyIds && ! $request->filled('shop_id')) {
+            $shopId = (int) $selected->countBy('sales_platform_shop_id')->sortDesc()->keys()->first();
+        }
         if (! $shopRows->contains('id', $shopId)) {
             $platform = (string) $request->input('platform', '');
             $shopId = (int) ($shopRows->firstWhere('platform', $platform)['id'] ?? $shopRows->first()['id'] ?? 0);
         }
         $tab = in_array($request->input('tab'), self::TABS, true) ? $request->input('tab') : 'matched';
+        if ($this->onlyIds && ! $request->filled('tab')) {
+            $tab = MarketplaceListing::whereIn('id', $this->onlyIds)->where('sales_platform_shop_id', $shopId)->linked()->exists() ? 'matched' : 'unmatched';
+        }
         $search = trim((string) $request->input('search', ''));
-        $activeOnly = $request->has('active_only') ? $request->boolean('active_only') : true;
+        // a picked listing may be inactive — don't hide it behind the default "active only"
+        $activeOnly = $request->has('active_only') ? $request->boolean('active_only') : $this->onlyIds === null;
         $minScore = (int) $request->input('min_score', 0);
         if (! in_array($minScore, self::MIN_SCORES, true)) {
             $minScore = 0;
@@ -124,6 +142,7 @@ class ProductMatchingController extends Controller
             'active_only' => $activeOnly,
             'min_score' => $minScore,
             'per_page' => $perPage,
+            'ids' => $this->onlyIds ?? [],
         ];
 
         $summary = ['matched' => 0, 'unmatched' => 0, 'suggested' => 0, 'ignored' => 0, 'not_listed' => 0];
@@ -156,6 +175,8 @@ class ProductMatchingController extends Controller
         return Inertia::render('catalog/marketplace/product-matching', [
             'shopGroups' => $groups,
             'filters' => $filters,
+            // selected listings per shop — the page says how many are in other shops
+            'selection' => $selected->countBy('sales_platform_shop_id')->all(),
             'summary' => $summary,
             'rows' => $rows,
             'syncRuns' => $shopId ? MarketplaceListingSyncRun::where('sales_platform_shop_id', $shopId)
@@ -225,6 +246,7 @@ class ProductMatchingController extends Controller
     {
         return MarketplaceListing::query()
             ->where('marketplace_listings.sales_platform_shop_id', $shopId)
+            ->when($this->onlyIds !== null, fn ($q) => $q->whereIn('marketplace_listings.id', $this->onlyIds))
             ->when($activeOnly, fn ($q) => $q->where('marketplace_listings.is_active', true))
             ->when($search !== '', function ($q) use ($search) {
                 $like = '%'.addcslashes($search, '%_\\').'%';
