@@ -48,7 +48,7 @@ class ProductMatchStatus
      * (opens ProductMatchingDetailDialog by listing id).
      *
      * @param  Collection<int, Product>  $products  top-level products with `variants` loaded
-     * @return array<int, list<array{id: int, item_id: string, seller_sku: ?string, name: ?string, shop: string}>>
+     * @return array<int, list<array{id: int, item_id: string, seller_sku: ?string, name: ?string, shop: string, direct: bool}>>
      */
     public static function matchedListingsByProduct(Collection $products, ?string $platform, ?User $user): array
     {
@@ -80,13 +80,13 @@ class ProductMatchStatus
         $direct = DB::table('marketplace_listings as l')
             ->whereIn('l.sales_platform_shop_id', $shopIds)
             ->whereIn('l.product_id', $productIds)
-            ->get([...$columns, 'l.product_id']);
+            ->get([...$columns, 'l.product_id', DB::raw('true as direct')]);
 
         $components = DB::table('marketplace_listing_components as c')
             ->join('marketplace_listings as l', 'l.id', '=', 'c.marketplace_listing_id')
             ->whereIn('l.sales_platform_shop_id', $shopIds)
             ->whereIn('c.product_id', $productIds)
-            ->get([...$columns, 'c.product_id']);
+            ->get([...$columns, 'c.product_id', DB::raw('false as direct')]);
 
         $result = [];
         foreach ($direct->concat($components)->sortBy('id') as $row) {
@@ -98,6 +98,8 @@ class ProductMatchStatus
                 'seller_sku' => $row->seller_sku,
                 'name' => $row->name,
                 'shop' => $shops->get($row->sales_platform_shop_id)->name,
+                // linked to this product itself (not as a bundle component) — importable
+                'direct' => (bool) $row->direct,
             ];
         }
 

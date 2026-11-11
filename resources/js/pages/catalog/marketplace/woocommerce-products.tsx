@@ -39,6 +39,8 @@ import {
 } from './marketplace-ui';
 import styles from './marketplace.module.css';
 import { MatchedListingCell, type ProductMatching } from './matched-listing-cell';
+import { PlatformEditPanel } from './platform-edit-panel';
+import { PlatformPushPanel } from './platform-push-panel';
 
 type ProductFilter = 'all' | 'mapped' | 'unmapped';
 
@@ -311,6 +313,22 @@ export default function WooCommerceProductsMapping({ products, stats, filters }:
             .finally(() => setSyncingFamily(false));
     };
 
+    // step "นำเข้าและแก้ไขข้อมูลจาก WooCommerce" — ปุ่มดินสอ (แก้ไข) ทั้งในตารางและบนหัวหน้าพามาที่นี่
+    const EDIT_SECTION_INDEX = 3;
+    // step "Push ไป WooCommerce" — ที่เดียวที่ push / ปิดการขาย / ลบ listing ได้
+    const PUSH_SECTION_INDEX = 4;
+    const [pendingSection, setPendingSection] = useState<number | null>(null);
+    const openProductAt = (product: ProductRow, idx: number) => {
+        openProduct(product);
+        setPendingSection(idx);
+    };
+    useEffect(() => {
+        if (pendingSection === null || !activeProduct) return;
+        const idx = pendingSection;
+        setPendingSection(null);
+        window.setTimeout(() => scrollToSection(idx), 0);
+    }, [pendingSection, activeProduct]);
+
     const scrollToSection = (idx: number) => {
         suppressScrollSpy.current = true;
         setSectionIndex(idx);
@@ -344,6 +362,9 @@ export default function WooCommerceProductsMapping({ products, stats, filters }:
         const row = openId ? products.data.find((p) => p.id === openId) : undefined;
         if (!row) return;
         openProduct(row);
+        // &section=edit|push — เช่นลิงก์ "ไป Push" จากหน้าแก้ไขสินค้า
+        const section = params.get('section');
+        if (section === 'edit' || section === 'push') setPendingSection(section === 'push' ? PUSH_SECTION_INDEX : EDIT_SECTION_INDEX);
         const categoryId = Number(params.get('category'));
         if (categoryId && !row.category_mapped) setSelectedWooCatId(categoryId);
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -639,7 +660,7 @@ export default function WooCommerceProductsMapping({ products, stats, filters }:
                                 icon="edit"
                                 tooltip="แก้ไขสินค้า"
                                 accessibleName="แก้ไขสินค้า"
-                                onClick={() => router.visit(`/catalog/products/${row.id}/edit?platform=woocommerce`)}
+                                onClick={() => openProductAt(row, EDIT_SECTION_INDEX)}
                             />
                         )}
                     </HStack>
@@ -732,7 +753,7 @@ export default function WooCommerceProductsMapping({ products, stats, filters }:
                                         icon="edit"
                                         tooltip="แก้ไขสินค้า"
                                         accessibleName="แก้ไขสินค้า"
-                                        onClick={() => router.visit(`/catalog/products/${activeProduct.id}/edit?platform=woocommerce`)}
+                                        onClick={() => scrollToSection(EDIT_SECTION_INDEX)}
                                     />
                                 )}
                                 {activeProduct.matching.matched && (
@@ -770,7 +791,9 @@ export default function WooCommerceProductsMapping({ products, stats, filters }:
                                 <Tab text="1. Category Mapping" selected={sectionIndex === 0} />
                                 <Tab text="2. Attribute Mapping" selected={sectionIndex === 1} />
                                 <Tab text="3. Payload WooCommerce" selected={sectionIndex === 2} />
-                                <Tab text="4. History" disabled={!activeProduct.master_category} selected={sectionIndex === 3} />
+                                <Tab text="4. นำเข้าและแก้ไขข้อมูลจาก WooCommerce" selected={sectionIndex === 3} />
+                                <Tab text="5. Push ไป WooCommerce" selected={sectionIndex === 4} />
+                                <Tab text="6. History" disabled={!activeProduct.master_category} selected={sectionIndex === 5} />
                             </TabContainer>
                         </div>
 
@@ -1046,13 +1069,72 @@ export default function WooCommerceProductsMapping({ products, stats, filters }:
                                 </VStack>
                             </SectionCard>
 
-                            {/* Section 4 — History: WooCommerceMappingTimelineBuilder ขอบเขต
+                            {/* Section 4 — นำเข้าและแก้ไขข้อมูลจาก WooCommerce: ฟอร์มแก้ค่าใน PIM จัดแท็บย่อยแบบหน้า
+                                seller center ของ WooCommerce + ค่าจาก listing ที่จับคู่ไว้ — ดู PlatformEditPanel / ListingImportService
+                                (ปุ่มดินสอ "แก้ไข" ในตารางและบนหัวหน้าพามาที่ step นี้) */}
+                            <SectionCard
+                                ref={(el: HTMLDivElement | null) => {
+                                    sectionRefs.current[3] = el;
+                                }}
+                                scrollMarginTop={SECTION_SCROLL_MARGIN}
+                                // พื้นหลังสีแยกให้เห็นว่าเป็น step แก้ไขข้อมูล (ไม่ใช่ step ตั้งค่า mapping)
+                                style={{ background: '#f5f8fe' }}
+                            >
+                                <VStack gap="1.25rem">
+                                    <SectionHeading
+                                        title="นำเข้าและแก้ไขข้อมูลจาก WooCommerce"
+                                        description='แก้ค่าใน PIM ที่ใช้ส่งขึ้น WooCommerce — ถ้าจับคู่ listing ไว้ จะเห็นค่าบนร้านใต้แต่ละช่องพร้อมปุ่ม "ใช้ค่านี้"'
+                                    />
+                                    {!canEditProducts ? (
+                                        <LockedNotice>ต้องมีสิทธิ์แก้ไขสินค้าจึงจะแก้ไขข้อมูลได้</LockedNotice>
+                                    ) : (
+                                        <PlatformEditPanel
+                                            key={activeProduct.id}
+                                            active={sectionIndex === 3}
+                                            productId={activeProduct.id}
+                                            platform="woocommerce"
+                                            platformLabel="WooCommerce"
+                                            listings={activeProduct.matching.listings}
+                                            platformCategoryId={activeProduct.woocommerce_category?.id ?? null}
+                                            platformCategoryPath={activeProduct.woocommerce_category?.path ?? null}
+                                            onSaved={loadPayloadFields}
+                                        />
+                                    )}
+                                </VStack>
+                            </SectionCard>
+
+                            {/* Section 5 — Push ไป WooCommerce: ที่เดียวที่ส่งข้อมูลขึ้นร้านได้ (Push / ปิดการขาย / ลบ /
+                                เช็คสถานะ ทีละร้าน) — ดู PlatformPushPanel / PlatformPushController */}
+                            <SectionCard
+                                ref={(el: HTMLDivElement | null) => {
+                                    sectionRefs.current[4] = el;
+                                }}
+                                scrollMarginTop={SECTION_SCROLL_MARGIN}
+                                // พื้นหลังเขียวอ่อน — แยกจาก step แก้ไขข้อมูล (ฟ้าอ่อน) ให้เห็นว่าเป็น step ที่ส่งข้อมูลขึ้นร้านจริง
+                                style={{ background: '#f3faf4' }}
+                            >
+                                <VStack gap="1.25rem">
+                                    <SectionHeading
+                                        title="Push ไป WooCommerce"
+                                        description="ส่งข้อมูลสินค้าจาก PIM ขึ้นร้าน WooCommerce ทีละร้าน — การ Push / ปิดการขาย / ลบ listing ทำได้จากที่นี่เท่านั้น"
+                                    />
+                                    <PlatformPushPanel
+                                        key={activeProduct.id}
+                                        active={sectionIndex === 4}
+                                        productId={activeProduct.id}
+                                        platform="woocommerce"
+                                        platformLabel="WooCommerce"
+                                    />
+                                </VStack>
+                            </SectionCard>
+
+                            {/* Section 6 — History: WooCommerceMappingTimelineBuilder ขอบเขต
                                 แคบกว่า 3 platform อื่น — แค่ audit trail ของ Category Mapping
                                 (section 1) เท่านั้น เพราะ attribute mapping เป็น global ไม่ผูก
                                 กับ category นี้เจาะจง */}
                             <SectionCard
                                 ref={(el: HTMLDivElement | null) => {
-                                    sectionRefs.current[3] = el;
+                                    sectionRefs.current[5] = el;
                                 }}
                                 scrollMarginTop={SECTION_SCROLL_MARGIN}
                             >

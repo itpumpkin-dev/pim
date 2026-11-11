@@ -7,6 +7,7 @@ use App\Models\Locale;
 use App\Models\Product;
 use App\Models\ProductValue;
 use App\Services\Marketplace\ResolvesProductAttributeValues;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Storage;
 
 /** @return object{attributeValue: Closure, attributeImageUrls: Closure, resolveProductImageUrls: Closure, resolveMappedField: Closure, mappedBrandOptionId: Closure} */
@@ -16,7 +17,8 @@ function traitFixture(): object
     // method names (attributeValue(), etc.) — a class-defined method of the
     // same name silently overrides a trait method with no conflict error,
     // which previously turned every call into infinite self-recursion.
-    return new class {
+    return new class
+    {
         use ResolvesProductAttributeValues;
 
         public function callAttributeValue(Product $p, string $code, ?int $channelId, ?string $localeCode = null): ?string
@@ -34,7 +36,7 @@ function traitFixture(): object
             return $this->resolveProductImageUrls($p, $channelId);
         }
 
-        public function callResolveMappedField(\Illuminate\Support\Collection $mappings, string $targetField, Product $p, ?int $channelId, ?string $localeCode = null): ?string
+        public function callResolveMappedField(Collection $mappings, string $targetField, Product $p, ?int $channelId, ?string $localeCode = null): ?string
         {
             return $this->resolveMappedField($mappings, $targetField, $p, $channelId, $localeCode);
         }

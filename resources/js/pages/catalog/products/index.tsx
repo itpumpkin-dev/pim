@@ -20,7 +20,6 @@ import '@ui5/webcomponents-icons/dist/filter.js';
 import '@ui5/webcomponents-icons/dist/inspection.js';
 import '@ui5/webcomponents-icons/dist/product.js';
 import '@ui5/webcomponents-icons/dist/search.js';
-import '@ui5/webcomponents-icons/dist/share.js';
 import '@ui5/webcomponents-icons/dist/slim-arrow-left.js';
 import '@ui5/webcomponents-icons/dist/slim-arrow-right.js';
 import '@ui5/webcomponents-icons/dist/sys-first-page.js';
@@ -30,7 +29,6 @@ import '@ui5/webcomponents-icons/dist/upload-to-cloud.js';
 import {
     Bar,
     Button,
-    CheckBox,
     ComboBox,
     ComboBoxItem,
     Dialog,
@@ -246,7 +244,7 @@ function productColumnPriority(key: string): FioriColumnPriority {
     return 'low';
 }
 
-export default function ProductIndex({ gridConfig, gridData, filters, attributes, families, salesChannels }: Props) {
+export default function ProductIndex({ gridConfig, gridData, filters, attributes, families }: Props) {
     const { t } = useTranslation('catalog');
     const { t: tNav } = useTranslation('nav');
     const { t: tGrid } = useTranslation('grid');
@@ -299,78 +297,8 @@ export default function ProductIndex({ gridConfig, gridData, filters, attributes
         );
     };
 
-    // ปุ่ม "Share" แบบ bulk — publish + push สินค้าที่เลือกทั้งหมดไปยังทุกช่องทางขาย
-    // ที่ติ๊กไว้ในคำขอเดียว (ProductController::pushBulk()) ทำงานแบบยิงแล้วไม่รอผล
-    // เหมือน translateSelected() ใน missing-translations.tsx: flash message แค่บอก
-    // ว่า queue job ไปกี่งาน ส่วนผลจริงว่าแต่ละสินค้า/แต่ละช่องทางสำเร็จหรือพลาด
-    // จะไปโชว์ทีหลังที่หน้า Edit ของสินค้านั้นๆ (แผง Sales Channels มี badge สถานะ
-    // แบบเรียลไทม์อยู่แล้ว)
-    const [shareDialogOpen, setShareDialogOpen] = useState(false);
-    const [selectedShopIds, setSelectedShopIds] = useState<number[]>([]);
-    const [sharing, setSharing] = useState(false);
-    // ยืนยัน "สร้างเป็นสินค้าใหม่" ให้คู่ สินค้า×ร้าน ที่ยังไม่ผ่าน Product Matching (ไม่ติ๊ก = server ข้ามให้)
-    const [shareConfirmNewListing, setShareConfirmNewListing] = useState(false);
-    const [deactivating, setDeactivating] = useState(false);
-
-    // 'all' = สินค้าที่เลือกทั้งหมด publish ไปที่ร้านนี้แล้ว, 'some' = publish ไปแค่
-    // บางส่วน, 'none' = ยังไม่มีตัวไหน publish เลย คำนวณจาก published_shop_ids
-    // (ที่ ProductController::index() แนบมาให้ในแต่ละแถวของ grid) เทียบกับแถวที่
-    // เลือกไว้ซึ่งอยู่ในหน้าปัจจุบัน — ไม่ต้องยิง request เพิ่มตอนเปิด dialog เลย
-    const shopPublishStatus = (shopId: number): 'all' | 'some' | 'none' => {
-        const selectedRows = gridData.data.filter((row) => selectedIds.includes(row.id));
-        if (selectedRows.length === 0) return 'none';
-        const publishedCount = selectedRows.filter((row) => (row.published_shop_ids ?? []).includes(shopId)).length;
-        if (publishedCount === 0) return 'none';
-        return publishedCount === selectedRows.length ? 'all' : 'some';
-    };
-
-    const openShareDialog = () => {
-        const alreadyPublishedEverywhere = salesChannels
-            .flatMap((group) => group.shops)
-            .filter((shop) => shopPublishStatus(shop.id) === 'all')
-            .map((shop) => shop.id);
-        setSelectedShopIds(alreadyPublishedEverywhere);
-        setShareDialogOpen(true);
-    };
-
-    const toggleShareShop = (shopId: number, checked: boolean) => {
-        setSelectedShopIds((prev) => (checked ? [...prev, shopId] : prev.filter((id) => id !== shopId)));
-    };
-
-    const shareSelectedProducts = () => {
-        setSharing(true);
-        router.post(
-            '/catalog/products/push-bulk',
-            { product_ids: selectedIds, shop_ids: selectedShopIds, confirm_new_listing: shareConfirmNewListing },
-            {
-                preserveScroll: true,
-                onSuccess: () => {
-                    setShareDialogOpen(false);
-                    setSelectedShopIds([]);
-                    setSelectedIds([]);
-                    setShareConfirmNewListing(false);
-                },
-                onFinish: () => setSharing(false),
-            },
-        );
-    };
-
-    const deactivateSelectedProducts = () => {
-        setDeactivating(true);
-        router.post(
-            '/catalog/products/deactivate-bulk',
-            { product_ids: selectedIds, shop_ids: selectedShopIds },
-            {
-                preserveScroll: true,
-                onSuccess: () => {
-                    setShareDialogOpen(false);
-                    setSelectedShopIds([]);
-                    setSelectedIds([]);
-                },
-                onFinish: () => setDeactivating(false),
-            },
-        );
-    };
+    // ปุ่ม "Share" (push / ปิดการขายหลายรายการ) ถูกเอาออกแล้ว — การเขียนขึ้น marketplace
+    // ทำได้ที่ step "Push" ของหน้า Map สินค้าทีละสินค้าเท่านั้น (ดู PlatformPushController)
 
     // "Check Live Status" — ยิงถาม marketplace แต่ละที่ตรงๆ (เรียก API จริงผ่าน
     // ProductController::checkLiveStatus()) ไม่ใช้ router.post() เพราะ endpoint นี้
@@ -759,7 +687,6 @@ export default function ProductIndex({ gridConfig, gridData, filters, attributes
         return () => clearTimeout(timer);
     }, [liveStatusInfo]);
 
-    const shareBusy = sharing || deactivating;
     const activeFilterCount = Object.keys(activeFilters).length + activeAttributeFilters.length;
 
     const tableColumns: FioriResponsiveColumn<ProductRow>[] = [
@@ -849,12 +776,6 @@ export default function ProductIndex({ gridConfig, gridData, filters, attributes
                             <Button design="Transparent" icon="upload-to-cloud" onClick={() => setQuickExportOpen(true)}>
                                 {t('quickExport')}
                             </Button>
-                            {canEdit && (
-                                <Button icon="share" onClick={openShareDialog} disabled={selectedIds.length === 0}>
-                                    {t('share')}
-                                    {selectedIds.length > 0 ? ` (${selectedIds.length})` : ''}
-                                </Button>
-                            )}
                             {canCreate && (
                                 <Button design="Emphasized" onClick={() => router.visit('/catalog/products/create')}>
                                     {t('createProduct')}
@@ -1096,110 +1017,6 @@ export default function ProductIndex({ gridConfig, gridData, filters, attributes
                                 ))}
                             </ComboBox>
                         </FioriField>
-                    </div>
-                </Dialog>
-
-                {/* Dialog Share (push สินค้าไปหลายช่องทางขายพร้อมกัน) */}
-                <Dialog
-                    open={shareDialogOpen}
-                    className={styles.dialog}
-                    onBeforeClose={(e) => {
-                        // ระหว่างกำลังส่งคำขอ ห้ามปิด dialog (รวมถึงกด ESC)
-                        if (shareBusy) e.preventDefault();
-                    }}
-                    onClose={() => setShareDialogOpen(false)}
-                    header={
-                        <Bar
-                            startContent={<Title level="H5">{t('shareToChannels')}</Title>}
-                            endContent={
-                                <Button
-                                    design="Transparent"
-                                    icon="decline"
-                                    tooltip={t('close')}
-                                    accessibleName={t('close')}
-                                    disabled={shareBusy}
-                                    onClick={() => setShareDialogOpen(false)}
-                                />
-                            }
-                        />
-                    }
-                    footer={
-                        <Bar
-                            design="Footer"
-                            endContent={
-                                <>
-                                    <Button design="Transparent" onClick={() => setShareDialogOpen(false)} disabled={shareBusy}>
-                                        {t('cancel')}
-                                    </Button>
-                                    <Button
-                                        design="Negative"
-                                        onClick={deactivateSelectedProducts}
-                                        disabled={selectedShopIds.length === 0 || shareBusy}
-                                        loading={deactivating}
-                                        loadingDelay={0}
-                                    >
-                                        {t('deactivate')}
-                                    </Button>
-                                    <Button
-                                        design="Emphasized"
-                                        onClick={shareSelectedProducts}
-                                        disabled={selectedShopIds.length === 0 || shareBusy}
-                                        loading={sharing}
-                                        loadingDelay={0}
-                                    >
-                                        {t('share')}
-                                    </Button>
-                                </>
-                            }
-                        />
-                    }
-                >
-                    <div className={styles.dialogBody}>
-                        <span className={styles.muted}>{t('shareSelectChannelsHelp')}</span>
-
-                        {salesChannels.length === 0 && <span className={`${styles.disabledText} ${styles.italic}`}>{t('shareNoChannels')}</span>}
-
-                        {salesChannels.map((group) => (
-                            <div key={group.platform}>
-                                <div className={styles.shopGroupTitle}>{group.platform}</div>
-                                <div>
-                                    {group.shops.map((shop) => {
-                                        const publishStatus = shopPublishStatus(shop.id);
-                                        const checked = selectedShopIds.includes(shop.id);
-
-                                        return (
-                                            <div key={shop.id} className={styles.shopRow}>
-                                                <CheckBox
-                                                    accessibleName={shop.name}
-                                                    checked={checked}
-                                                    indeterminate={publishStatus === 'some' && !checked}
-                                                    onChange={(e) => toggleShareShop(shop.id, e.target.checked)}
-                                                    disabled={shareBusy}
-                                                />
-                                                <span>{shop.name}</span>
-                                                {publishStatus === 'all' && <span className={styles.caption}>({t('alreadyShared')})</span>}
-                                                {publishStatus === 'some' && <span className={styles.caption}>({t('alreadySharedPartial')})</span>}
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            </div>
-                        ))}
-
-                        {salesChannels.length > 0 && (
-                            <div>
-                                <CheckBox
-                                    text="สร้างเป็นสินค้าใหม่สำหรับรายการที่ยังไม่ได้จับคู่"
-                                    checked={shareConfirmNewListing}
-                                    onChange={(e) => setShareConfirmNewListing(e.target.checked)}
-                                    disabled={shareBusy}
-                                />
-                                <div className={styles.caption}>
-                                    ไม่ติ๊ก = ข้ามสินค้าที่ยังไม่ได้จับคู่ (Product Matching) กับร้านนี้ —
-                                    ติ๊กเฉพาะเมื่อแน่ใจว่าเป็นสินค้าใหม่ที่ยังไม่เคยวางขาย (มีผลกับปุ่ม Share เท่านั้น)
-                                </div>
-                            </div>
-                        )}
                     </div>
                 </Dialog>
 

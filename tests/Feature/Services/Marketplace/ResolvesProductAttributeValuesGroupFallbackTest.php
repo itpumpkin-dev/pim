@@ -8,8 +8,11 @@ use App\Models\FamilyAttribute;
 use App\Models\LazadaAttributeMapping;
 use App\Models\LazadaBrand;
 use App\Models\LazadaCategory;
+use App\Models\LazadaSellerAccount;
 use App\Models\Product;
 use App\Models\ProductValue;
+use App\Models\SalesPlatform;
+use App\Models\SalesPlatformShop;
 use App\Services\Lazada\LazadaClient;
 use App\Services\Lazada\LazadaProductSyncService;
 use Illuminate\Support\Facades\Http;
@@ -53,14 +56,14 @@ test('buildPayload uses the primary (lowest id) group placement value for a mult
 
     Http::fake(['*/category/attributes/get*' => Http::response(['code' => '0', 'data' => []], 200)]);
 
-    $account = new \App\Models\LazadaSellerAccount();
+    $account = new LazadaSellerAccount;
     $account->app_key = 'appkey123';
     $account->app_secret = 'appsecret123';
     $account->access_token = 'token123';
     $service = new LazadaProductSyncService(new LazadaClient($account));
 
-    $platform = \App\Models\SalesPlatform::create(['code' => 'lazada_rpav', 'name' => 'Lazada']);
-    $shop = \App\Models\SalesPlatformShop::create(['sales_platform_id' => $platform->id, 'code' => 'shop_rpav', 'name' => 'My Shop']);
+    $platform = SalesPlatform::create(['code' => 'lazada_rpav', 'name' => 'Lazada']);
+    $shop = SalesPlatformShop::create(['sales_platform_id' => $platform->id, 'code' => 'shop_rpav', 'name' => 'My Shop']);
 
     $payload = $service->buildPayload($product, $shop);
 

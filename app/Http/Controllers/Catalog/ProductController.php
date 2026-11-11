@@ -2916,9 +2916,6 @@ class ProductController extends Controller
             // บอกหน้าแก้ไขว่าบันทึกแล้วระบบจะส่ง/ยกเลิกบน marketplace ให้อัตโนมัติหรือไม่
             // (QueueAutoMarketplaceSync) — ใช้เตือนในกล่องยืนยัน "บันทึกร่าง"
             'marketplaceAutoSync' => (bool) config('services.marketplace_sync.auto_enabled'),
-            // ร้านที่สินค้านี้ผ่าน Product Matching แล้ว (หรือเคย push สำเร็จ) — ร้านอื่น push
-            // ได้ก็ต่อเมื่อยืนยัน "สร้างเป็นสินค้าใหม่" (ดู MarketplaceSyncGate::knownShopIds())
-            'marketplaceKnownShopIds' => $product->exists ? (new MarketplaceSyncGate)->knownShopIds($product) : [],
             // ✓ ข้างหัวข้อ "แก้ไขสินค้า | SKU" — ร้านที่สินค้านี้ (หรือ variant) ผูกไว้ใน
             // Product Matching แล้ว ทุก platform (กฎเดียวกับคอลัมน์ Matching ของหน้า Product Mapping)
             'matchedShopNames' => $product->exists
@@ -3423,134 +3420,26 @@ class ProductController extends Controller
     }
 
     /**
-     * ปุ่ม bulk "Share" ในหน้ารายการสินค้า — publish สินค้าที่เลือกทั้งหมด
-     * ไปยัง shop ที่เลือกทั้งหมด (ติ๊กช่องให้อัตโนมัติ ที่ปกติ user ต้องมาติ๊ก
-     * เองทีละสินค้าในแผง Sales Channels ของหน้า Edit) แล้ว queue job push
-     * ทีละคู่ product×shop ผ่าน dispatchMarketplaceSyncJob() ด้านบน ทำงาน
-     * แบบ fire-and-forget: ฟังก์ชันนี้ return จำนวนแบบ flash message ทันที
-     * เหมือนกับ queueMissingTranslationsBulk() — ผลสำเร็จหรือล้มเหลวของ
-     * แต่ละสินค้า/แต่ละ shop (รวมถึงการ validate required-attribute ของแต่ละ
-     * platform ที่ยังรันเหมือนเดิมอยู่ใน queued job) จะไปเช็คทีหลังได้ที่
-     * หน้า Edit ของสินค้านั้นๆ
+     * ปิดแล้ว — เดิมเป็นปุ่ม bulk "Share" ของหน้ารายการสินค้า / "Push ที่เลือก" ของหน้า Product
+     * Mapping ตอนนี้การเขียนขึ้น marketplace ทำได้จาก step "Push" ของหน้า Map สินค้าทีละสินค้า
+     * เท่านั้น (PlatformPushController) — route ยังอยู่เพื่อตอบ error ชัดๆ แทน 404
      */
     public function pushBulk(Request $request): RedirectResponse
     {
-        $validated = $request->validate([
-            'product_ids' => ['required', 'array', 'min:1'],
-            'product_ids.*' => ['integer', 'exists:products,id'],
-            'shop_ids' => ['required', 'array', 'min:1'],
-            'shop_ids.*' => ['integer', 'exists:sales_platform_shops,id'],
-            'confirm_new_listing' => ['sometimes', 'boolean'],
-        ]);
-
-        $products = Product::whereIn('id', $validated['product_ids'])->get();
-        $shops = SalesPlatformShop::with('platform:id,code')->whereIn('id', $validated['shop_ids'])->get()
-            ->filter(fn (SalesPlatformShop $shop) => $request->user()?->canAccessShop($shop))
-            ->values();
-
-        if ($shops->isEmpty()) {
-            return back()->with('error', "You don't have access to any of the selected shop(s).");
-        }
-
-        // ข้ามสินค้าที่ปิด "การเผยแพร่" (enabled) อยู่ — เหตุผลเดียวกับ
-        // queueMarketplaceSync() ไม่ติ๊กร้านให้ด้วย
-        $skippedCount = $products->where('enabled', false)->count();
-        $products = $products->where('enabled', true)->values();
-
-        if ($products->isEmpty()) {
-            return back()->with('error', __('None of the selected product(s) are enabled for publishing — turn on "Publishing" first.'));
-        }
-
-        $shopIds = $shops->pluck('id')->all();
-        // คู่ สินค้า×ร้าน ที่ยังไม่ผ่าน Product Matching จะถูกข้าม (ไม่ติ๊ก published ให้ด้วย)
-        // เว้นแต่ผู้ใช้ติ๊กยืนยัน "สร้างเป็นสินค้าใหม่" ใน dialog — ดู queueMarketplaceSync()
-        $confirmNew = (bool) ($validated['confirm_new_listing'] ?? false);
-        $gate = new MarketplaceSyncGate;
-        $queued = 0;
-        $notMatched = 0;
-
-        foreach ($products as $product) {
-            $knownShopIds = $confirmNew ? $shopIds : $gate->knownShopIds($product, $shops);
-            $pushShops = $shops->filter(fn (SalesPlatformShop $shop) => in_array($shop->id, $knownShopIds, true));
-            $notMatched += $shops->count() - $pushShops->count();
-            if ($pushShops->isEmpty()) {
-                continue;
-            }
-
-            $product->platformShops()->syncWithoutDetaching($pushShops->pluck('id')->all());
-
-            foreach ($pushShops as $shop) {
-                $this->dispatchMarketplaceSyncJob($product, $shop, $shop->platform->code, 'push');
-                $queued++;
-            }
-        }
-
-        $message = __('Queued push for :products product(s) across :shops channel(s).', ['products' => $products->count(), 'shops' => $shops->count()]);
-        if ($skippedCount > 0) {
-            $message .= ' '.__('Skipped :count product(s) not enabled for publishing.', ['count' => $skippedCount]);
-        }
-        if ($notMatched > 0) {
-            $message = "Queued {$queued} push job(s). ข้าม {$notMatched} รายการ (สินค้า×ร้าน) ที่ยังไม่ได้จับคู่ (Product Matching) — จับคู่ก่อน หรือติ๊กยืนยัน \"สร้างเป็นสินค้าใหม่\"";
-            if ($skippedCount > 0) {
-                $message .= ' '.__('Skipped :count product(s) not enabled for publishing.', ['count' => $skippedCount]);
-            }
-
-            return back()->with($queued === 0 ? 'error' : 'warning', $message);
-        }
-
-        return back()->with('success', $message);
+        // ปิดแล้ว — การเขียนขึ้น marketplace (push / ปิดการขาย / ลบ) ทำได้จาก step "Push" ของ
+        // หน้า Map สินค้า (Product Mapping) ทีละสินค้าเท่านั้น (ดู PlatformPushController)
+        return back()->with('error', 'การ Push / ปิดการขายหลายรายการถูกปิดแล้ว — ทำได้ที่ step "Push" ในหน้า Map สินค้าของแต่ละ platform');
     }
 
     /**
-     * ปุ่ม bulk "Deactivate" ในหน้ารายการสินค้า — เป็นคู่หูฝั่ง Deactivate ของ
-     * pushBulk() ด้านบน ต่างจาก push ตรงที่ตัวนี้จะไม่ auto-publish ให้เลย:
-     * จะ queue เฉพาะคู่ product×shop ที่ถูกติ๊ก "published" ไว้อยู่แล้วเท่านั้น
-     * (product->platformShops()) สอดคล้องกับทั้งเงื่อนไข "ยังไม่ได้ published"
-     * ของ queueMarketplaceSync() และแผง Sales Channels ของหน้า Edit ที่จะไม่
-     * มีปุ่ม Deactivate โผล่มาให้กดถ้า shop นั้นยังไม่ได้ติ๊กไว้ คู่ไหนที่ยังไม่
-     * ได้ publish จะถูกข้ามไปเงียบๆ (แค่นับจำนวนไว้ ไม่ถือเป็น error) แทนที่จะ
-     * ทำให้ request ทั้งก้อนพังไปเพราะคู่นั้นคู่เดียว
+     * ปิดแล้ว — คู่หูของ pushBulk() ด้านบน (ปิดการขายหลายรายการ) ทำได้ที่ step "Push" ของหน้า
+     * Map สินค้าทีละสินค้าเท่านั้น
      */
     public function deactivateBulk(Request $request): RedirectResponse
     {
-        $validated = $request->validate([
-            'product_ids' => ['required', 'array', 'min:1'],
-            'product_ids.*' => ['integer', 'exists:products,id'],
-            'shop_ids' => ['required', 'array', 'min:1'],
-            'shop_ids.*' => ['integer', 'exists:sales_platform_shops,id'],
-        ]);
-
-        $products = Product::whereIn('id', $validated['product_ids'])->get();
-        $shops = SalesPlatformShop::with('platform:id,code')->whereIn('id', $validated['shop_ids'])->get()
-            ->filter(fn (SalesPlatformShop $shop) => $request->user()?->canAccessShop($shop))
-            ->values();
-
-        if ($shops->isEmpty()) {
-            return back()->with('error', "You don't have access to any of the selected shop(s).");
-        }
-
-        $queued = 0;
-        $skipped = 0;
-        foreach ($products as $product) {
-            $publishedShopIds = $product->platformShops()->pluck('sales_platform_shops.id')->all();
-
-            foreach ($shops as $shop) {
-                if (!in_array($shop->id, $publishedShopIds, true)) {
-                    $skipped++;
-                    continue;
-                }
-
-                $this->dispatchMarketplaceSyncJob($product, $shop, $shop->platform->code, 'deactivate');
-                $queued++;
-            }
-        }
-
-        $message = "Queued deactivate for {$queued} product/channel pair(s).";
-        if ($skipped > 0) {
-            $message .= " Skipped {$skipped} pair(s) not published there.";
-        }
-
-        return back()->with('success', $message);
+        // ปิดแล้ว — การเขียนขึ้น marketplace (push / ปิดการขาย / ลบ) ทำได้จาก step "Push" ของ
+        // หน้า Map สินค้า (Product Mapping) ทีละสินค้าเท่านั้น (ดู PlatformPushController)
+        return back()->with('error', 'การ Push / ปิดการขายหลายรายการถูกปิดแล้ว — ทำได้ที่ step "Push" ในหน้า Map สินค้าของแต่ละ platform');
     }
 
     /**
@@ -4595,7 +4484,6 @@ class ProductController extends Controller
         $validated = $request->validate([
             'published_shop_ids' => ['nullable', 'array'],
             'published_shop_ids.*' => ['integer', 'exists:sales_platform_shops,id'],
-            'confirm_new_listing' => ['sometimes', 'boolean'],
         ]);
 
         $shopIds = collect($validated['published_shop_ids'] ?? [])->map(fn ($id) => (int) $id)->sort()->values()->all();
@@ -4622,23 +4510,11 @@ class ProductController extends Controller
         });
 
         if (empty($shopIds)) {
-            return back()->with('success', 'Product enabled. Tick at least one sales channel to push it live.');
+            return back()->with('success', 'เปิดการเผยแพร่แล้ว — ติ๊กช่องทางขายอย่างน้อย 1 ร้าน แล้ว Push ที่หน้า Map สินค้า');
         }
 
-        $shops = SalesPlatformShop::with('platform:id,code')->whereIn('id', $shopIds)->get();
-        // ร้านที่ยังไม่ผ่าน Product Matching ข้ามไป (ยังติ๊ก published ไว้ตามเดิม) เว้นแต่
-        // ผู้ใช้ยืนยัน "สร้างเป็นสินค้าใหม่" แล้ว — edit.tsx ถามก่อนเรียก (ดู knownShopIds prop)
-        $knownShopIds = $request->boolean('confirm_new_listing') ? $shopIds : (new MarketplaceSyncGate)->knownShopIds($product, $shops);
-        [$shops, $skipped] = $shops->partition(fn (SalesPlatformShop $shop) => in_array($shop->id, $knownShopIds, true));
-        foreach ($shops as $shop) {
-            $this->dispatchMarketplaceSyncJob($product, $shop, $shop->platform->code, 'push');
-        }
-
-        if ($skipped->isNotEmpty()) {
-            return back()->with('warning', "Product enabled and push queued to {$shops->count()} channel(s). ไม่ได้ push: {$skipped->pluck('name')->join(', ')} — ยังไม่ได้จับคู่ (Product Matching)");
-        }
-
-        return back()->with('success', "Product enabled and push queued to {$shops->count()} channel(s).");
+        // ไม่ push แล้ว — Push ทำได้จาก step "Push" ของหน้า Map สินค้าเท่านั้น (PlatformPushController)
+        return back()->with('success', 'เปิดการเผยแพร่และบันทึกช่องทางขายแล้ว ('.count($shopIds).' ร้าน) — กด Push ได้ที่ step "Push" ในหน้า Map สินค้า');
     }
 
     /**

@@ -19,9 +19,12 @@ class ProductDataChanged implements ShouldBroadcastNow
 {
     use InteractsWithSockets;
 
-    public function __construct(public int $productId, public bool $enabled)
-    {
-    }
+    /**
+     * $skipMarketplaceAutoSync: the change came *from* a marketplace (e.g.
+     * ListingImportService) — refresh the storefront, but don't let
+     * QueueAutoMarketplaceSync push the same data straight back.
+     */
+    public function __construct(public int $productId, public bool $enabled, public bool $skipMarketplaceAutoSync = false) {}
 
     /**
      * @return array<int, Channel>
