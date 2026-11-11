@@ -30,6 +30,7 @@ use App\Http\Controllers\Catalog\ListingImportController;
 use App\Http\Controllers\Catalog\PlatformPushController;
 use App\Http\Controllers\Catalog\LazadaMasterProductsController;
 use App\Http\Controllers\Catalog\MarketplaceAttributeMappingController;
+use App\Http\Controllers\Catalog\MarketplaceProductMasterController;
 use App\Http\Controllers\Catalog\TikTokAttributeMappingController;
 use App\Http\Controllers\Catalog\ShopeeAttributeMappingController;
 use App\Http\Controllers\Catalog\WooCommerceAttributeMappingController;
@@ -183,6 +184,10 @@ Route::middleware(['auth'])->prefix('catalog')->name('catalog.')->group(function
     // "จับคู่สินค้า (Product Matching)" — listing จริงบนทุก marketplace ↔ PIM
     // product ต่อร้าน (phase 1 อ่านอย่างเดียว + auto-match ตาม SKU) — ดู
     // ProductMatchingController / MarketplaceListingSyncService
+    // มาสเตอร์ > มาร์เก็ตเพลส: หน้ารวม (การ์ดเดียว) + "Marketplace Product Master" ตารางสินค้าทุก
+    // platform (อ่านอย่างเดียว) — ดู MarketplaceProductMasterController
+    Route::get('marketplace', fn () => Inertia::render('catalog/marketplace/marketplace-hub'))->name('marketplace.hub')->middleware('permission:products,list_products');
+    Route::get('marketplace/product-master', [MarketplaceProductMasterController::class, 'index'])->name('marketplace.productMaster')->middleware('permission:products,list_products');
     Route::get('marketplace/product-matching', [ProductMatchingController::class, 'index'])->name('marketplace.productMatching')->middleware('permission:products,list_products');
     Route::post('marketplace/product-matching/sync', [ProductMatchingController::class, 'sync'])->name('marketplace.productMatching.sync')->middleware('permission:products,edit_products');
     // phase 2 — ผูก/ชุดรวม/ยืนยันคำแนะนำ/ยกเลิกการผูก/ซ่อน (แก้แค่ DB ไม่ยิง API
@@ -623,14 +628,11 @@ Route::middleware(['auth'])->prefix('catalog')->name('catalog.')->group(function
             Route::get("marketplace/connect/{$platform}", fn () => app(SalesPlatformController::class)->connectionSettings($platform))
                 ->name("marketplace.connect.{$platform}");
 
-            // Hub page ของแพลตฟอร์มนี้ (มาสเตอร์ > มาร์เก็ตเพลส > {แพลตฟอร์ม}) — grid
-            // การ์ด 3 ใบพาไปหน้าจับคู่หมวดหมู่/จับคู่ข้อมูลส่ง/ตั้งค่าการเชื่อมต่อของ
-            // แพลตฟอร์มนั้น (ดู resources/js/pages/catalog/marketplace/platform-hub.tsx)
-            // เป็นแค่หน้า launcher ไม่มี business logic ของตัวเอง เลย render ตรงนี้
-            // แบบเดียวกับ marketplace/connect/{platform} ด้านบน ไม่ต้องมี controller แยก
-            Route::get("marketplace/{$platform}", fn () => Inertia::render('catalog/marketplace/platform-hub', [
-                'platform' => $platform,
-            ]))->name("marketplace.hub.{$platform}");
+            // เดิมเป็นหน้า hub ต่อแพลตฟอร์ม (platform-hub.tsx — ลบแล้ว) ตอนนี้ มาสเตอร์ > มาร์เก็ตเพลส
+            // เป็นเมนูเดียว (/catalog/marketplace) — URL เดิมพาไป Marketplace Product Master ที่กรอง
+            // แพลตฟอร์มนี้ไว้แทน เพื่อไม่ให้ bookmark/ลิงก์เก่าเจอ 404
+            Route::redirect("marketplace/{$platform}", "/catalog/marketplace/product-master?platform={$platform}")
+                ->name("marketplace.hub.{$platform}");
         });
     }
 

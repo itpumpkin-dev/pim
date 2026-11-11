@@ -140,47 +140,16 @@ export function useMainNavItems(): NavItem[] {
                                 permission: 'product_types.list_product_types',
                             },
                             {
-                                // แต่ก่อนซ้อน 2 ชั้น (มาร์เก็ตเพลส > การเชื่อมต่อ [4 แพลตฟอร์ม] +
-                                // มาร์เก็ตเพลส > {แพลตฟอร์ม} > [จับคู่หมวดหมู่, จับคู่ข้อมูลส่ง])
-                                // ตอนนี้แบนราบเหลือแค่ มาร์เก็ตเพลส > {แพลตฟอร์ม} ตรงๆ แต่ละอันพาไป
-                                // หน้า hub ของแพลตฟอร์มนั้น (resources/js/pages/catalog/marketplace/
-                                // platform-hub.tsx) ที่โชว์การ์ดทั้ง 3 อัน (จับคู่หมวดหมู่/จับคู่
-                                // ข้อมูลส่ง/ตั้งค่าการเชื่อมต่อ) พร้อมกันในที่เดียว แทนที่จะต้องไล่
-                                // เปิดเมนูย่อยทีละชั้น — สิทธิ์เข้าถึงแต่ละการ์ดยังเช็คที่หน้า
-                                // ปลายทางเหมือนเดิม (การ์ดจะซ่อนเองถ้าไม่มีสิทธิ์) ส่วนตัวลิงก์เมนูนี้
-                                // เอง (และหน้า hub ที่มันพาไป) ตอนนี้มีสิทธิ์ของตัวเองแยกต่อแพลตฟอร์ม
-                                // แล้ว (marketplace_{platform}.list_marketplace_{platform} — ดู
-                                // routes/catalog.php) แทนที่จะแชร์ products.list_products เหมือนเดิม
+                                // มาร์เก็ตเพลส = เมนูเดียว (เดิมเป็นกลุ่ม Shopee / Lazada / TikTok / WooCommerce /
+                                // จับคู่สินค้า) พาไปหน้ารวม /catalog/marketplace ที่มีการ์ด "Marketplace Product
+                                // Master" ใบเดียว — ตารางนั้นมีปุ่มไปจับคู่สินค้า / สินค้า (Product Mapping) ต่อ
+                                // ส่วนหน้า hub ต่อ platform (/catalog/marketplace/{platform}) ยังเปิดได้ตาม URL
+                                // matchUrls: ทุกหน้าใต้ /catalog/marketplace ไฮไลต์จาก url อยู่แล้ว (prefix) — หน้า
+                                // จับคู่หมวดหมู่ต่อ platform อยู่คนละ path เลยต้องระบุเพิ่ม
                                 title: t('marketplace'),
-                                // SideNavigation รองรับแค่ 2 ชั้น (item > sub-item) — group ชั้นที่ 3
-                                // นี้เลยถูกยกขึ้นมาเป็น item ข้างๆ "มาสเตอร์" ตอน render (ดู
-                                // toSideNavTree ใน app-sidebar.tsx) จึงต้องมีไอคอนของตัวเอง
-                                icon: 'cart',
-                                items: [
-                                    ...(['shopee', 'lazada', 'tiktok', 'woocommerce'] as const).map((platform) => ({
-                                        title: platform === 'woocommerce' ? 'WooCommerce' : platform.charAt(0).toUpperCase() + platform.slice(1),
-                                        url: `/catalog/marketplace/${platform}`,
-                                        permission: `marketplace_${platform}.list_marketplace_${platform}`,
-                                        // การ์ดบนหน้า hub พาไปหน้าจริงที่ไม่ได้อยู่ใต้
-                                        // /catalog/marketplace/{platform}/ ทุกอัน (เช่น หน้าจับคู่
-                                        // หมวดหมู่อยู่คนละ path เลย) — ต้องระบุ matchUrls ตรงๆ ไม่งั้น
-                                        // เปิดจากการ์ดแล้วเมนู "มาร์เก็ตเพลส" นี้จะไม่ไฮไลต์ (เหมือน
-                                        // ปัญหาเดียวกับที่หน้า "จัดการ" เจอมาก่อน — ดูคอมเมนต์ที่นั่น)
-                                        matchUrls: [
-                                            `/catalog/categories/${platform}-mapping`,
-                                            `/catalog/marketplace/${platform}/products`,
-                                            `/catalog/marketplace/${platform}/attribute-mapping`,
-                                            `/catalog/marketplace/connect/${platform}`,
-                                        ],
-                                    })),
-                                    // หน้ารวมทุก platform (ไม่ได้แยกต่อแพลตฟอร์ม) — ข้อความไทย
-                                    // ฮาร์ดโค้ดเหมือนหน้า marketplace อื่นๆ (ไม่มี i18n key)
-                                    {
-                                        title: 'จับคู่สินค้า',
-                                        url: '/catalog/marketplace/product-matching',
-                                        permission: 'products.list_products',
-                                    },
-                                ],
+                                url: '/catalog/marketplace',
+                                permission: 'products.list_products',
+                                matchUrls: ['shopee', 'lazada', 'tiktok', 'woocommerce'].map((platform) => `/catalog/categories/${platform}-mapping`),
                             },
                         ],
                     },

@@ -70,8 +70,8 @@ export default function LazadaMasterProducts({ products, shops, filters, totalCa
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'Catalog', href: '#' },
         { title: 'Master', href: '#' },
-        { title: 'Marketplace', href: '#' },
-        { title: 'Lazada', href: '/catalog/marketplace/lazada' },
+        { title: 'Marketplace', href: '/catalog/marketplace' },
+        { title: 'Lazada', href: '/catalog/marketplace/product-master?platform=lazada' },
         { title: 'Master Product List', href: '#' },
     ];
 

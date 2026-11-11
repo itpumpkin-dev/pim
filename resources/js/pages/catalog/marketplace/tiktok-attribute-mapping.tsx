@@ -19,8 +19,8 @@ export default function TikTokAttributeMapping({ attributes, tiktokAttributes, c
     const breadcrumbs: BreadcrumbItem[] = [
         { title: tNav('catalog'), href: '#' },
         { title: tNav('master'), href: '#' },
-        { title: tNav('marketplace'), href: '#' },
-        { title: 'TikTok', href: '/catalog/marketplace/tiktok' },
+        { title: tNav('marketplace'), href: '/catalog/marketplace' },
+        { title: 'TikTok', href: '/catalog/marketplace/product-master?platform=tiktok' },
         { title: tNav('mapPushData'), href: '#' },
     ];
 

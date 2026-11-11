@@ -64,8 +64,8 @@ export default function MarketplaceConnectionSettings({ platform, shops }: Props
     const breadcrumbs: BreadcrumbItem[] = [
         { title: tNav('catalog'), href: '#' },
         { title: tNav('master'), href: '#' },
-        { title: tNav('marketplace'), href: '#' },
-        { title: platformLabel, href: `/catalog/marketplace/${platform}` },
+        { title: tNav('marketplace'), href: '/catalog/marketplace' },
+        { title: platformLabel, href: `/catalog/marketplace/product-master?platform=${platform}` },
         { title: tNav('marketplaceConnect'), href: '#' },
     ];
 

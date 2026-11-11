@@ -96,8 +96,8 @@ export default function WoocommerceCategoryMapping({ categories, stats, lastSync
     const breadcrumbs: BreadcrumbItem[] = [
         { title: tNav('catalog'), href: '#' },
         { title: tNav('master'), href: '#' },
-        { title: tNav('marketplace'), href: '#' },
-        { title: 'WooCommerce', href: '/catalog/marketplace/woocommerce' },
+        { title: tNav('marketplace'), href: '/catalog/marketplace' },
+        { title: 'WooCommerce', href: '/catalog/marketplace/product-master?platform=woocommerce' },
         { title: t('woocommerceMappingTitle'), href: '#' },
     ];
 
@@ -464,7 +464,7 @@ export default function WoocommerceCategoryMapping({ categories, stats, lastSync
             <MappingPage>
                 <MappingPageHeader
                     backLabel="WooCommerce"
-                    onBack={() => router.visit('/catalog/marketplace/woocommerce')}
+                    onBack={() => router.visit('/catalog/marketplace/product-master?platform=woocommerce')}
                     title={t('woocommerceMappingTitle')}
                     subtitle={
                         <>

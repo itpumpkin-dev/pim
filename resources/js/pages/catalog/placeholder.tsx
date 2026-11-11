@@ -28,8 +28,7 @@ export default function CatalogPlaceholder({ titleKey, subtitle = null }: Props)
 
     // "ตั้งค่าการเชื่อมต่อ" (marketplaceConnect) เป็น stub เดียวที่อยู่ลึกเข้าไป
     // ใต้ มาสเตอร์ > มาร์เก็ตเพลส > {แพลตฟอร์ม} จริงๆ (ดู
-    // resources/js/pages/catalog/marketplace/platform-hub.tsx ที่การ์ด
-    // "ตั้งค่าการเชื่อมต่อ" พามาที่นี่) — stub อื่น (เช่น "bom") อยู่ตรงใต้
+    // การ์ด "ตั้งค่าการเชื่อมต่อ" ของหน้า มาร์เก็ตเพลส) — stub อื่น (เช่น "bom") อยู่ตรงใต้
     // Catalog เฉยๆ ไม่มีชั้นพ่อแม่ให้ต้องใส่ ใช้ subtitle (ชื่อแพลตฟอร์มที่ route
     // นี้ส่งมาอยู่แล้ว) หาทางกลับไปหน้า hub ของแพลตฟอร์มนั้นด้วยเลย
     const isMarketplaceConnect = titleKey === 'marketplaceConnect' && subtitle;
@@ -38,8 +37,8 @@ export default function CatalogPlaceholder({ titleKey, subtitle = null }: Props)
         ...(isMarketplaceConnect
             ? [
                   { title: tNav('master'), href: '#' },
-                  { title: tNav('marketplace'), href: '#' },
-                  { title: subtitle, href: `/catalog/marketplace/${subtitle.toLowerCase()}` },
+                  { title: tNav('marketplace'), href: '/catalog/marketplace' },
+                  { title: subtitle, href: `/catalog/marketplace/product-master?platform=${subtitle.toLowerCase()}` },
               ]
             : []),
         { title, href: '#' },

@@ -19,8 +19,8 @@ export default function ShopeeAttributeMapping({ attributes, shopeeAttributes, c
     const breadcrumbs: BreadcrumbItem[] = [
         { title: tNav('catalog'), href: '#' },
         { title: tNav('master'), href: '#' },
-        { title: tNav('marketplace'), href: '#' },
-        { title: 'Shopee', href: '/catalog/marketplace/shopee' },
+        { title: tNav('marketplace'), href: '/catalog/marketplace' },
+        { title: 'Shopee', href: '/catalog/marketplace/product-master?platform=shopee' },
         { title: tNav('mapPushData'), href: '#' },
     ];
 

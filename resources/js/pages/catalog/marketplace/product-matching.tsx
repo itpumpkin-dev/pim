@@ -148,6 +148,8 @@ interface Filters {
     active_only: boolean;
     min_score: number;
     per_page: number;
+    /** listings picked on Marketplace Product Master — only these are shown */
+    ids?: number[];
 }
 
 interface Props {
@@ -156,6 +158,8 @@ interface Props {
     summary: Record<MatchTab, number>;
     rows: Paginated<ListingRow | NotListedRow> | null;
     syncRuns: SyncRun[];
+    /** shop id => how many of the picked listings (?ids=) are in that shop */
+    selection?: Record<string, number>;
 }
 
 const PAGE_URL = '/catalog/marketplace/product-matching';
@@ -205,7 +209,7 @@ const suggestionTag = (s: Suggestion) => {
  * ProductMatchingActionsController / ListingMatchSuggester. Every action here
  * only changes PIM's own link table, never the marketplace.
  */
-export default function ProductMatching({ shopGroups, filters, summary, rows, syncRuns }: Props) {
+export default function ProductMatching({ shopGroups, filters, summary, rows, syncRuns, selection = {} }: Props) {
     const { auth } = usePage<SharedData>().props;
     const permissions = auth.permissions || [];
     const canSync = permissions.includes('products.edit_products');
@@ -232,7 +236,7 @@ export default function ProductMatching({ shopGroups, filters, summary, rows, sy
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'Catalog', href: '#' },
         { title: 'Master', href: '#' },
-        { title: 'Marketplace', href: '#' },
+        { title: 'Marketplace', href: '/catalog/marketplace' },
         { title: 'จับคู่สินค้า', href: PAGE_URL },
     ];
 
@@ -252,6 +256,7 @@ export default function ProductMatching({ shopGroups, filters, summary, rows, sy
                 active_only: next.active_only ? 1 : 0,
                 min_score: next.min_score || undefined,
                 per_page: next.per_page,
+                ids: next.ids && next.ids.length > 0 ? next.ids.join(',') : undefined,
                 page: overrides.page,
             },
             { preserveState: true, preserveScroll: true, replace: options.replace },
@@ -720,6 +725,18 @@ export default function ProductMatching({ shopGroups, filters, summary, rows, sy
                             )}
                         </div>
 
+                        {filters.ids && filters.ids.length > 0 && (
+                            <FioriMessageStrip severity="information" style={{ marginBottom: '1rem' }}>
+                                แสดงเฉพาะสินค้าที่เลือกมาจาก Marketplace Product Master — ร้านนี้ {selection[String(shop?.id)] ?? 0} จาก{' '}
+                                {filters.ids.length} รายการ
+                                {Object.entries(selection)
+                                    .filter(([id]) => Number(id) !== shop?.id)
+                                    .map(([id, count]) => `${allShops.find((s) => s.id === Number(id))?.name ?? 'ร้าน #' + id} ${count} รายการ`)
+                                    .join(', ')
+                                    .replace(/^(.+)$/, ' (อยู่ร้านอื่น: $1 — เลือกร้านด้านบนเพื่อดู)')}{' '}
+                                <Link onClick={() => visit({ ids: [] })}>แสดงทั้งหมด</Link>
+                            </FioriMessageStrip>
+                        )}
                         {shop?.last_run?.status === 'failed' && shop.last_run.error && (
                             <FioriMessageStrip severity="error" style={{ marginBottom: '1rem' }}>
                                 ซิงค์ล่าสุดล้มเหลว ({formatDateTime(shop.last_run.started_at)}): {shop.last_run.error}

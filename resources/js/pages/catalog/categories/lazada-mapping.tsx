@@ -108,8 +108,8 @@ export default function LazadaCategoryMapping({ categories, stats, lastSyncedAt,
     const breadcrumbs: BreadcrumbItem[] = [
         { title: tNav('catalog'), href: '#' },
         { title: tNav('master'), href: '#' },
-        { title: tNav('marketplace'), href: '#' },
-        { title: 'Lazada', href: '/catalog/marketplace/lazada' },
+        { title: tNav('marketplace'), href: '/catalog/marketplace' },
+        { title: 'Lazada', href: '/catalog/marketplace/product-master?platform=lazada' },
         { title: t('lazadaMappingTitle'), href: '#' },
     ];
 
@@ -665,7 +665,7 @@ export default function LazadaCategoryMapping({ categories, stats, lastSyncedAt,
             <MappingPage>
                 <MappingPageHeader
                     backLabel="Lazada"
-                    onBack={() => router.visit('/catalog/marketplace/lazada')}
+                    onBack={() => router.visit('/catalog/marketplace/product-master?platform=lazada')}
                     title={t('lazadaMappingTitle')}
                     subtitle={
                         <>

@@ -19,8 +19,8 @@ export default function LazadaAttributeMapping({ attributes, lazadaAttributes, c
     const breadcrumbs: BreadcrumbItem[] = [
         { title: tNav('catalog'), href: '#' },
         { title: tNav('master'), href: '#' },
-        { title: tNav('marketplace'), href: '#' },
-        { title: 'Lazada', href: '/catalog/marketplace/lazada' },
+        { title: tNav('marketplace'), href: '/catalog/marketplace' },
+        { title: 'Lazada', href: '/catalog/marketplace/product-master?platform=lazada' },
         { title: tNav('mapPushData'), href: '#' },
     ];
 

@@ -155,7 +155,7 @@ interface PaginatedData<T> {
 interface Props {
     products: PaginatedData<ProductRow>;
     stats: { total: number; mapped: number; unmapped: number; matched: number; not_matched: number };
-    filters: { filter: ProductFilter; search: string; per_page: number; matching?: MatchingFilter };
+    filters: { filter: ProductFilter; search: string; per_page: number; matching?: MatchingFilter; ids?: number[] };
     /** ทุกร้าน Shopee ในระบบ — ใช้เป็นตัวเลือกใน dialog "Push ที่เลือก" (bulk) ด้านล่างตาราง */
     shopeeShops: { id: number; name: string }[];
 }
@@ -259,6 +259,8 @@ export default function ShopeeProductsMapping({ products, stats, filters }: Prop
     const [search, setSearch] = useState(filters.search ?? '');
     const [filter, setFilter] = useState<ProductFilter>(filters.filter ?? 'all');
     const [matching, setMatching] = useState<MatchingFilter>(filters.matching ?? 'all');
+    // ?ids= — สินค้าที่เลือกมาจาก Marketplace Product Master: ทุกการโหลดตารางคงตัวกรองนี้ไว้จนกด "แสดงทั้งหมด"
+    const idsParam = filters.ids && filters.ids.length > 0 ? filters.ids.join(',') : undefined;
     // ตาราง reload แบบ preserveState (กรอง / ค้นหา / เปลี่ยนหน้า) ไม่มี skeleton ของทั้งแอป
     // — โชว์ busy ทับตารางเอง เฉพาะเมื่อโหลดนานกว่า 150ms (โหลดเร็วไม่กระพริบ)
     const [navigating, setNavigating] = useState(false);
@@ -434,8 +436,8 @@ export default function ShopeeProductsMapping({ products, stats, filters }: Prop
     const breadcrumbs: BreadcrumbItem[] = [
         { title: tNav('catalog'), href: '#' },
         { title: tNav('master'), href: '#' },
-        { title: tNav('marketplace'), href: '#' },
-        { title: 'Shopee', href: '/catalog/marketplace/shopee' },
+        { title: tNav('marketplace'), href: '/catalog/marketplace' },
+        { title: 'Shopee', href: '/catalog/marketplace/product-master?platform=shopee' },
         { title: 'สินค้า', href: '/catalog/marketplace/shopee/products' },
         ...(activeProduct ? [{ title: activeProduct.name, href: '#' }] : []),
     ];
@@ -449,7 +451,7 @@ export default function ShopeeProductsMapping({ products, stats, filters }: Prop
         const timeout = setTimeout(() => {
             router.get(
                 '/catalog/marketplace/shopee/products',
-                { search, matching, filter, per_page: perPage },
+                { search, ids: idsParam, matching, filter, per_page: perPage },
                 { preserveState: true, replace: true, ...navEvents },
             );
         }, 300);
@@ -461,7 +463,7 @@ export default function ShopeeProductsMapping({ products, stats, filters }: Prop
         setFilter(value);
         router.get(
             '/catalog/marketplace/shopee/products',
-            { search, matching, filter: value, per_page: perPage },
+            { search, ids: idsParam, matching, filter: value, per_page: perPage },
             { preserveState: true, ...navEvents },
         );
     };
@@ -470,20 +472,24 @@ export default function ShopeeProductsMapping({ products, stats, filters }: Prop
         setMatching(value);
         router.get(
             '/catalog/marketplace/shopee/products',
-            { search, matching: value, filter, per_page: perPage },
+            { search, ids: idsParam, matching: value, filter, per_page: perPage },
             { preserveState: true, ...navEvents },
         );
     };
 
     const handlePerPageChange = (value: number) => {
         setPerPage(value);
-        router.get('/catalog/marketplace/shopee/products', { search, matching, filter, per_page: value }, { preserveState: true, ...navEvents });
+        router.get(
+            '/catalog/marketplace/shopee/products',
+            { search, ids: idsParam, matching, filter, per_page: value },
+            { preserveState: true, ...navEvents },
+        );
     };
 
     const goToPage = (page: number) => {
         router.get(
             '/catalog/marketplace/shopee/products',
-            { search, matching, filter, per_page: perPage, page },
+            { search, ids: idsParam, matching, filter, per_page: perPage, page },
             { preserveState: true, ...navEvents },
         );
     };
@@ -1690,7 +1696,11 @@ export default function ShopeeProductsMapping({ products, stats, filters }: Prop
                     title={`สินค้า (${products.total})`}
                     subtitle="จัดการการแมปหมวดหมู่และ Attributes ของ Shopee ตั้งแต่ระดับสินค้า"
                     actions={
-                        <Button design="Transparent" icon="nav-back" onClick={() => router.visit('/catalog/marketplace/shopee')}>
+                        <Button
+                            design="Transparent"
+                            icon="nav-back"
+                            onClick={() => router.visit('/catalog/marketplace/product-master?platform=shopee')}
+                        >
                             Shopee Hub
                         </Button>
                     }
@@ -1763,6 +1773,23 @@ export default function ShopeeProductsMapping({ products, stats, filters }: Prop
                     </div>
 
                     <div className={styles.divider} />
+
+                    {idsParam && (
+                        <FioriMessageStrip severity="information" style={{ margin: '0.75rem 1.25rem 0' }}>
+                            แสดงเฉพาะ {filters.ids?.length} สินค้าที่เลือกมาจาก Marketplace Product Master{' '}
+                            <Link
+                                onClick={() =>
+                                    router.get(
+                                        '/catalog/marketplace/shopee/products',
+                                        { search, matching, filter, per_page: perPage },
+                                        { preserveState: true, ...navEvents },
+                                    )
+                                }
+                            >
+                                แสดงทั้งหมด
+                            </Link>
+                        </FioriMessageStrip>
+                    )}
 
                     {/* Data Table — busy layer ทับระหว่างโหลดแบบ in-place */}
                     <div className={styles.busyArea} aria-busy={navigating}>

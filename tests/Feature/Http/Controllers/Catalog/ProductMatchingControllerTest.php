@@ -107,3 +107,30 @@ test('matched rows carry the parent product and the cached listing category for 
         ->and($rows['11']['product']['mapping_product'])->toBe(['id' => $plain->id, 'sku' => 'PMC-PLAIN'])
         ->and($rows['11']['listing_category_id'])->toBeNull();
 });
+
+test('?ids= (picked on Marketplace Product Master) shows only those listings, opening their shop and tab', function () {
+    $user = User::factory()->create();
+    $shopA = pmcShop();
+    $shopB = pmcShop();
+    $p = Product::create(['sku' => 'PMC-IDS']);
+    $picked = pmcListing($shopA, ['item_id' => '1', 'seller_sku' => 'A1', 'is_active' => false]);
+    pmcListing($shopA, ['item_id' => '2', 'seller_sku' => 'A2']);
+    $pickedB = pmcListing($shopB, ['item_id' => '3', 'seller_sku' => 'B1', 'product_id' => $p->id, 'match_method' => 'manual']);
+
+    $props = pmcProps($user, ['ids' => "{$picked->id},{$pickedB->id}"]);
+    expect($props['filters']['shop_id'])->toBeIn([$shopA->id, $shopB->id])
+        ->and($props['filters']['ids'])->toEqualCanonicalizing([$picked->id, $pickedB->id])
+        ->and($props['selection'])->toEqual([$shopA->id => 1, $shopB->id => 1]);
+
+    // shop A: the picked (inactive, unmatched) listing only — tab defaults to unmatched, inactive not hidden
+    $props = pmcProps($user, ['ids' => "{$picked->id},{$pickedB->id}", 'shop_id' => $shopA->id]);
+    expect($props['filters']['tab'])->toBe('unmatched')
+        ->and($props['filters']['active_only'])->toBeFalse()
+        ->and(collect($props['rows']->items())->pluck('item_id')->all())->toBe(['1'])
+        ->and($props['summary']['unmatched'])->toBe(1);
+
+    // shop B: the matched one → matched tab
+    $props = pmcProps($user, ['ids' => (string) $pickedB->id]);
+    expect($props['filters']['tab'])->toBe('matched')
+        ->and(collect($props['rows']->items())->pluck('item_id')->all())->toBe(['3']);
+});
