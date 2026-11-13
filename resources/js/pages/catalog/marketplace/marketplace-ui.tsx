@@ -14,7 +14,23 @@ import '@ui5/webcomponents-icons/dist/slim-arrow-left.js';
 import '@ui5/webcomponents-icons/dist/slim-arrow-right.js';
 import '@ui5/webcomponents-icons/dist/sys-first-page.js';
 import '@ui5/webcomponents-icons/dist/sys-last-page.js';
-import { BusyIndicator, Button, Icon, Input, Option, Select, Text, Title } from '@ui5/webcomponents-react';
+import {
+    BusyIndicator,
+    Button,
+    Icon,
+    Input,
+    Link,
+    ObjectStatus,
+    Option,
+    Select,
+    Table,
+    TableCell,
+    TableHeaderCell,
+    TableHeaderRow,
+    TableRow,
+    Text,
+    Title,
+} from '@ui5/webcomponents-react';
 import { forwardRef, useEffect, useState, type CSSProperties, type ReactNode } from 'react';
 
 import styles from './marketplace.module.css';
@@ -291,18 +307,69 @@ export function HStack({
     );
 }
 
-/** Simple two-column mapping table (platform attribute ↔ PIM attribute) with a header row and row hover. */
-export function MappingTable({ headers, children }: { headers: [ReactNode, ReactNode]; children: ReactNode }) {
+/**
+ * Mapping table (platform attribute ↔ PIM attribute [↔ option mapping]) on the UI5 Table — children
+ * are `MappingRow`s holding one `MappingCell` per header. The first column (the platform field) is
+ * fixed-ish width; the rest share the remaining space.
+ */
+export function MappingTable({ headers, children }: { headers: ReactNode[]; children: ReactNode }) {
     return (
-        <table className={styles.mapTable}>
-            <thead>
-                <tr>
-                    <th>{headers[0]}</th>
-                    <th>{headers[1]}</th>
-                </tr>
-            </thead>
-            <tbody>{children}</tbody>
-        </table>
+        <Table
+            className={styles.mapTable}
+            headerRow={
+                <TableHeaderRow>
+                    {headers.map((h, i) => (
+                        <TableHeaderCell key={i} minWidth={i === 0 ? '14rem' : '12rem'} width={i === 0 ? '32%' : undefined}>
+                            {h}
+                        </TableHeaderCell>
+                    ))}
+                </TableHeaderRow>
+            }
+        >
+            {children}
+        </Table>
+    );
+}
+
+export const MappingRow = TableRow;
+
+/** UI5 table cells lay their children out as a flex row — wrap so stacked content (label over caption) stays stacked. */
+export function MappingCell({ children }: { children?: ReactNode }) {
+    return (
+        <TableCell>
+            <div className={styles.mapCell}>{children}</div>
+        </TableCell>
+    );
+}
+
+/** First column of a mapping row: the platform field's name (+ required mark) over its key / type. */
+export function MappingFieldLabel({ label, required, meta }: { label: ReactNode; required?: boolean; meta?: ReactNode }) {
+    return (
+        <>
+            <span className={styles.mapFieldName}>
+                {label}
+                {required && <span className={styles.mapRequired}> *</span>}
+            </span>
+            {meta && <span className={styles.mapFieldMeta}>{meta}</span>}
+        </>
+    );
+}
+
+/**
+ * "ตัวเลือก" column of an attribute mapping row: how many of the platform's options are matched
+ * (green when all are, orange when some are missing) + a link that opens the option-mapping dialog.
+ * `hint` replaces both when option mapping doesn't apply yet (e.g. no PIM attribute picked).
+ */
+export function OptionMappingStatus({ mapped, total, onOpen, hint }: { mapped: number; total: number; onOpen?: () => void; hint?: string }) {
+    if (hint || !onOpen) return <span className={styles.mapFieldMeta}>{hint ?? '—'}</span>;
+    const state = total === 0 ? 'None' : mapped >= total ? 'Positive' : 'Critical';
+    return (
+        <div className={styles.mapOptions}>
+            <ObjectStatus state={state} showDefaultIcon={total > 0}>
+                {total === 0 ? 'ไม่มีตัวเลือกจากแพลตฟอร์ม' : `จับคู่แล้ว ${mapped}/${total}`}
+            </ObjectStatus>
+            <Link onClick={onOpen}>จับคู่ตัวเลือก</Link>
+        </div>
     );
 }
 

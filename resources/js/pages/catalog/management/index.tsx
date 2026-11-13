@@ -2,7 +2,7 @@ import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem, type SharedData } from '@/types';
 import { Head, router, usePage } from '@inertiajs/react';
 import '@ui5/webcomponents-icons/dist/translate.js';
-import { Icon, Title } from '@ui5/webcomponents-react';
+import { Avatar, Card, CardHeader, Text } from '@ui5/webcomponents-react';
 import { useTranslation } from 'react-i18next';
 
 import { MasterListPage, masterStyles } from '../master-crud';
@@ -53,15 +53,22 @@ export default function CatalogManagement() {
             <MasterListPage title={t('managementTitle')} intro={t('managementSubtitle')}>
                 <div className={masterStyles.tileGrid}>
                     {visibleTiles.map((tile) => (
-                        <button key={tile.key} type="button" className={masterStyles.tile} onClick={() => router.visit(tile.url)}>
-                            <span className={masterStyles.tileIcon}>
-                                <Icon name={tile.icon} />
-                            </span>
-                            <Title level="H3" size="H5" wrappingType="Normal">
-                                {tile.title}
-                            </Title>
-                            <span className={masterStyles.tileDescription}>{tile.description}</span>
-                        </button>
+                        <Card
+                            key={tile.key}
+                            className={masterStyles.tileCard}
+                            header={
+                                <CardHeader
+                                    interactive
+                                    onClick={() => router.visit(tile.url)}
+                                    titleText={tile.title}
+                                    avatar={<Avatar icon={tile.icon} shape="Square" size="S" colorScheme="Accent6" />}
+                                />
+                            }
+                        >
+                            <div className={masterStyles.tileCardContent}>
+                                <Text className={masterStyles.muted}>{tile.description}</Text>
+                            </div>
+                        </Card>
                     ))}
 
                     {visibleTiles.length === 0 && <span className={masterStyles.muted}>{t('managementNoAccess')}</span>}

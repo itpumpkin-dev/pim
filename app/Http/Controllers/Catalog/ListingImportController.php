@@ -56,6 +56,24 @@ class ListingImportController extends Controller
             ] : null,
             'rows' => $this->importer->plan($product, $platform, $listing, $detail, $this->categoryId($request), $request->user()),
             'images' => $hasData ? $this->images->plan($product, $detail, $request->user()) : null,
+            'gallery' => $this->images->gallery($product, $request->user()),
+        ]);
+    }
+
+    /** gallery editor of the step (reorder / remove / upload) — the whole new `pgallery` list, see ListingImageImportService::saveGallery() */
+    public function saveGallery(Request $request, Product $product): JsonResponse
+    {
+        $validated = $request->validate([
+            'paths' => ['present', 'array', 'max:'.ListingImageImportService::MAX_IMAGES],
+            'paths.*' => ['required', 'string', 'max:512'],
+        ]);
+
+        $result = $this->images->saveGallery($product, $validated['paths'], $request->user());
+
+        return response()->json([
+            ...$result,
+            'gallery' => $this->images->gallery($product, $request->user()),
+            'message' => "บันทึกแกลเลอรีแล้ว ({$result['saved']} รูป)",
         ]);
     }
 
@@ -103,6 +121,56 @@ class ListingImportController extends Controller
                 ? "นำเข้ารูปภาพ {$result['written']} รูปแล้ว".($failed > 0 ? " (ดาวน์โหลดไม่สำเร็จ {$failed} รูป)" : '')
                 : 'ดาวน์โหลดรูปภาพไม่สำเร็จ',
         ], $result['written'] > 0 ? 200 : 422);
+    }
+
+    /**
+     * The platform category of the listing this product is matched to — the Product Mapping page
+     * preselects it in "1. Category Mapping" while the product's Master Category isn't mapped yet
+     * (the user still saves it, since that mapping applies to every product in the category).
+     * Cached listing details are used first; when none of the product's direct listings has one,
+     * the first listing's detail is fetched from the platform once (then cached like every detail).
+     */
+    public function listingCategory(Request $request, Product $product, string $platform): JsonResponse
+    {
+        $this->assertPlatform($platform);
+        $productIds = [$product->id, ...Product::where('parent_id', $product->id)->pluck('id')->all()];
+
+        $listings = MarketplaceListing::with('shop.platform')
+            ->whereIn('product_id', $productIds)
+            ->orderBy('id')
+            ->get()
+            ->filter(fn (MarketplaceListing $l) => $l->shop
+                && $request->user()?->canAccessShop($l->shop)
+                && ListingImportService::platformOf($l) === $platform)
+            ->unique(fn (MarketplaceListing $l) => $l->sales_platform_shop_id.':'.$l->item_id)
+            ->values();
+
+        $answer = fn (MarketplaceListing $l, $detail, string $source) => response()->json([
+            'category_id' => (int) $detail->category_id,
+            'category_name' => $detail->category_name,
+            'shop' => $l->shop->name,
+            'source' => $source,
+        ]);
+
+        foreach ($listings as $listing) {
+            $detail = $this->details->find($listing->shop, (string) $listing->item_id);
+            if ($detail && ctype_digit((string) $detail->category_id)) {
+                return $answer($listing, $detail, 'cache');
+            }
+        }
+
+        if ($first = $listings->first()) {
+            try {
+                $detail = $this->details->fetch($first->shop, (string) $first->item_id);
+                if (ctype_digit((string) $detail->category_id)) {
+                    return $answer($first, $detail, 'fetched');
+                }
+            } catch (\Throwable) {
+                // platform unreachable / item gone — just no suggestion
+            }
+        }
+
+        return response()->json(['category_id' => null, 'category_name' => null, 'shop' => null, 'source' => null]);
     }
 
     private function assertPlatform(string $platform): void

@@ -10,6 +10,7 @@ import { Button, CheckBox, Link, ObjectStatus, Text, Toolbar, ToolbarSpacer } fr
 import { useCallback, useEffect, useState } from 'react';
 
 import type { EditPlatform } from './platform-edit-panel';
+import { useFullscreenPanel } from './use-fullscreen-panel';
 
 interface SyncJob {
     id: number;
@@ -85,6 +86,7 @@ export function PlatformPushPanel({
     platformLabel: string;
 }) {
     const [data, setData] = useState<PushStatus | null>(null);
+    const fs = useFullscreenPanel(`Push ไป ${platformLabel}`);
     const [loading, setLoading] = useState(false);
     const [busyShop, setBusyShop] = useState<number | null>(null);
     const [message, setMessage] = useState<{ severity: 'success' | 'error' | 'information'; text: string } | null>(null);
@@ -419,14 +421,16 @@ export function PlatformPushPanel({
     ];
 
     return (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+        <div ref={fs.panelRef} className={fs.panelClassName} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
             {confirmElement}
-            <Toolbar design="Transparent" style={{ padding: 0 }}>
+            {fs.title}
+            <Toolbar design="Transparent" className={fs.toolbarClassName} style={{ padding: 0 }}>
                 <Text>Push ได้ทีละร้าน — ติ๊ก &quot;เผยแพร่&quot; ร้านที่จะขาย แล้วกด Push</Text>
                 <ToolbarSpacer />
                 <Button design="Transparent" icon="refresh" disabled={loading} onClick={load}>
                     โหลดสถานะใหม่
                 </Button>
+                {fs.toggleButton}
             </Toolbar>
 
             {blockers.map((b) => (

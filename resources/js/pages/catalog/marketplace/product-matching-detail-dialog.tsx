@@ -1,4 +1,5 @@
 import { FioriMessageStrip } from '@/components/fiori-form';
+import { FioriResponsiveTable } from '@/components/fiori-responsive-table';
 import { ClickableThumbnail, ImagePreviewProvider } from '@/components/image-preview';
 import { xsrfToken } from '@/lib/csrf';
 import { router } from '@inertiajs/react';
@@ -400,18 +401,19 @@ export function ProductMatchingDetailDialog({
                             {detail.attributes.length > 0 && (
                                 <section className={styles.section}>
                                     <div className={styles.sectionTitle}>คุณสมบัติ ({detail.attributes.length})</div>
-                                    <div className={styles.tableWrap}>
-                                        <table className={styles.table}>
-                                            <tbody>
-                                                {detail.attributes.map((a, i) => (
-                                                    <tr key={`${a.id ?? a.name}-${i}`}>
-                                                        <th scope="row">{a.name}</th>
-                                                        <td>{a.values.join(', ')}</td>
-                                                    </tr>
-                                                ))}
-                                            </tbody>
-                                        </table>
-                                    </div>
+                                    <FioriResponsiveTable
+                                        columns={[
+                                            {
+                                                key: 'name',
+                                                header: 'คุณสมบัติ',
+                                                width: '40%',
+                                                render: (a) => <span className={styles.label}>{a.name}</span>,
+                                            },
+                                            { key: 'value', header: 'ค่า', render: (a) => a.values.join(', ') },
+                                        ]}
+                                        rows={detail.attributes.map((a, i) => ({ ...a, rowKey: `${a.id ?? a.name}-${i}` }))}
+                                        getRowKey={(a) => a.rowKey}
+                                    />
                                 </section>
                             )}
 
@@ -420,51 +422,52 @@ export function ProductMatchingDetailDialog({
                                 {detail.variants.length === 0 ? (
                                     <Caption>— ไม่มีข้อมูล SKU —</Caption>
                                 ) : (
-                                    <div className={styles.tableWrap}>
-                                        <table className={styles.table}>
-                                            <thead>
-                                                <tr>
-                                                    <th>Seller SKU</th>
-                                                    <th>ตัวเลือก</th>
-                                                    <th className={styles.num}>ราคา</th>
-                                                    <th className={styles.num}>คงเหลือ</th>
-                                                    <th>สถานะ</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                {detail.variants.map((v, i) => {
-                                                    const current = v.variant_id === data.listing.variant_id;
+                                    <FioriResponsiveTable
+                                        columns={[
+                                            {
+                                                key: 'sku',
+                                                header: 'Seller SKU',
+                                                render: (v) => <span className={styles.mono}>{v.seller_sku ?? '—'}</span>,
+                                            },
+                                            {
+                                                key: 'options',
+                                                header: 'ตัวเลือก',
+                                                priority: 'high',
+                                                render: (v) => {
                                                     const options = Object.entries(v.options ?? {});
-                                                    return (
-                                                        <tr
-                                                            key={`${v.variant_id}-${i}`}
-                                                            className={current ? styles.currentRow : undefined}
-                                                            title={current ? 'listing แถวที่เปิดอยู่' : undefined}
-                                                        >
-                                                            <td className={styles.mono}>{v.seller_sku ?? '—'}</td>
-                                                            <td>
-                                                                {options.length > 0 ? options.map(([k, val]) => `${k}: ${val}`).join(' · ') : '—'}
-                                                            </td>
-                                                            <td className={styles.num}>
-                                                                {v.special_price !== null ? (
-                                                                    <>
-                                                                        <span style={{ color: TONE_TEXT.error, fontWeight: 600 }}>
-                                                                            {formatPrice(v.special_price)}
-                                                                        </span>
-                                                                        <span className={styles.strike}>{formatPrice(v.price)}</span>
-                                                                    </>
-                                                                ) : (
-                                                                    formatPrice(v.price)
-                                                                )}
-                                                            </td>
-                                                            <td className={styles.num}>{v.quantity ?? '—'}</td>
-                                                            <td>{v.status ?? '—'}</td>
-                                                        </tr>
-                                                    );
-                                                })}
-                                            </tbody>
-                                        </table>
-                                    </div>
+                                                    return options.length > 0 ? options.map(([k, val]) => `${k}: ${val}`).join(' · ') : '—';
+                                                },
+                                            },
+                                            {
+                                                key: 'price',
+                                                header: 'ราคา',
+                                                align: 'right',
+                                                priority: 'high',
+                                                render: (v) =>
+                                                    v.special_price !== null ? (
+                                                        <span className={styles.num}>
+                                                            <span style={{ color: TONE_TEXT.error, fontWeight: 600 }}>
+                                                                {formatPrice(v.special_price)}
+                                                            </span>
+                                                            <span className={styles.strike}>{formatPrice(v.price)}</span>
+                                                        </span>
+                                                    ) : (
+                                                        <span className={styles.num}>{formatPrice(v.price)}</span>
+                                                    ),
+                                            },
+                                            {
+                                                key: 'qty',
+                                                header: 'คงเหลือ',
+                                                align: 'right',
+                                                priority: 'medium',
+                                                render: (v) => <span className={styles.num}>{v.quantity ?? '—'}</span>,
+                                            },
+                                            { key: 'status', header: 'สถานะ', priority: 'medium', render: (v) => v.status ?? '—' },
+                                        ]}
+                                        rows={detail.variants.map((v, i) => ({ ...v, rowKey: `${v.variant_id}-${i}` }))}
+                                        getRowKey={(v) => v.rowKey}
+                                        rowClassName={(v) => (v.variant_id === data.listing.variant_id ? styles.currentRow : undefined)}
+                                    />
                                 )}
                             </section>
                         </div>

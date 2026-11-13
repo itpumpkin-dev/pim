@@ -62,7 +62,8 @@ class LazadaProductSyncService
         // system — Lazada already pulls the whole gallery dynamically, a
         // different (multi-value) mechanism than the single-value fields
         // below.
-        $imageUrls = $this->resolveProductImageUrls($product, $shop->channel_id);
+        // Lazada takes at most 8 product images (seller-centre rule) — trim instead of failing the push
+        $imageUrls = array_slice($this->resolveProductImageUrls($product, $shop->channel_id), 0, 8);
         $qty = $this->resolveMappedField($mappings, 'qty', $product, $shop->channel_id);
         // PIM's own uploaded-file `video` attribute — NOT `youtube_url` (a
         // plain external link): a real push once hit Lazada's

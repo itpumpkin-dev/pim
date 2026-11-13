@@ -27,6 +27,9 @@ import {
     HStack,
     KpiTiles,
     LockedNotice,
+    MappingCell,
+    MappingFieldLabel,
+    MappingRow,
     MappingTable,
     PageHeader,
     Pager,
@@ -41,6 +44,7 @@ import styles from './marketplace.module.css';
 import { MatchedListingCell, type ProductMatching } from './matched-listing-cell';
 import { PlatformEditPanel } from './platform-edit-panel';
 import { PlatformPushPanel } from './platform-push-panel';
+import { useListingCategoryPrefill } from './use-listing-category-prefill';
 
 type ProductFilter = 'all' | 'mapped' | 'unmapped';
 /** ตัวกรอง Product Matching — ดู ProductMatchStatus::applyMatchingFilter() */
@@ -174,6 +178,8 @@ export default function WooCommerceProductsMapping({ products, stats, filters }:
 
     // Category mapping section state
     const [selectedWooCatId, setSelectedWooCatId] = useState<number | null>(null);
+    // สินค้าที่จับคู่ listing แล้วแต่ยังไม่ได้แมปหมวดหมู่ → ตั้งหมวดหมู่ของ listing เป็นค่าเริ่มต้นใน picker
+    const categoryPrefillNote = useListingCategoryPrefill('woocommerce', activeProduct, selectedWooCatId, setSelectedWooCatId);
     const [savingCatMap, setSavingCatMap] = useState(false);
     // "Sync Categories" — ดึงต้นไม้หมวดหมู่ทั้งหมดจาก WooCommerce จริงมา refresh
     // แคช woocommerce_categories (คนละอย่างกับ saveCategoryMapping ด้านล่าง)
@@ -918,6 +924,7 @@ export default function WooCommerceProductsMapping({ products, stats, filters }:
                                             onChange={setSelectedWooCatId}
                                         />
                                     </div>
+                                    {categoryPrefillNote}
 
                                     <div>
                                         <Button
@@ -993,30 +1000,28 @@ export default function WooCommerceProductsMapping({ products, stats, filters }:
                                     ) : wooAttributes && wooAttributes.length > 0 ? (
                                         <MappingTable headers={['WooCommerce Attribute', 'PIM Attribute (ต้นทาง)']}>
                                             {wooAttributes.map((attr) => (
-                                                <tr key={attr.id}>
-                                                    <td>
-                                                        <Body style={{ fontWeight: 600, fontSize: '0.8125rem' }}>{attr.name}</Body>
-                                                    </td>
-                                                    <td>
+                                                <MappingRow key={attr.id}>
+                                                    <MappingCell>
+                                                        <MappingFieldLabel label={attr.name} />
+                                                    </MappingCell>
+                                                    <MappingCell>
                                                         <HStack gap="0.5rem">
-                                                            <div style={{ flex: 1, minWidth: 200 }}>
-                                                                <PimAttributePicker
-                                                                    value={attr.mapped}
-                                                                    disabled={savingAttributeId === attr.id}
-                                                                    onChange={(val) => {
-                                                                        if (val) {
-                                                                            assignAttribute(attr.id, val);
-                                                                        } else if (attr.mapped) {
-                                                                            clearAttribute(attr.id, attr.mapped.id);
-                                                                        }
-                                                                    }}
-                                                                    placeholder="เลือก PIM attribute..."
-                                                                />
-                                                            </div>
+                                                            <PimAttributePicker
+                                                                value={attr.mapped}
+                                                                disabled={savingAttributeId === attr.id}
+                                                                onChange={(val) => {
+                                                                    if (val) {
+                                                                        assignAttribute(attr.id, val);
+                                                                    } else if (attr.mapped) {
+                                                                        clearAttribute(attr.id, attr.mapped.id);
+                                                                    }
+                                                                }}
+                                                                placeholder="เลือก PIM attribute..."
+                                                            />
                                                             {savingAttributeId === attr.id && <Spinner />}
                                                         </HStack>
-                                                    </td>
-                                                </tr>
+                                                    </MappingCell>
+                                                </MappingRow>
                                             ))}
                                         </MappingTable>
                                     ) : (
@@ -1046,14 +1051,11 @@ export default function WooCommerceProductsMapping({ products, stats, filters }:
                                     ) : (
                                         <MappingTable headers={['WooCommerce Payload Field', 'PIM Attribute (ต้นทาง)']}>
                                             {(payloadFields ?? []).map((f) => (
-                                                <tr key={f.target_field}>
-                                                    <td>
-                                                        <Body style={{ fontWeight: 600, fontSize: '0.8125rem' }}>
-                                                            {PAYLOAD_FIELD_LABELS[f.target_field]}
-                                                        </Body>
-                                                        <Caption>{f.target_field}</Caption>
-                                                    </td>
-                                                    <td>
+                                                <MappingRow key={f.target_field}>
+                                                    <MappingCell>
+                                                        <MappingFieldLabel label={PAYLOAD_FIELD_LABELS[f.target_field]} meta={f.target_field} />
+                                                    </MappingCell>
+                                                    <MappingCell>
                                                         {f.multi ? (
                                                             // description/short_description — รับได้หลาย attribute พร้อมกัน
                                                             // (แต่ละตัวถูกประกอบเป็นหนึ่ง section ต่อกันฝั่ง WooCommerce จริง)
@@ -1113,8 +1115,8 @@ export default function WooCommerceProductsMapping({ products, stats, filters }:
                                                                 {savingPayloadField === f.target_field && <Spinner />}
                                                             </HStack>
                                                         )}
-                                                    </td>
-                                                </tr>
+                                                    </MappingCell>
+                                                </MappingRow>
                                             ))}
                                         </MappingTable>
                                     )}

@@ -218,48 +218,12 @@
     gap: 1.5rem;
 }
 
-.tile {
-    display: flex;
-    flex-direction: column;
-    padding: 1.5rem;
-    border: 1px solid var(--sapGroup_ContentBorderColor);
-    border-radius: var(--sapElement_BorderCornerRadius, 0.5rem);
-    background: var(--sapGroup_ContentBackground);
-    box-shadow: var(--sapContent_Shadow0);
-    color: inherit;
-    font: inherit;
-    text-align: left;
-    cursor: pointer;
-    transition: border-color 0.15s ease;
+.tileCard {
+    height: 100%;
 }
 
-.tile:hover,
-.tile:focus-visible {
-    border-color: var(--sapBrandColor);
-}
-
-.tileIcon {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 48px;
-    height: 48px;
-    margin-bottom: 1rem;
-    border-radius: 0.5rem;
-    background: var(--sapBrandColor);
-    color: var(--sapContent_ContrastIconColor, #fff);
-}
-
-.tileIcon > ui5-icon {
-    width: 1.5rem;
-    height: 1.5rem;
-    color: inherit;
-}
-
-.tileDescription {
-    margin-top: 0.25rem;
-    color: var(--sapContent_LabelColor);
-    font-size: var(--sapFontSize);
+.tileCardContent {
+    padding: 0 1rem 1rem;
 }
 
 .emptyPanel {

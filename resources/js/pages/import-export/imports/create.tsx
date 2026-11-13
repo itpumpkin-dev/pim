@@ -25,6 +25,11 @@ import {
     Panel,
     RadioButton,
     Select,
+    Table,
+    TableCell,
+    TableHeaderCell,
+    TableHeaderRow,
+    TableRow,
     Tag,
     Text,
     Title,
@@ -700,24 +705,26 @@ export default function ImportCreate({ types, requiredColumnsByType, columnLabel
                                     {schema && schema.sample.columns.length > 0 && (
                                         <div>
                                             <span className={styles.subHeading}>{t('filePreview')}</span>
-                                            <div className={styles.sampleTableWrap}>
-                                                <table className={styles.sampleTable}>
-                                                    <thead>
-                                                        <tr>
-                                                            {schema.sample.columns.map((col) => (
-                                                                <th key={col}>{col}</th>
-                                                            ))}
-                                                        </tr>
-                                                    </thead>
-                                                    <tbody>
-                                                        <tr>
-                                                            {schema.sample.columns.map((col) => (
-                                                                <td key={col}>{schema.sample.rows[0]?.[col] ?? ''}</td>
-                                                            ))}
-                                                        </tr>
-                                                    </tbody>
-                                                </table>
-                                            </div>
+                                            {/* overflowMode Scroll (not Popin) — a file can have dozens of columns; scroll sideways like a spreadsheet */}
+                                            <Table
+                                                className={styles.sampleTable}
+                                                overflowMode="Scroll"
+                                                headerRow={
+                                                    <TableHeaderRow>
+                                                        {schema.sample.columns.map((col) => (
+                                                            <TableHeaderCell key={col} minWidth="8rem">
+                                                                {col}
+                                                            </TableHeaderCell>
+                                                        ))}
+                                                    </TableHeaderRow>
+                                                }
+                                            >
+                                                <TableRow>
+                                                    {schema.sample.columns.map((col) => (
+                                                        <TableCell key={col}>{schema.sample.rows[0]?.[col] ?? ''}</TableCell>
+                                                    ))}
+                                                </TableRow>
+                                            </Table>
                                         </div>
                                     )}
 

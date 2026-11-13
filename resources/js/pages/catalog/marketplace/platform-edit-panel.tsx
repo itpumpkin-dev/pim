@@ -28,8 +28,9 @@ import {
 } from '@ui5/webcomponents-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
-import { ImageImport, type ImagePlan } from './listing-image-import';
+import { GalleryEditor, ImageImport, type GalleryState, type ImagePlan } from './listing-image-import';
 import type { MatchedListing } from './matched-listing-cell';
+import { useFullscreenPanel } from './use-fullscreen-panel';
 
 export type EditPlatform = 'shopee' | 'lazada' | 'tiktok' | 'woocommerce';
 
@@ -79,6 +80,7 @@ interface FormResponse {
     } | null;
     rows: FormRow[];
     images: ImagePlan | null;
+    gallery: GalleryState;
 }
 
 /** sub-tabs per platform — laid out like each platform's own seller-centre product form */
@@ -205,6 +207,7 @@ export function PlatformEditPanel({
     const [result, setResult] = useState<string | null>(null);
     const [activated, setActivated] = useState(active);
     const [openLocked, setOpenLocked] = useState<Record<string, boolean>>({});
+    const fs = useFullscreenPanel(`นำเข้าและแก้ไขข้อมูลจาก ${platformLabel}`);
     const { confirm, confirmElement } = useFioriConfirm();
 
     useEffect(() => {
@@ -574,6 +577,22 @@ export function PlatformEditPanel({
             );
             parts.push(
                 <FioriFormGroup key="images" title="รูปภาพสินค้า">
+                    {data?.gallery && (
+                        <GalleryEditor
+                            key={data.gallery.current.map((i) => i.path).join('|')}
+                            gallery={data.gallery}
+                            productId={productId}
+                            platform={platform}
+                            onDone={(message) => {
+                                setResult(message);
+                                onSaved?.();
+                                load();
+                            }}
+                        />
+                    )}
+                    <Label showColon style={{ display: 'block', marginTop: '1.5rem' }}>
+                        นำเข้ารูปจาก {platformLabel}
+                    </Label>
                     {data?.images && data.listing ? (
                         <ImageImport
                             key={`${data.listing.id}:${data.detail?.fetched_at}`}
@@ -681,11 +700,16 @@ export function PlatformEditPanel({
         return <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', paddingTop: '0.75rem' }}>{parts}</div>;
     };
 
-    return (
+    const panel = (
         // ดอกจันบังคับกรอก (UI5 Label required) เป็นสีแดงทั้ง step — ตัวแปรธีมสืบทอดเข้า shadow DOM ของ Label
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', ['--sapField_RequiredColor' as string]: 'var(--sapNegativeColor)' }}>
+        <div
+            ref={fs.panelRef}
+            className={fs.panelClassName}
+            style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', ['--sapField_RequiredColor' as string]: 'var(--sapNegativeColor)' }}
+        >
             {confirmElement}
-            <Toolbar design="Transparent" style={{ padding: 0, flexWrap: 'wrap' }}>
+            {fs.title}
+            <Toolbar design="Transparent" className={fs.toolbarClassName} style={{ padding: 0, flexWrap: 'wrap' }}>
                 <Label for="platform-edit-source" showColon>
                     ข้อมูลจากร้าน
                 </Label>
@@ -740,6 +764,7 @@ export function PlatformEditPanel({
                 >
                     บันทึกลง PIM ({dirtyRows.length})
                 </Button>
+                {fs.toggleButton}
             </Toolbar>
 
             <FioriMessageStrip severity="information">
@@ -776,4 +801,6 @@ export function PlatformEditPanel({
             {loading && !data ? <Text>กำลังโหลด...</Text> : tabContent(tab)}
         </div>
     );
+
+    return panel;
 }

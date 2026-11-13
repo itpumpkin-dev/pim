@@ -264,6 +264,33 @@ test('push uploads each image via uploadMedia and swaps the src URL for the retu
     });
 });
 
+test('buildPayload sends the whole pgallery, with the mapped image field first and not repeated', function () {
+    [$product] = wcBasicProduct();
+    $product->update(['woocommerce_category_id' => 555, 'woocommerce_brand_id' => 999]);
+    $gallery = Attribute::create(['code' => 'pgallery', 'type' => 'gallery']);
+    wcSetValue($product, $gallery, json_encode(['https://cdn.example.com/a.jpg', 'https://cdn.example.com/b.jpg', 'https://cdn.example.com/c.jpg']));
+    wcSetValue($product, wcMapField('image', 'image_attr'), 'https://cdn.example.com/b.jpg');
+
+    $payload = $this->service->buildPayload($product, wcShop());
+
+    expect($payload['images'])->toBe([
+        ['src' => 'https://cdn.example.com/b.jpg'],
+        ['src' => 'https://cdn.example.com/a.jpg'],
+        ['src' => 'https://cdn.example.com/c.jpg'],
+    ]);
+});
+
+test('buildPayload sends the gallery when no image field is mapped', function () {
+    [$product] = wcBasicProduct();
+    $product->update(['woocommerce_category_id' => 555, 'woocommerce_brand_id' => 999]);
+    $gallery = Attribute::create(['code' => 'pgallery', 'type' => 'gallery']);
+    wcSetValue($product, $gallery, json_encode(['https://cdn.example.com/a.jpg', 'https://cdn.example.com/b.jpg']));
+
+    $payload = $this->service->buildPayload($product, wcShop());
+
+    expect($payload['images'])->toBe([['src' => 'https://cdn.example.com/a.jpg'], ['src' => 'https://cdn.example.com/b.jpg']]);
+});
+
 test('createOrRecoverProduct falls back to updating the resource WooCommerce names on a product_invalid_sku error', function () {
     [$product] = wcBasicProduct();
     $product->update(['woocommerce_category_id' => 555, 'woocommerce_brand_id' => 999]);

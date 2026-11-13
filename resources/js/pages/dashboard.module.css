@@ -125,55 +125,6 @@
     box-shadow: var(--sapContent_Shadow1);
 }
 
-.table {
-    width: 100%;
-    border-collapse: collapse;
-    text-align: left;
-}
-
-.table thead {
-    background: var(--sapList_HeaderBackground);
-    border-bottom: 1px solid var(--sapList_BorderColor);
-}
-
-.table th {
-    padding: 12px 20px;
-    font-weight: 600;
-    font-size: 0.8rem;
+.secondary {
     color: var(--sapContent_LabelColor);
-    text-transform: uppercase;
-    letter-spacing: 0.03em;
-}
-
-.table td {
-    padding: 12px 20px;
-    font-size: 0.875rem;
-    color: var(--sapTextColor);
-}
-
-.table tbody tr {
-    border-bottom: 1px solid var(--sapList_BorderColor);
-    transition: background-color 0.15s;
-}
-
-.table tbody tr:hover {
-    background: var(--sapList_Hover_Background);
-}
-
-.table tbody tr:last-of-type {
-    border-bottom: none;
-}
-
-.table td.secondary {
-    color: var(--sapContent_LabelColor);
-}
-
-.table td.empty {
-    padding: 1.5rem;
-    text-align: center;
-    color: var(--sapContent_LabelColor);
-}
-
-.table tbody tr.emptyRow:hover {
-    background: transparent;
 }

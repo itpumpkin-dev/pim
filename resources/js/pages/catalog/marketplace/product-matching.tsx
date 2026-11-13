@@ -984,43 +984,41 @@ export default function ProductMatching({ shopGroups, filters, summary, rows, sy
                 {syncRuns.length === 0 ? (
                     <Caption block>ยังไม่มีประวัติการซิงค์ของร้านนี้</Caption>
                 ) : (
-                    <div style={{ overflowX: 'auto' }}>
-                        <table className={pm.runTable}>
-                            <thead>
-                                <tr>
-                                    <th>เริ่ม</th>
-                                    <th>ที่มา</th>
-                                    <th>สถานะ</th>
-                                    <th>ใช้เวลา</th>
-                                    <th>ผล</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {syncRuns.map((run) => (
-                                    <tr key={run.id}>
-                                        <td>{formatDateTime(run.started_at)}</td>
-                                        <td>{TRIGGER_LABEL[run.trigger]}</td>
-                                        <td>
-                                            <Tag design={runTagDesign(run.status)} title={run.error ?? undefined}>
-                                                {RUN_STATUS_LABEL[run.status]}
-                                            </Tag>
-                                        </td>
-                                        <td>{formatDuration(run.duration_ms)}</td>
-                                        <td>
-                                            {run.error ? (
-                                                <span style={{ color: TONE_TEXT.error }}>{run.error}</span>
-                                            ) : run.stats ? (
-                                                `ดึงมา ${run.stats.fetched ?? 0} · ผูกแล้ว ${run.stats.matched ?? 0} · ยังไม่มีคู่ ${run.stats.unmatched ?? 0}` +
-                                                (run.stats.score_suggested !== undefined ? ` · แนะนำจากชื่อ ${run.stats.score_suggested}` : '')
-                                            ) : (
-                                                '—'
-                                            )}
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
+                    <FioriResponsiveTable
+                        variant="plain"
+                        columns={[
+                            { key: 'started', header: 'เริ่ม', render: (run) => formatDateTime(run.started_at) },
+                            { key: 'trigger', header: 'ที่มา', priority: 'medium', render: (run) => TRIGGER_LABEL[run.trigger] },
+                            {
+                                key: 'status',
+                                header: 'สถานะ',
+                                priority: 'high',
+                                render: (run) => (
+                                    <Tag design={runTagDesign(run.status)} title={run.error ?? undefined}>
+                                        {RUN_STATUS_LABEL[run.status]}
+                                    </Tag>
+                                ),
+                            },
+                            { key: 'duration', header: 'ใช้เวลา', priority: 'low', render: (run) => formatDuration(run.duration_ms) },
+                            {
+                                key: 'result',
+                                header: 'ผล',
+                                priority: 'medium',
+                                minWidth: '16rem',
+                                render: (run) =>
+                                    run.error ? (
+                                        <span style={{ color: TONE_TEXT.error }}>{run.error}</span>
+                                    ) : run.stats ? (
+                                        `ดึงมา ${run.stats.fetched ?? 0} · ผูกแล้ว ${run.stats.matched ?? 0} · ยังไม่มีคู่ ${run.stats.unmatched ?? 0}` +
+                                        (run.stats.score_suggested !== undefined ? ` · แนะนำจากชื่อ ${run.stats.score_suggested}` : '')
+                                    ) : (
+                                        '—'
+                                    ),
+                            },
+                        ]}
+                        rows={syncRuns}
+                        getRowKey={(run) => run.id}
+                    />
                 )}
             </Dialog>
 

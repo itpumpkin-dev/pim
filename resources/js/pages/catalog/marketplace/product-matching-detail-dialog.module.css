@@ -95,39 +95,12 @@
     background: var(--sapGroup_ContentBackground);
 }
 
-.tableWrap {
-    overflow-x: auto;
-    border: 1px solid var(--sapGroup_ContentBorderColor);
-    border-radius: var(--sapElement_BorderCornerRadius);
-}
-
-.table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: var(--sapFontSmallSize);
-}
-
-.table th,
-.table td {
-    text-align: left;
-    padding: 0.375rem 0.5rem;
-    border-bottom: 1px solid var(--sapList_BorderColor);
-    vertical-align: top;
-}
-
-.table tr:last-child td {
-    border-bottom: none;
-}
-
-.table th {
+.label {
     color: var(--sapContent_LabelColor);
     font-weight: 600;
-    background: var(--sapList_HeaderBackground);
-    white-space: nowrap;
 }
 
 .num {
-    text-align: right !important;
     white-space: nowrap;
     font-variant-numeric: tabular-nums;
 }
@@ -136,7 +109,7 @@
     font-family: monospace;
 }
 
-.currentRow td {
+.currentRow {
     background: var(--sapList_SelectionBackgroundColor);
 }
 
