@@ -14,7 +14,7 @@ use Illuminate\Support\Facades\DB;
  * already in marketplace_listings — synchronously, one item at a time with a
  * pause between API calls, one item failing never stops the run (its error
  * is stored on the row). Items whose detail is still fresh (TTL) are skipped
- * unless --force. Not scheduled.
+ * unless --force. Runs nightly with --force (MarketplaceListingDetailsSchedule, 03:00).
  *
  *   php artisan marketplace:fetch-listing-details --shop=2 --limit=20
  *   php artisan marketplace:fetch-listing-details --platform=shopee --only-missing

@@ -27,6 +27,9 @@ use InvalidArgumentException;
  */
 class MarketplaceListingSyncService
 {
+    /** synced columns whose change moves data_changed_at (see flush()) */
+    private const TRACKED_COLUMNS = ['seller_sku', 'name', 'status', 'is_active', 'price', 'quantity', 'image_url', 'url'];
+
     private const CHUNK = 500;
 
     public function __construct(private readonly MarketplaceListingFetcherResolver $resolver) {}
@@ -75,6 +78,7 @@ class MarketplaceListingSyncService
                 'image_url' => $row['image_url'],
                 'url' => $row['url'],
                 'last_synced_at' => $now,
+                'data_changed_at' => $now,
                 'created_at' => $now,
                 'updated_at' => $now,
             ];
@@ -175,10 +179,18 @@ class MarketplaceListingSyncService
             return 0;
         }
 
+        $existing = implode(', ', array_map(fn ($c) => "marketplace_listings.{$c}", self::TRACKED_COLUMNS));
+        $incoming = implode(', ', array_map(fn ($c) => "excluded.{$c}", self::TRACKED_COLUMNS));
+
         DB::table('marketplace_listings')->upsert(
             $rows,
             ['sales_platform_shop_id', 'item_id', 'variant_id'],
-            ['platform', 'seller_sku', 'name', 'status', 'is_active', 'price', 'quantity', 'image_url', 'url', 'last_synced_at', 'updated_at']
+            [
+                'platform', ...self::TRACKED_COLUMNS, 'last_synced_at', 'updated_at',
+                // bumped only when a synced value really differs (the other timestamps move every sync);
+                // inserts take the row's own value ($now)
+                'data_changed_at' => DB::raw("CASE WHEN ({$existing}) IS DISTINCT FROM ({$incoming}) THEN excluded.last_synced_at ELSE marketplace_listings.data_changed_at END"),
+            ]
         );
 
         return count($rows);

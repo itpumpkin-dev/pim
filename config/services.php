@@ -63,6 +63,10 @@ return [
     // opening it fetches again — see MarketplaceListingDetailService.
     'marketplace_listing_details' => [
         'ttl_hours' => (int) env('MARKETPLACE_LISTING_DETAILS_TTL_HOURS', 24),
+        // nightly refresh of every listing's detail — see MarketplaceListingDetailsSchedule
+        'schedule_enabled' => env('MARKETPLACE_LISTING_DETAILS_SCHEDULE', true),
+        'schedule_time' => env('MARKETPLACE_LISTING_DETAILS_TIME', '03:00'),
+        'timezone' => 'Asia/Bangkok',
     ],
 
     'lazada' => [

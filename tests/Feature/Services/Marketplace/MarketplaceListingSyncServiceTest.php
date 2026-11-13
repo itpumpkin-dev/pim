@@ -181,3 +181,24 @@ test('the same seller SKU on two listings in one shop matches both to the same p
     expect($stats['fetched'])->toBe(3)->and($stats['upserted'])->toBe(2)->and($stats['matched'])->toBe(2);
     expect(MarketplaceListing::where('product_id', $product->id)->count())->toBe(2);
 });
+
+test('data_changed_at moves only when a synced value changes, last_synced_at moves every sync', function () {
+    $shop = mlsShop();
+    $at = fn (string $field) => MarketplaceListing::where('item_id', '300')->first()->{$field}->toDateTimeString();
+
+    $this->travelTo('2026-11-01 10:00:00');
+    mlsFake([['item_id' => '300', 'seller_sku' => 'DC-1', 'price' => 100.0]]);
+    mlsSync($shop);
+    expect($at('data_changed_at'))->toBe('2026-11-01 10:00:00');
+
+    $this->travelTo('2026-11-02 10:00:00');
+    mlsFake([['item_id' => '300', 'seller_sku' => 'DC-1', 'price' => 100.0]]); // nothing changed
+    mlsSync($shop);
+    expect($at('data_changed_at'))->toBe('2026-11-01 10:00:00')
+        ->and($at('last_synced_at'))->toBe('2026-11-02 10:00:00');
+
+    $this->travelTo('2026-11-03 10:00:00');
+    mlsFake([['item_id' => '300', 'seller_sku' => 'DC-1', 'price' => 89.0]]); // price changed
+    mlsSync($shop);
+    expect($at('data_changed_at'))->toBe('2026-11-03 10:00:00');
+});

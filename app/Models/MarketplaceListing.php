@@ -69,6 +69,7 @@ class MarketplaceListing extends Model
         'matched_by',
         'pack_quantity',
         'last_synced_at',
+        'data_changed_at',
         'ignored_at',
         'ignored_by',
         'ignore_reason',
@@ -81,6 +82,7 @@ class MarketplaceListing extends Model
         'pack_quantity' => 'integer',
         'matched_at' => 'datetime',
         'last_synced_at' => 'datetime',
+        'data_changed_at' => 'datetime',
         'ignored_at' => 'datetime',
     ];
 

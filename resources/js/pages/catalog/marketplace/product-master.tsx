@@ -55,6 +55,8 @@ interface Row {
     image_url: string | null;
     url: string | null;
     last_synced_at: string | null;
+    /** last time the synced data (sku / name / status / price / qty / image / url) actually changed — first seen until then */
+    data_changed_at: string | null;
     shop: string | null;
     platform: Platform | string;
     mapping_ids: number[];
@@ -277,6 +279,24 @@ export default function ProductMaster({ platforms, shops, rows, stats, filters }
             render: (row) => (
                 <ObjectStatus state={row.is_active ? 'Positive' : 'None'}>{row.status ?? (row.is_active ? 'active' : 'inactive')}</ObjectStatus>
             ),
+        },
+        {
+            key: 'changed',
+            header: 'เปลี่ยนแปลงล่าสุด',
+            priority: 'low',
+            minWidth: 130,
+            render: (row) => (
+                <Text title="ครั้งล่าสุดที่ข้อมูลจากร้าน (SKU ชื่อ สถานะ ราคา สต็อก รูป ลิงก์) เปลี่ยน — นับตั้งแต่ระบบเริ่มเก็บ ก่อนหน้านั้นคือวันที่พบครั้งแรก">
+                    {dateTime(row.data_changed_at)}
+                </Text>
+            ),
+        },
+        {
+            key: 'synced',
+            header: 'ซิงค์ล่าสุด',
+            priority: 'low',
+            minWidth: 130,
+            render: (row) => <Text>{dateTime(row.last_synced_at)}</Text>,
         },
         { key: 'pim', header: 'สินค้าใน PIM', priority: 'high', minWidth: 160, render: pimCell },
         {

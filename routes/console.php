@@ -1,5 +1,6 @@
 <?php
 
+use App\Services\Marketplace\Listings\Details\MarketplaceListingDetailsSchedule;
 use App\Services\Marketplace\Listings\MarketplaceListingSyncSchedule;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
@@ -12,3 +13,7 @@ Artisan::command('inspire', function () {
 // Nightly marketplace listing sync (Product Matching) — time / on-off via
 // config('services.marketplace_listing_sync'); see MarketplaceListingSyncSchedule.
 MarketplaceListingSyncSchedule::register(Schedule::getFacadeRoot());
+
+// Nightly listing DETAIL sync (category / brand / images / attributes), after the listing sync —
+// config('services.marketplace_listing_details'); see MarketplaceListingDetailsSchedule.
+MarketplaceListingDetailsSchedule::register(Schedule::getFacadeRoot());

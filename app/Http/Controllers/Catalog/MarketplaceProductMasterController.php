@@ -101,6 +101,7 @@ class MarketplaceProductMasterController extends Controller
                 'image_url' => $l->image_url,
                 'url' => $l->url,
                 'last_synced_at' => $l->last_synced_at?->toIso8601String(),
+                'data_changed_at' => $l->data_changed_at?->toIso8601String(),
                 'shop' => $l->shop?->name,
                 'platform' => $l->platform,
                 // PIM products (parents — what the Product Mapping table lists) for its ?ids= deep link
