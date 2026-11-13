@@ -13,6 +13,7 @@
     "attributeFamilies": "ตระกูลแอตทริบิวต์",
     "attributeApiSources": "แหล่งข้อมูล API",
     "system": "ระบบ",
+    "queueMonitor": "สถานะคิวงาน",
     "users": "ผู้ใช้งาน",
     "userGroups": "กลุ่มผู้ใช้งาน",
     "departments": "แผนก",

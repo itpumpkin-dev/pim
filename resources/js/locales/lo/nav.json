@@ -11,6 +11,7 @@
     "attributeFamilies": "Attribute Families",
     "attributeApiSources": "API Sources",
     "system": "System",
+    "queueMonitor": "Queue Monitor",
     "users": "Users",
     "userGroups": "User Groups",
     "departments": "Departments",

@@ -1,10 +1,11 @@
+import { FioriMessageStrip } from '@/components/fiori-form';
 import { FioriMessageBox } from '@/components/fiori-message-box';
 import { FioriResponsiveColumn, FioriResponsiveTable } from '@/components/fiori-responsive-table';
 import { followLink } from '@/components/import-export/follow-link';
 import AppLayout from '@/layouts/app-layout';
 import { FioriStatus, type FioriTone } from '@/lib/fiori-style';
-import { type BreadcrumbItem } from '@/types';
-import { Head, router } from '@inertiajs/react';
+import { type BreadcrumbItem, type SharedData } from '@/types';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 import '@ui5/webcomponents-icons/dist/download.js';
 import '@ui5/webcomponents-icons/dist/nav-back.js';
 import '@ui5/webcomponents-icons/dist/sys-cancel.js';
@@ -43,6 +44,8 @@ interface JobDetail {
     total_translations_completed: number;
     result_file_path: string | null;
     error_log: ErrorLogEntry[] | null;
+    /** มี queue:work รายงานตัวภายใน ~90 วิ — JobTrackerController (show + status poll) */
+    queue_worker_alive?: boolean | null;
 }
 
 interface Props {
@@ -72,6 +75,7 @@ export default function JobTrackerShow({ job: initialJob }: Props) {
     const { t: tGrid } = useTranslation('grid');
 
     const [job, setJob] = useState(initialJob);
+    const canViewQueue = (usePage<SharedData>().props.auth.permissions || []).includes('queue_jobs.list_queue_jobs');
     const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
     const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
     const [cancelling, setCancelling] = useState(false);
@@ -228,6 +232,14 @@ export default function JobTrackerShow({ job: initialJob }: Props) {
                         </div>
                         <div className={styles.indeterminateTrack} />
                     </div>
+                )}
+
+                {/* รอคิวอยู่แต่ไม่มี queue:work รันเลย — งานจะไม่เริ่มเอง (QueueWorkerHeartbeat) */}
+                {job.status === 'pending' && job.queue_worker_alive === false && (
+                    <FioriMessageStrip severity="error" style={{ marginBottom: '1.5rem' }}>
+                        ไม่มี queue worker ทำงานอยู่ — งานนี้จะไม่เริ่มจนกว่าจะเปิด <code>php artisan queue:work</code>{' '}
+                        {canViewQueue && <Link href="/system/queue">ดูสถานะคิวงาน</Link>}
+                    </FioriMessageStrip>
                 )}
 
                 <div className={styles.statGrid}>
