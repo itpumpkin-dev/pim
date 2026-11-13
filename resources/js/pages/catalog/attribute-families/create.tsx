@@ -16,12 +16,13 @@ import '@ui5/webcomponents-icons/dist/sys-minus.js';
 import '@ui5/webcomponents-icons/dist/vertical-grip.js';
 import {
     Bar,
-    BusyIndicator,
     Button,
     Dialog,
     Icon,
     Input,
     Label,
+    List,
+    ListItemStandard,
     Menu,
     MenuItem,
     MessageStrip,
@@ -730,17 +731,21 @@ export default function AttributeFamilyCreate({ groups, attributes, otherFamilie
                 {templateStep === 'pick' && (
                     <div className={styles.dialogBody}>
                         <Text style={{ color: 'var(--sapContent_LabelColor)' }}>{t('useTemplateFromHelp')}</Text>
-                        <div className={styles.templateList}>
+                        <List
+                            className={styles.templateList}
+                            separators="Inner"
+                            loading={templatePreviewLoading}
+                            onItemClick={(e) => {
+                                const id = Number(e.detail.item.dataset.id);
+                                if (id) loadTemplatePreview(id);
+                            }}
+                        >
                             {otherFamilies.map((fam) => (
-                                <button key={fam.id} type="button" className={styles.templateItem} onClick={() => loadTemplatePreview(fam.id)}>
-                                    <span>
-                                        <span className={styles.templateItemName}>{fam.name || fam.code}</span>
-                                        <span className={styles.caption}>{fam.code}</span>
-                                    </span>
-                                    {templatePreviewLoading && selectedTemplateId === fam.id && <BusyIndicator active size="S" />}
-                                </button>
+                                <ListItemStandard key={fam.id} data-id={fam.id} type="Navigation" description={fam.code}>
+                                    {fam.name || fam.code}
+                                </ListItemStandard>
                             ))}
-                        </div>
+                        </List>
                     </div>
                 )}
 

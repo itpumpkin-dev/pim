@@ -37,7 +37,11 @@ import {
     ImageThumbs,
     KpiTiles,
     LockedNotice,
+    MappingCell,
+    MappingFieldLabel,
+    MappingRow,
     MappingTable,
+    OptionMappingStatus,
     PageHeader,
     Pager,
     SearchField,
@@ -53,6 +57,7 @@ import styles from './marketplace.module.css';
 import { MatchedListingCell, type ProductMatching } from './matched-listing-cell';
 import { PlatformEditPanel } from './platform-edit-panel';
 import { PlatformPushPanel } from './platform-push-panel';
+import { useListingCategoryPrefill } from './use-listing-category-prefill';
 
 type ProductFilter = 'all' | 'mapped' | 'unmapped';
 /** ตัวกรอง Product Matching — ดู ProductMatchStatus::applyMatchingFilter() */
@@ -357,6 +362,8 @@ export default function LazadaProductsMapping({ products, stats, filters }: Prop
 
     // Category mapping section state
     const [selectedLazadaCatId, setSelectedLazadaCatId] = useState<number | null>(null);
+    // สินค้าที่จับคู่ listing แล้วแต่ยังไม่ได้แมปหมวดหมู่ → ตั้งหมวดหมู่ของ listing เป็นค่าเริ่มต้นใน picker
+    const categoryPrefillNote = useListingCategoryPrefill('lazada', activeProduct, selectedLazadaCatId, setSelectedLazadaCatId);
     const [savingCatMap, setSavingCatMap] = useState(false);
     const [clearingCatMap, setClearingCatMap] = useState(false);
     // "Sync Categories" — ดึงต้นไม้หมวดหมู่ทั้งหมดจาก Lazada จริงมา refresh
@@ -1257,6 +1264,7 @@ export default function LazadaProductsMapping({ products, stats, filters }: Prop
                                             onChange={setSelectedLazadaCatId}
                                         />
                                     </div>
+                                    {categoryPrefillNote}
 
                                     {/* แนะนำหมวดหมู่จาก Lazada จริง (/product/category/suggestion/get)
                                     — เลือกจากรูป+ชื่อสินค้าตัวนี้ กดแล้วแค่ตั้งค่า
@@ -1433,60 +1441,59 @@ export default function LazadaProductsMapping({ products, stats, filters }: Prop
                                         {loadingAttributes ? (
                                             <CenteredSpinner />
                                         ) : visibleLazadaAttributes && visibleLazadaAttributes.length > 0 ? (
-                                            <MappingTable headers={['Lazada Attribute', 'PIM Attribute (ต้นทาง)']}>
+                                            <MappingTable headers={['Lazada Attribute', 'PIM Attribute (ต้นทาง)', 'ตัวเลือก']}>
                                                 {visibleLazadaAttributes.map((attr) => {
                                                     const isMappable = attr.input_type && MAPPABLE_LAZADA_INPUT_TYPES.includes(attr.input_type);
+                                                    const hasOptions = Boolean(
+                                                        attr.input_type && SELECT_LAZADA_INPUT_TYPES.includes(attr.input_type),
+                                                    );
 
                                                     return (
-                                                        <tr key={attr.name}>
-                                                            <td>
-                                                                <Body style={{ fontWeight: 600, fontSize: '0.8125rem' }}>
-                                                                    {attr.label} {attr.mandatory && <span style={{ color: TONE_TEXT.error }}>*</span>}
-                                                                </Body>
-                                                                <Caption>
-                                                                    {attr.name} ({attr.input_type ?? 'text'})
-                                                                </Caption>
-                                                            </td>
-                                                            <td>
+                                                        <MappingRow key={attr.name}>
+                                                            <MappingCell>
+                                                                <MappingFieldLabel
+                                                                    label={attr.label}
+                                                                    required={attr.mandatory}
+                                                                    meta={`${attr.name} · ${attr.input_type ?? 'text'}`}
+                                                                />
+                                                            </MappingCell>
+                                                            <MappingCell>
                                                                 {!isMappable ? (
                                                                     <FioriStatus label="ไม่รองรับการแมปอัตโนมัติ" tone="neutral" />
                                                                 ) : (
-                                                                    <VStack gap="0.5rem">
-                                                                        <HStack gap="0.5rem">
-                                                                            <div style={{ flex: 1, minWidth: 200 }}>
-                                                                                <PimAttributePicker
-                                                                                    value={attr.mapped}
-                                                                                    disabled={savingAttributeName === attr.name}
-                                                                                    typeFilter={
-                                                                                        attr.input_type === 'img' ? ['image', 'file'] : undefined
-                                                                                    }
-                                                                                    onChange={(val) => {
-                                                                                        if (val) {
-                                                                                            assignAttribute(attr.name, val);
-                                                                                        } else if (attr.mapped) {
-                                                                                            clearAttribute(attr.name, attr.mapped.id);
-                                                                                        }
-                                                                                    }}
-                                                                                    placeholder="เลือก PIM attribute..."
-                                                                                />
-                                                                            </div>
-                                                                            {savingAttributeName === attr.name && <Spinner />}
-                                                                        </HStack>
-                                                                        {attr.input_type &&
-                                                                            SELECT_LAZADA_INPUT_TYPES.includes(attr.input_type) &&
-                                                                            attr.mapped && (
-                                                                                <Button
-                                                                                    onClick={() => setOptionMappingRow(attr)}
-                                                                                    style={{ alignSelf: 'flex-start' }}
-                                                                                >
-                                                                                    จับคู่ตัวเลือก ({attr.option_mappings.length}/
-                                                                                    {attr.options.length})
-                                                                                </Button>
-                                                                            )}
-                                                                    </VStack>
+                                                                    <HStack gap="0.5rem">
+                                                                        <PimAttributePicker
+                                                                            value={attr.mapped}
+                                                                            disabled={savingAttributeName === attr.name}
+                                                                            typeFilter={attr.input_type === 'img' ? ['image', 'file'] : undefined}
+                                                                            onChange={(val) => {
+                                                                                if (val) {
+                                                                                    assignAttribute(attr.name, val);
+                                                                                } else if (attr.mapped) {
+                                                                                    clearAttribute(attr.name, attr.mapped.id);
+                                                                                }
+                                                                            }}
+                                                                            placeholder="เลือก PIM attribute..."
+                                                                        />
+                                                                        {savingAttributeName === attr.name && <Spinner />}
+                                                                    </HStack>
                                                                 )}
-                                                            </td>
-                                                        </tr>
+                                                            </MappingCell>
+                                                            <MappingCell>
+                                                                <OptionMappingStatus
+                                                                    mapped={attr.option_mappings.length}
+                                                                    total={attr.options.length}
+                                                                    hint={
+                                                                        !isMappable || !hasOptions
+                                                                            ? '—'
+                                                                            : !attr.mapped
+                                                                              ? 'เลือก PIM attribute ก่อน'
+                                                                              : undefined
+                                                                    }
+                                                                    onOpen={() => setOptionMappingRow(attr)}
+                                                                />
+                                                            </MappingCell>
+                                                        </MappingRow>
                                                     );
                                                 })}
                                             </MappingTable>
@@ -1524,14 +1531,11 @@ export default function LazadaProductsMapping({ products, stats, filters }: Prop
                                     ) : (
                                         <MappingTable headers={['Lazada Payload Field', 'PIM Attribute (ต้นทาง)']}>
                                             {(payloadFields ?? []).map((f) => (
-                                                <tr key={f.target_field}>
-                                                    <td>
-                                                        <Body style={{ fontWeight: 600, fontSize: '0.8125rem' }}>
-                                                            {PAYLOAD_FIELD_LABELS[f.target_field]}
-                                                        </Body>
-                                                        <Caption>{f.target_field}</Caption>
-                                                    </td>
-                                                    <td>
+                                                <MappingRow key={f.target_field}>
+                                                    <MappingCell>
+                                                        <MappingFieldLabel label={PAYLOAD_FIELD_LABELS[f.target_field]} meta={f.target_field} />
+                                                    </MappingCell>
+                                                    <MappingCell>
                                                         <HStack gap="0.5rem">
                                                             <div style={{ flex: 1, minWidth: 200 }}>
                                                                 <PimAttributePicker
@@ -1550,8 +1554,8 @@ export default function LazadaProductsMapping({ products, stats, filters }: Prop
                                                             </div>
                                                             {savingPayloadField === f.target_field && <Spinner />}
                                                         </HStack>
-                                                    </td>
-                                                </tr>
+                                                    </MappingCell>
+                                                </MappingRow>
                                             ))}
                                         </MappingTable>
                                     )}

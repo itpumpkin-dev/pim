@@ -38,7 +38,11 @@ import {
     ImageThumbs,
     KpiTiles,
     LockedNotice,
+    MappingCell,
+    MappingFieldLabel,
+    MappingRow,
     MappingTable,
+    OptionMappingStatus,
     PageHeader,
     Pager,
     SearchField,
@@ -54,6 +58,7 @@ import styles from './marketplace.module.css';
 import { MatchedListingCell, type ProductMatching } from './matched-listing-cell';
 import { PlatformEditPanel } from './platform-edit-panel';
 import { PlatformPushPanel } from './platform-push-panel';
+import { useListingCategoryPrefill } from './use-listing-category-prefill';
 
 type ProductFilter = 'all' | 'mapped' | 'unmapped';
 /** ตัวกรอง Product Matching — ดู ProductMatchStatus::applyMatchingFilter() */
@@ -362,6 +367,8 @@ export default function TikTokProductsMapping({ products, stats, filters }: Prop
 
     // Category mapping section state
     const [selectedTikTokCatId, setSelectedTikTokCatId] = useState<number | null>(null);
+    // สินค้าที่จับคู่ listing แล้วแต่ยังไม่ได้แมปหมวดหมู่ → ตั้งหมวดหมู่ของ listing เป็นค่าเริ่มต้นใน picker
+    const categoryPrefillNote = useListingCategoryPrefill('tiktok', activeProduct, selectedTikTokCatId, setSelectedTikTokCatId);
     const [savingCatMap, setSavingCatMap] = useState(false);
     const [clearingCatMap, setClearingCatMap] = useState(false);
     // "Sync Categories" — ดึงต้นไม้หมวดหมู่ทั้งหมดจาก TikTok จริงมา refresh
@@ -1233,6 +1240,7 @@ export default function TikTokProductsMapping({ products, stats, filters }: Prop
                                             onChange={setSelectedTikTokCatId}
                                         />
                                     </div>
+                                    {categoryPrefillNote}
 
                                     {/* แนะนำหมวดหมู่จาก TikTok จริง (POST /categories/recommend)
                                     — เลือกจากชื่อสินค้าตัวนี้ กดแล้วแค่ตั้งค่า
@@ -1409,45 +1417,48 @@ export default function TikTokProductsMapping({ products, stats, filters }: Prop
                                         {loadingAttributes ? (
                                             <CenteredSpinner />
                                         ) : visibleTikTokAttributes && visibleTikTokAttributes.length > 0 ? (
-                                            <MappingTable headers={['TikTok Attribute', 'PIM Attribute (ต้นทาง)']}>
+                                            <MappingTable headers={['TikTok Attribute', 'PIM Attribute (ต้นทาง)', 'ตัวเลือก']}>
                                                 {visibleTikTokAttributes.map((attr) => (
-                                                    <tr key={attr.id}>
-                                                        <td>
-                                                            <Body style={{ fontWeight: 600, fontSize: '0.8125rem' }}>
-                                                                {attr.name} {attr.mandatory && <span style={{ color: TONE_TEXT.error }}>*</span>}
-                                                            </Body>
-                                                            <Caption>{tiktokTypeLabel(attr)}</Caption>
-                                                        </td>
-                                                        <td>
-                                                            <VStack gap="0.5rem">
-                                                                <HStack gap="0.5rem">
-                                                                    <div style={{ flex: 1, minWidth: 200 }}>
-                                                                        <PimAttributePicker
-                                                                            value={attr.mapped}
-                                                                            disabled={savingAttributeId === attr.id}
-                                                                            onChange={(val) => {
-                                                                                if (val) {
-                                                                                    assignAttribute(attr.id, val);
-                                                                                } else if (attr.mapped) {
-                                                                                    clearAttribute(attr.id, attr.mapped.id);
-                                                                                }
-                                                                            }}
-                                                                            placeholder="เลือก PIM attribute..."
-                                                                        />
-                                                                    </div>
-                                                                    {savingAttributeId === attr.id && <Spinner />}
-                                                                </HStack>
-                                                                {!attr.is_customizable && attr.mapped && (
-                                                                    <Button
-                                                                        onClick={() => setOptionMappingRow(attr)}
-                                                                        style={{ alignSelf: 'flex-start' }}
-                                                                    >
-                                                                        จับคู่ตัวเลือก ({attr.option_mappings.length}/{attr.options.length})
-                                                                    </Button>
-                                                                )}
-                                                            </VStack>
-                                                        </td>
-                                                    </tr>
+                                                    <MappingRow key={attr.id}>
+                                                        <MappingCell>
+                                                            <MappingFieldLabel
+                                                                label={attr.name}
+                                                                required={attr.mandatory}
+                                                                meta={tiktokTypeLabel(attr)}
+                                                            />
+                                                        </MappingCell>
+                                                        <MappingCell>
+                                                            <HStack gap="0.5rem">
+                                                                <PimAttributePicker
+                                                                    value={attr.mapped}
+                                                                    disabled={savingAttributeId === attr.id}
+                                                                    onChange={(val) => {
+                                                                        if (val) {
+                                                                            assignAttribute(attr.id, val);
+                                                                        } else if (attr.mapped) {
+                                                                            clearAttribute(attr.id, attr.mapped.id);
+                                                                        }
+                                                                    }}
+                                                                    placeholder="เลือก PIM attribute..."
+                                                                />
+                                                                {savingAttributeId === attr.id && <Spinner />}
+                                                            </HStack>
+                                                        </MappingCell>
+                                                        <MappingCell>
+                                                            <OptionMappingStatus
+                                                                mapped={attr.option_mappings.length}
+                                                                total={attr.options.length}
+                                                                hint={
+                                                                    attr.is_customizable
+                                                                        ? 'กรอกค่าเองได้'
+                                                                        : !attr.mapped
+                                                                          ? 'เลือก PIM attribute ก่อน'
+                                                                          : undefined
+                                                                }
+                                                                onOpen={() => setOptionMappingRow(attr)}
+                                                            />
+                                                        </MappingCell>
+                                                    </MappingRow>
                                                 ))}
                                             </MappingTable>
                                         ) : tiktokAttributes && tiktokAttributes.length > 0 ? (
@@ -1501,14 +1512,11 @@ export default function TikTokProductsMapping({ products, stats, filters }: Prop
                                     ) : (
                                         <MappingTable headers={['TikTok Payload Field', 'PIM Attribute (ต้นทาง)']}>
                                             {(payloadFields ?? []).map((f) => (
-                                                <tr key={f.target_field}>
-                                                    <td>
-                                                        <Body style={{ fontWeight: 600, fontSize: '0.8125rem' }}>
-                                                            {PAYLOAD_FIELD_LABELS[f.target_field]}
-                                                        </Body>
-                                                        <Caption>{f.target_field}</Caption>
-                                                    </td>
-                                                    <td>
+                                                <MappingRow key={f.target_field}>
+                                                    <MappingCell>
+                                                        <MappingFieldLabel label={PAYLOAD_FIELD_LABELS[f.target_field]} meta={f.target_field} />
+                                                    </MappingCell>
+                                                    <MappingCell>
                                                         <HStack gap="0.5rem">
                                                             <div style={{ flex: 1, minWidth: 200 }}>
                                                                 <PimAttributePicker
@@ -1527,8 +1535,8 @@ export default function TikTokProductsMapping({ products, stats, filters }: Prop
                                                             </div>
                                                             {savingPayloadField === f.target_field && <Spinner />}
                                                         </HStack>
-                                                    </td>
-                                                </tr>
+                                                    </MappingCell>
+                                                </MappingRow>
                                             ))}
                                         </MappingTable>
                                     )}

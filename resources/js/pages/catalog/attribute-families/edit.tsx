@@ -30,6 +30,8 @@ import {
     Icon,
     Input,
     Label,
+    List,
+    ListItemStandard,
     Menu,
     MenuItem,
     MultiComboBox,
@@ -1229,17 +1231,21 @@ export default function AttributeFamilyEdit({
                 {templateStep === 'pick' && (
                     <div className={styles.dialogBody}>
                         <span className={styles.subtitle}>{t('useTemplateFromHelp')}</span>
-                        <div className={styles.templateList}>
+                        <List
+                            className={styles.templateList}
+                            separators="Inner"
+                            loading={templatePreviewLoading}
+                            onItemClick={(e) => {
+                                const id = Number(e.detail.item.dataset.id);
+                                if (id) loadTemplatePreview(id);
+                            }}
+                        >
                             {otherFamilies.map((fam) => (
-                                <button key={fam.id} type="button" className={styles.templateItem} onClick={() => loadTemplatePreview(fam.id)}>
-                                    <span>
-                                        <span className={styles.templateItemName}>{fam.name || fam.code}</span>
-                                        <span className={styles.caption}>{fam.code}</span>
-                                    </span>
-                                    {templatePreviewLoading && selectedTemplateId === fam.id && <BusyIndicator active size="S" />}
-                                </button>
+                                <ListItemStandard key={fam.id} data-id={fam.id} type="Navigation" description={fam.code}>
+                                    {fam.name || fam.code}
+                                </ListItemStandard>
                             ))}
-                        </div>
+                        </List>
                     </div>
                 )}
 

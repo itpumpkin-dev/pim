@@ -189,33 +189,9 @@
     margin-top: 1.5rem;
 }
 
-.sampleTableWrap {
-    overflow-x: auto;
+.sampleTable {
     border: 1px solid var(--sapList_BorderColor);
     border-radius: var(--sapElement_BorderCornerRadius, 0.5rem);
-}
-
-.sampleTable {
-    border-collapse: collapse;
-    width: 100%;
-    font-size: 0.8125rem;
-    font-family: var(--sapFontFamily);
-    color: var(--sapTextColor);
-}
-
-.sampleTable th {
-    text-align: left;
-    white-space: nowrap;
-    padding: 0.5rem;
-    font-weight: 600;
-    background: var(--sapList_HeaderBackground);
-    border-bottom: 1px solid var(--sapList_BorderColor);
-}
-
-.sampleTable td {
-    white-space: nowrap;
-    padding: 0.5rem;
-    background: var(--sapList_Background);
 }
 
 /* KPI tiles (1 col on phones, 3 from 600px). */

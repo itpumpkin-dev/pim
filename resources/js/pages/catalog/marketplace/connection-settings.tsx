@@ -2,22 +2,26 @@ import { FioriResponsiveColumn, FioriResponsiveTable } from '@/components/fiori-
 import AppLayout from '@/layouts/app-layout';
 import { FioriStatus } from '@/lib/fiori-style';
 import { type BreadcrumbItem } from '@/types';
-import { Head } from '@inertiajs/react';
-import { Text, Title } from '@ui5/webcomponents-react';
+import { Head, router } from '@inertiajs/react';
+import { ObjectStatus, SegmentedButton, SegmentedButtonItem, Text, Title } from '@ui5/webcomponents-react';
 import { useTranslation } from 'react-i18next';
 
 import styles from './marketplace.module.css';
 
 type MarketplacePlatform = 'shopee' | 'lazada' | 'tiktok' | 'woocommerce';
 
-// เหมือนกับ PLATFORM_LABEL ใน platform-hub.tsx — ทั้งสองหน้าไม่ได้ share
-// component เดียวกัน (หน้านี้เป็น table list, หน้านั้นเป็น card launcher) เลย
-// คงชุด mapping ไว้แยกกัน แต่ค่าต้องตรงกันเป๊ะ
-const PLATFORM_LABEL: Record<MarketplacePlatform, string> = {
+const PLATFORM_LABEL: Record<string, string> = {
     shopee: 'Shopee',
     lazada: 'Lazada',
     tiktok: 'TikTok',
     woocommerce: 'WooCommerce',
+};
+// สีเดียวกับคอลัมน์ Platform ใน product-master.tsx
+const PLATFORM_STATE: Record<string, 'Critical' | 'Information' | 'Positive' | 'Indication05'> = {
+    shopee: 'Critical',
+    lazada: 'Information',
+    tiktok: 'Indication05',
+    woocommerce: 'Positive',
 };
 
 interface ShopItem {
@@ -28,10 +32,14 @@ interface ShopItem {
     shopee_seller_account_id: string | null;
     tiktok_seller_account_id: number | null;
     is_active: boolean;
+    platform: MarketplacePlatform;
 }
 
 interface Props {
-    platform: MarketplacePlatform;
+    /** เฉพาะ platform ที่ผู้ใช้มีสิทธิ์ marketplace_{platform}.list_marketplace_{platform} */
+    platforms: { value: MarketplacePlatform; label: string }[];
+    /** ตัวกรองปัจจุบัน — null = ทุก platform */
+    platform: MarketplacePlatform | null;
     shops: ShopItem[];
 }
 
@@ -46,26 +54,20 @@ function linkedAccountLabel(shop: ShopItem): string | null {
 }
 
 /**
- * "ตั้งค่าการเชื่อมต่อ" ของแต่ละแพลตฟอร์ม (มาสเตอร์ > มาร์เก็ตเพลส > {แพลตฟอร์ม}
- * > ตั้งค่าการเชื่อมต่อ — การ์ดจาก platform-hub.tsx พามาที่นี่) เดิมเป็นแค่
- * placeholder "under construction" ตอนนี้เป็นขั้นแรกจริง: ตารางร้านค้า
- * (SalesPlatformShop) ที่ผูกกับแพลตฟอร์มนี้อยู่ — โชว์อย่างเดียวก่อน ยังไม่มี
- * เพิ่ม/แก้ไข/ลบในหน้านี้ (ใช้หน้า Catalog > ช่องทางขาย > Platforms
- * (/catalog/sales-platforms) ที่มี CRUD ครบอยู่แล้วไปพลางก่อน) รอต่อยอดเป็น
- * flow เชื่อมต่อร้านค้าเต็มรูปแบบทีหลัง — ดู
+ * "ตั้งค่าการเชื่อมต่อ" (มาสเตอร์ > มาร์เก็ตเพลส > ตั้งค่าการเชื่อมต่อ — การ์ดจาก marketplace-hub.tsx
+ * พามาที่นี่) หน้าเดียวรวมทุกแพลตฟอร์ม กรอง platform ด้วย SegmentedButton (?platform=) — ตาราง
+ * ร้านค้า (SalesPlatformShop) โชว์อย่างเดียวก่อน ยังไม่มีเพิ่ม/แก้ไข/ลบในหน้านี้ (ใช้หน้า
+ * Catalog > ช่องทางขาย > Platforms (/catalog/sales-platforms) ที่มี CRUD ครบไปพลางก่อน) — ดู
  * SalesPlatformController::connectionSettings()
  */
-export default function MarketplaceConnectionSettings({ platform, shops }: Props) {
+export default function MarketplaceConnectionSettings({ platforms, platform, shops }: Props) {
     const { t } = useTranslation('catalog');
     const { t: tNav } = useTranslation('nav');
-
-    const platformLabel = PLATFORM_LABEL[platform] ?? platform;
 
     const breadcrumbs: BreadcrumbItem[] = [
         { title: tNav('catalog'), href: '#' },
         { title: tNav('master'), href: '#' },
         { title: tNav('marketplace'), href: '/catalog/marketplace' },
-        { title: platformLabel, href: `/catalog/marketplace/product-master?platform=${platform}` },
         { title: tNav('marketplaceConnect'), href: '#' },
     ];
 
@@ -82,6 +84,16 @@ export default function MarketplaceConnectionSettings({ platform, shops }: Props
                     <div style={{ fontWeight: 600, fontSize: 'var(--sapFontSize)', color: 'var(--sapTextColor)' }}>{shop.name}</div>
                     <span className={styles.caption}>{shop.code}</span>
                 </div>
+            ),
+        },
+        {
+            key: 'platform',
+            header: 'Platform',
+            priority: 'high',
+            render: (shop) => (
+                <ObjectStatus state={PLATFORM_STATE[shop.platform] ?? 'None'} inverted>
+                    {PLATFORM_LABEL[shop.platform] ?? shop.platform}
+                </ObjectStatus>
             ),
         },
         {
@@ -111,10 +123,35 @@ export default function MarketplaceConnectionSettings({ platform, shops }: Props
                     <Title level="H4" size="H4" wrappingType="Normal" className={styles.pageTitle}>
                         {tNav('marketplaceConnect')}
                     </Title>
-                    <Text className={styles.subtitle}>{platformLabel}</Text>
+                    <Text className={styles.subtitle}>ร้านค้าและบัญชีผู้ขายที่เชื่อมต่อของแต่ละ platform</Text>
                 </div>
 
-                <div className={styles.card} style={{ padding: '1rem' }}>
+                <div className={styles.card}>
+                    <div className={styles.toolbar}>
+                        <div className={styles.toolbarStart}>
+                            <SegmentedButton
+                                accessibleName="Platform"
+                                onSelectionChange={(e) => {
+                                    const v = (e.detail.selectedItems[0] as HTMLElement | undefined)?.dataset.value;
+                                    if (v === undefined) return;
+                                    router.get('/catalog/marketplace/connect', v ? { platform: v } : {}, {
+                                        preserveScroll: true,
+                                        preserveState: true,
+                                    });
+                                }}
+                            >
+                                <SegmentedButtonItem data-value="" selected={!platform}>
+                                    ทุก platform
+                                </SegmentedButtonItem>
+                                {platforms.map((p) => (
+                                    <SegmentedButtonItem key={p.value} data-value={p.value} selected={platform === p.value}>
+                                        {p.label}
+                                    </SegmentedButtonItem>
+                                ))}
+                            </SegmentedButton>
+                        </div>
+                        <Text className={styles.caption}>{shops.length} ร้าน</Text>
+                    </div>
                     <FioriResponsiveTable
                         variant="plain"
                         columns={shopColumns}

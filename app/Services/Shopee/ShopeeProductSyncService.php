@@ -101,7 +101,8 @@ class ShopeeProductSyncService
         // system (see ShopeeAttributeMappingController's docblock) — Shopee
         // already pulls the whole gallery dynamically, a different
         // (multi-value) mechanism than the single-value fields below.
-        $imageUrls = $this->resolveProductImageUrls($product, $shop->channel_id);
+        // Shopee takes at most 9 product images (seller-centre rule) — trim instead of failing the push
+        $imageUrls = array_slice($this->resolveProductImageUrls($product, $shop->channel_id), 0, 9);
         $qty = $this->resolveMappedField($mappings, 'qty', $product, $shop->channel_id);
         $weight = $this->resolveMappedField($mappings, 'weight', $product, $shop->channel_id);
         // Falls back to $name only when a product has no mapped content yet,

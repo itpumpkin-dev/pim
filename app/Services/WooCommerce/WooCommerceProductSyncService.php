@@ -81,7 +81,13 @@ class WooCommerceProductSyncService
 
         $name = $this->resolveMappedField($mappings, 'name', $product, $shop->channel_id, localeCode: 'th');
         $price = $this->resolveMappedField($mappings, 'price', $product, $shop->channel_id, localeCode: 'th');
+        // ทั้งแกลเลอรี (pgallery → fallback pimage) เหมือน Lazada/Shopee/TikTok — เดิมส่งแค่รูปเดียวจาก field
+        // 'image' ที่จับคู่ไว้; ถ้าจับคู่ field นั้นไว้ยังเป็นรูปหลัก (ลำดับแรก) เหมือนเดิม ตามด้วยรูปแกลเลอรีที่เหลือ
         $imageUrl = $this->resolveMappedField($mappings, 'image', $product, $shop->channel_id, localeCode: 'th');
+        $imageUrls = $this->resolveProductImageUrls($product, $shop->channel_id);
+        if ($imageUrl) {
+            $imageUrls = [$imageUrl, ...array_values(array_diff($imageUrls, [$imageUrl]))];
+        }
         $qty = $this->resolveMappedField($mappings, 'qty', $product, $shop->channel_id, localeCode: 'th');
         $weight = $this->resolveMappedField($mappings, 'weight', $product, $shop->channel_id, localeCode: 'th');
         $length = $this->resolveMappedField($mappings, 'length', $product, $shop->channel_id, localeCode: 'th');
@@ -130,7 +136,7 @@ class WooCommerceProductSyncService
             'stock_quantity' => (int) ($qty ?? 0),
             'weight' => $weight !== null && $weight !== '' ? (string) $weight : null,
             'dimensions' => count($dimensions) ? array_map('strval', $dimensions) : null,
-            'images' => $imageUrl ? [['src' => $imageUrl]] : null,
+            'images' => $imageUrls !== [] ? array_map(fn (string $src) => ['src' => $src], $imageUrls) : null,
             'categories' => count($categoryIds) ? $categoryIds : null,
             'brands' => count($brandIds) ? $brandIds : null,
             'attributes' => count($wcAttributes) ? $wcAttributes : null,

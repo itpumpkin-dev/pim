@@ -25,6 +25,14 @@ use Inertia\Response;
 
 class SalesPlatformController extends Controller
 {
+    /** แพลตฟอร์มในหน้า "ตั้งค่าการเชื่อมต่อ" (code ใน sales_platforms => ชื่อที่แสดง) */
+    private const MARKETPLACE_PLATFORMS = [
+        'shopee' => 'Shopee',
+        'lazada' => 'Lazada',
+        'tiktok' => 'TikTok',
+        'woocommerce' => 'WooCommerce',
+    ];
+
     /**
      * The built-in marketplace integrations are identified by their platform
      * code everywhere — firstOrCreate() in the sync actions below, the
@@ -53,27 +61,41 @@ class SalesPlatformController extends Controller
     }
 
     /**
-     * "ตั้งค่าการเชื่อมต่อ" ของแต่ละแพลตฟอร์ม (มาสเตอร์ > มาร์เก็ตเพลส >
-     * {แพลตฟอร์ม} > ตั้งค่าการเชื่อมต่อ — การ์ดจาก platform-hub.tsx พามาที่นี่)
-     * เดิม route นี้เป็นแค่ placeholder ("under construction") ตอนนี้เป็น
-     * ขั้นแรกจริง: แสดงตารางร้านค้า (SalesPlatformShop) ที่ผูกกับแพลตฟอร์มนี้อยู่
-     * — ยังไม่มี action เพิ่ม/แก้ไข/ลบในหน้านี้ (ใช้หน้า sales-platforms ที่มีอยู่
-     * แล้วไปก่อนสำหรับ CRUD) รอต่อยอดเป็น flow เชื่อมต่อร้านค้าเต็มรูปแบบทีหลัง
+     * "ตั้งค่าการเชื่อมต่อ" (มาสเตอร์ > มาร์เก็ตเพลส > ตั้งค่าการเชื่อมต่อ — การ์ดในหน้า
+     * marketplace-hub พามาที่นี่) หน้าเดียวรวมทุกแพลตฟอร์ม (เดิมแยกหน้าต่อแพลตฟอร์ม
+     * /marketplace/connect/{platform} — ตอนนี้ redirect มาที่นี่พร้อม ?platform=) แสดงตาราง
+     * ร้านค้า (SalesPlatformShop) กรองด้วย ?platform= ได้ — ยังไม่มี action เพิ่ม/แก้ไข/ลบ
+     * ในหน้านี้ (ใช้หน้า sales-platforms ที่มีอยู่แล้วไปก่อนสำหรับ CRUD)
      *
-     * SalesPlatform อาจยังไม่มีแถวของแพลตฟอร์มนี้เลยก็ได้ (ยังไม่เคยสร้างผ่านหน้า
-     * sales-platforms) — ถือเป็น "ยังไม่มีร้านค้าเชื่อมต่อ" ธรรมดา ไม่ใช่ error
+     * เห็นเฉพาะแพลตฟอร์มที่มีสิทธิ์ marketplace_{platform}.list_marketplace_{platform}
+     * (ไม่มีเลยสักตัว → 403) — ?platform= ที่ไม่มีสิทธิ์/ไม่รู้จักถือเป็น "ทุก platform"
+     * SalesPlatform อาจยังไม่มีแถวของแพลตฟอร์มไหนเลยก็ได้ → แค่ไม่มีร้านของแพลตฟอร์มนั้น
      */
-    public function connectionSettings(string $platform): Response
+    public function connectionSettings(Request $request): Response
     {
-        $salesPlatform = SalesPlatform::where('code', $platform)->first();
+        $user = $request->user();
+        $allowed = array_values(array_filter(
+            array_keys(self::MARKETPLACE_PLATFORMS),
+            fn (string $p) => $user?->hasPermission("marketplace_{$p}", "list_marketplace_{$p}"),
+        ));
+        abort_if($allowed === [], 403, 'You do not have permission to perform this action.');
 
-        $shops = $salesPlatform
-            ? $salesPlatform->shops()
-                ->orderBy('name')
-                ->get(['id', 'code', 'name', 'lazada_seller_account_id', 'shopee_seller_account_id', 'tiktok_seller_account_id', 'is_active'])
-            : collect();
+        $platform = in_array($request->query('platform'), $allowed, true) ? $request->query('platform') : null;
+
+        $shops = SalesPlatformShop::query()
+            ->join('sales_platforms', 'sales_platforms.id', '=', 'sales_platform_shops.sales_platform_id')
+            ->whereIn('sales_platforms.code', $platform ? [$platform] : $allowed)
+            ->orderBy('sales_platforms.code')
+            ->orderBy('sales_platform_shops.name')
+            ->get([
+                'sales_platform_shops.id', 'sales_platform_shops.code', 'sales_platform_shops.name',
+                'sales_platform_shops.lazada_seller_account_id', 'sales_platform_shops.shopee_seller_account_id',
+                'sales_platform_shops.tiktok_seller_account_id', 'sales_platform_shops.is_active',
+                'sales_platforms.code as platform',
+            ]);
 
         return Inertia::render('catalog/marketplace/connection-settings', [
+            'platforms' => array_map(fn (string $p) => ['value' => $p, 'label' => self::MARKETPLACE_PLATFORMS[$p]], $allowed),
             'platform' => $platform,
             'shops' => $shops,
         ]);

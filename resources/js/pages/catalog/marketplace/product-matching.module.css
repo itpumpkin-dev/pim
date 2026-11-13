@@ -163,22 +163,3 @@
 }
 
 /* phase 4A — sync run status / history */
-
-.runTable {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: var(--sapFontSmallSize);
-}
-
-.runTable th,
-.runTable td {
-    text-align: left;
-    padding: 0.375rem 0.5rem;
-    border-bottom: 1px solid var(--sapList_BorderColor);
-    vertical-align: top;
-}
-
-.runTable th {
-    color: var(--sapContent_LabelColor);
-    font-weight: 600;
-}

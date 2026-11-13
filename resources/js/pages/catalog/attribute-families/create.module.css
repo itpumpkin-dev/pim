@@ -260,35 +260,8 @@
 .templateList {
     max-height: 360px;
     overflow-y: auto;
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-}
-
-.templateItem {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.5rem;
-    width: 100%;
-    padding: 0.5rem 0.75rem;
-    border-radius: 8px;
     border: 1px solid var(--sapList_BorderColor);
-    background: var(--sapList_Background);
-    color: var(--sapTextColor);
-    font: inherit;
-    text-align: left;
-    cursor: pointer;
-}
-
-.templateItem:hover {
-    background: var(--sapList_Hover_Background);
-}
-
-.templateItemName {
-    display: block;
-    font-size: var(--sapFontSize);
-    color: var(--sapTextColor);
+    border-radius: var(--sapElement_BorderCornerRadius);
 }
 
 .previewGroup {

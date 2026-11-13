@@ -1,3 +1,4 @@
+import { FioriResponsiveTable } from '@/components/fiori-responsive-table';
 import AppLayout from '@/layouts/app-layout';
 import { downloadCsv } from '@/lib/csv';
 import { FioriStatus, type FioriTone } from '@/lib/fiori-style';
@@ -495,55 +496,66 @@ export default function Dashboard({
                 {canViewProducts && (
                     <div className={styles.card} style={{ marginBottom: '1.5rem' }}>
                         <SectionHeader title={t('topViewedProducts')} subtitle={t('topViewedSubtitle')} />
-                        <div style={{ overflowX: 'auto' }}>
-                            <table className={styles.table}>
-                                <thead>
-                                    <tr>
-                                        <th>{t('rank')}</th>
-                                        <th>{t('product')}</th>
-                                        <th>{t('category')}</th>
-                                        <th>{t('views')}</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {topViewedProducts.map((product, index) => (
-                                        <tr key={product.id}>
-                                            <td style={{ fontWeight: 700, color: index < 3 ? 'var(--sapBrandColor)' : undefined }}>#{index + 1}</td>
-                                            <td>
-                                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                                                    <img
-                                                        src={product.image ?? `https://images.dcpumpkin.com/images/product/500/${product.sku}.jpg`}
-                                                        alt={product.name}
-                                                        onError={(event) => {
-                                                            (event.currentTarget as HTMLImageElement).style.visibility = 'hidden';
-                                                        }}
-                                                        style={{
-                                                            width: 36,
-                                                            height: 36,
-                                                            objectFit: 'contain',
-                                                            borderRadius: 'var(--sapElement_BorderCornerRadius)',
-                                                            border: '1px solid var(--sapGroup_ContentBorderColor)',
-                                                            background: 'var(--sapList_HeaderBackground)',
-                                                            flexShrink: 0,
-                                                        }}
-                                                    />
-                                                    <span style={{ fontWeight: 600 }}>{product.name}</span>
-                                                </div>
-                                            </td>
-                                            <td className={styles.secondary}>{product.category}</td>
-                                            <td style={{ fontWeight: 700 }}>{product.views}</td>
-                                        </tr>
-                                    ))}
-                                    {topViewedProducts.length === 0 && (
-                                        <tr className={styles.emptyRow}>
-                                            <td colSpan={4} className={styles.empty}>
-                                                {t('noViewData')}
-                                            </td>
-                                        </tr>
-                                    )}
-                                </tbody>
-                            </table>
-                        </div>
+                        <FioriResponsiveTable
+                            variant="plain"
+                            columns={[
+                                {
+                                    key: 'rank',
+                                    header: t('rank'),
+                                    width: '5rem',
+                                    render: (product) => {
+                                        const index = topViewedProducts.indexOf(product);
+                                        return (
+                                            <span style={{ fontWeight: 700, color: index < 3 ? 'var(--sapBrandColor)' : undefined }}>
+                                                #{index + 1}
+                                            </span>
+                                        );
+                                    },
+                                },
+                                {
+                                    key: 'product',
+                                    header: t('product'),
+                                    minWidth: '14rem',
+                                    render: (product) => (
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                                            <img
+                                                src={product.image ?? `https://images.dcpumpkin.com/images/product/500/${product.sku}.jpg`}
+                                                alt={product.name}
+                                                onError={(event) => {
+                                                    (event.currentTarget as HTMLImageElement).style.visibility = 'hidden';
+                                                }}
+                                                style={{
+                                                    width: 36,
+                                                    height: 36,
+                                                    objectFit: 'contain',
+                                                    borderRadius: 'var(--sapElement_BorderCornerRadius)',
+                                                    border: '1px solid var(--sapGroup_ContentBorderColor)',
+                                                    background: 'var(--sapList_HeaderBackground)',
+                                                    flexShrink: 0,
+                                                }}
+                                            />
+                                            <span style={{ fontWeight: 600 }}>{product.name}</span>
+                                        </div>
+                                    ),
+                                },
+                                {
+                                    key: 'category',
+                                    header: t('category'),
+                                    priority: 'medium',
+                                    render: (product) => <span className={styles.secondary}>{product.category}</span>,
+                                },
+                                {
+                                    key: 'views',
+                                    header: t('views'),
+                                    priority: 'high',
+                                    align: 'right',
+                                    render: (product) => <span style={{ fontWeight: 700 }}>{product.views}</span>,
+                                },
+                            ]}
+                            rows={topViewedProducts}
+                            getRowKey={(product) => product.id}
+                            emptyMessage={t('noViewData')}
+                        />
                     </div>
                 )}
 
@@ -653,20 +665,20 @@ export default function Dashboard({
                                 </Button>
                             }
                         />
-                        <div style={{ overflowX: 'auto' }}>
-                            <table className={styles.table}>
-                                <thead>
-                                    <tr>
-                                        <th>{t('id')}</th>
-                                        <th>{t('user')}</th>
-                                        <th>{t('event')}</th>
-                                        <th>{t('targetResource')}</th>
-                                        <th>{t('targetId')}</th>
-                                        <th>{t('time')}</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {recentActivities.map((activity) => {
+                        <FioriResponsiveTable
+                            variant="plain"
+                            columns={[
+                                { key: 'id', header: t('id'), width: '5rem', render: (activity) => `#${activity.id}` },
+                                {
+                                    key: 'user',
+                                    header: t('user'),
+                                    render: (activity) => <span style={{ fontWeight: 600 }}>{activity.user}</span>,
+                                },
+                                {
+                                    key: 'event',
+                                    header: t('event'),
+                                    priority: 'high',
+                                    render: (activity) => {
                                         const eventTone: FioriTone =
                                             activity.event === 'created'
                                                 ? 'success'
@@ -676,31 +688,31 @@ export default function Dashboard({
                                                     ? 'error'
                                                     : 'neutral';
                                         return (
-                                            <tr key={activity.id}>
-                                                <td>#{activity.id}</td>
-                                                <td style={{ fontWeight: 600 }}>{activity.user}</td>
-                                                <td>
-                                                    <FioriStatus
-                                                        label={t(activity.event, { defaultValue: activity.event.toUpperCase() }).toUpperCase()}
-                                                        tone={eventTone}
-                                                    />
-                                                </td>
-                                                <td className={styles.secondary}>{activity.auditable_type || '-'}</td>
-                                                <td>{activity.auditable_id || '-'}</td>
-                                                <td className={styles.secondary}>{new Date(activity.created_at).toLocaleString()}</td>
-                                            </tr>
+                                            <FioriStatus
+                                                label={t(activity.event, { defaultValue: activity.event.toUpperCase() }).toUpperCase()}
+                                                tone={eventTone}
+                                            />
                                         );
-                                    })}
-                                    {recentActivities.length === 0 && (
-                                        <tr className={styles.emptyRow}>
-                                            <td colSpan={6} className={styles.empty}>
-                                                {t('noActivities')}
-                                            </td>
-                                        </tr>
-                                    )}
-                                </tbody>
-                            </table>
-                        </div>
+                                    },
+                                },
+                                {
+                                    key: 'resource',
+                                    header: t('targetResource'),
+                                    priority: 'medium',
+                                    render: (activity) => <span className={styles.secondary}>{activity.auditable_type || '-'}</span>,
+                                },
+                                { key: 'targetId', header: t('targetId'), priority: 'low', render: (activity) => activity.auditable_id || '-' },
+                                {
+                                    key: 'time',
+                                    header: t('time'),
+                                    priority: 'medium',
+                                    render: (activity) => <span className={styles.secondary}>{new Date(activity.created_at).toLocaleString()}</span>,
+                                },
+                            ]}
+                            rows={recentActivities}
+                            getRowKey={(activity) => activity.id}
+                            emptyMessage={t('noActivities')}
+                        />
                     </div>
                 )}
             </div>

@@ -206,6 +206,8 @@ Route::middleware(['auth'])->prefix('catalog')->name('catalog.')->group(function
     Route::get('marketplace/products/{product}/platform-edit/{platform}', [ListingImportController::class, 'form'])->name('marketplace.platformEdit.form')->middleware('permission:products,edit_products');
     Route::post('marketplace/products/{product}/platform-edit/{platform}', [ListingImportController::class, 'save'])->name('marketplace.platformEdit.save')->middleware('permission:products,edit_products');
     Route::post('marketplace/products/{product}/listing-import/{listing}/images', [ListingImportController::class, 'applyImages'])->name('marketplace.listingImport.images')->middleware('permission:products,edit_products');
+    Route::put('marketplace/products/{product}/gallery', [ListingImportController::class, 'saveGallery'])->name('marketplace.platformEdit.gallery')->middleware('permission:products,edit_products');
+    Route::get('marketplace/products/{product}/listing-category/{platform}', [ListingImportController::class, 'listingCategory'])->name('marketplace.platformEdit.listingCategory')->middleware('permission:products,list_products');
     // step "Push ไป {platform}" ของหน้า Map สินค้า — ที่เดียวที่ push/ปิดการขาย/ลบ ได้ (ดู PlatformPushController)
     Route::get('marketplace/products/{product}/push/{platform}', [PlatformPushController::class, 'status'])->name('marketplace.platformPush.status')->middleware('permission:products,list_products');
     Route::post('marketplace/product-matching/listings/{listing}/unignore', [ProductMatchingActionsController::class, 'unignore'])->name('marketplace.productMatching.unignore')->middleware('permission:products,edit_products');
@@ -616,16 +618,15 @@ Route::middleware(['auth'])->prefix('catalog')->name('catalog.')->group(function
     // (รักษาสิทธิ์เข้าถึงเดิมไว้ ไม่ให้ใครหลุดออกจากเมนูที่เคยเห็นอยู่แล้ว) แล้ว
     // รัน `php artisan permissions:sync` เพื่อขึ้นทะเบียนสิทธิ์ใหม่นี้ในหน้า Roles
     // (auto-generate จาก route scan — ดู PermissionCatalog) ให้ Administrator ด้วย
+    // ตั้งค่าการเชื่อมต่อ — หน้าเดียวทุกแพลตฟอร์ม; สิทธิ์ต่อแพลตฟอร์ม (marketplace_{platform},
+    // list_marketplace_{platform}) เช็คใน controller เอง (เห็นเฉพาะ platform ที่มีสิทธิ์)
+    Route::get('marketplace/connect', [SalesPlatformController::class, 'connectionSettings'])->name('marketplace.connect');
+
     foreach (['shopee', 'lazada', 'tiktok', 'woocommerce'] as $platform) {
         Route::middleware("permission:marketplace_{$platform},list_marketplace_{$platform}")->group(function () use ($platform) {
-            // เดิมเป็นแค่ placeholder ("under construction") — ตอนนี้เป็นขั้นแรกจริง
-            // (ตารางร้านค้าของแพลตฟอร์มนี้) ดู SalesPlatformController::connectionSettings()
-            // — เรียกผ่าน closure แทนที่จะผูก route กับ [Controller::class, 'method']
-            // ตรงๆ เพราะ path ของแต่ละ loop iteration เป็น literal segment
-            // ("marketplace/connect/shopee") ไม่ใช่ {platform} wildcard แล้ว จึงไม่มี
-            // route parameter ให้ Laravel inject เข้า connectionSettings(string
-            // $platform) เองอัตโนมัติ — ส่ง $platform ของ iteration นี้เข้าไปตรงๆ แทน
-            Route::get("marketplace/connect/{$platform}", fn () => app(SalesPlatformController::class)->connectionSettings($platform))
+            // เดิมเป็นหน้าตั้งค่าแยกต่อแพลตฟอร์ม — ตอนนี้รวมเป็นหน้าเดียว (marketplace/connect
+            // ด้านล่าง กรอง platform ข้างใน) URL เดิม redirect ไปพร้อม ?platform= กัน bookmark เก่า 404
+            Route::redirect("marketplace/connect/{$platform}", "/catalog/marketplace/connect?platform={$platform}")
                 ->name("marketplace.connect.{$platform}");
 
             // เดิมเป็นหน้า hub ต่อแพลตฟอร์ม (platform-hub.tsx — ลบแล้ว) ตอนนี้ มาสเตอร์ > มาร์เก็ตเพลส
