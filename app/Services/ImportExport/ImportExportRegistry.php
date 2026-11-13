@@ -16,8 +16,6 @@ use App\Models\ProductGrade;
 use App\Models\ProductGradeTranslation;
 use App\Models\ProductType;
 use App\Models\ProductTypeTranslation;
-use App\Models\Vendor;
-use App\Models\VendorTranslation;
 use App\Services\ImportExport\Exporters\AttributeFamilyRowExporter;
 use App\Services\ImportExport\Exporters\AttributeOptionRowExporter;
 use App\Services\ImportExport\Exporters\AttributeRowExporter;
@@ -25,6 +23,7 @@ use App\Services\ImportExport\Exporters\CategoryRowExporter;
 use App\Services\ImportExport\Exporters\MasterEntityRowExporter;
 use App\Services\ImportExport\Exporters\ProductRowExporter;
 use App\Services\ImportExport\Exporters\RowExporterInterface;
+use App\Services\ImportExport\Exporters\VendorRowExporter;
 use App\Services\ImportExport\Importers\AttributeFamilyRowImporter;
 use App\Services\ImportExport\Importers\AttributeOptionRowImporter;
 use App\Services\ImportExport\Importers\AttributeRowImporter;
@@ -32,6 +31,7 @@ use App\Services\ImportExport\Importers\CategoryRowImporter;
 use App\Services\ImportExport\Importers\MasterEntityRowImporter;
 use App\Services\ImportExport\Importers\ProductRowImporter;
 use App\Services\ImportExport\Importers\RowImporterInterface;
+use App\Services\ImportExport\Importers\VendorRowImporter;
 use App\Models\User;
 
 class ImportExportRegistry
@@ -98,22 +98,7 @@ class ImportExportRegistry
                 translationModelClass: BusinessTypeTranslation::class,
                 translationForeignKey: 'business_type_id',
             ),
-            // ฟิลด์เยอะที่สุดใน 9 ตัวนี้ (ข้อมูลติดต่อ/ภาษี/เครดิตของผู้ขาย) —
-            // currency_id resolve จาก currency_code ที่กรอกมาในไฟล์ ไม่ใช่ id ตรงๆ
-            'vendors' => new MasterEntityDefinition(
-                modelClass: Vendor::class,
-                fillable: [
-                    'short_name', 'vendor_group', 'tax_id', 'branch',
-                    'tax_invoice_address_1', 'tax_invoice_address_2', 'tax_invoice_address_3', 'tax_invoice_address_4',
-                    'currency_id', 'payment_terms', 'default_price_term', 'remark',
-                    'contact_name', 'contact_position', 'contact_phone', 'contact_fax', 'contact_email',
-                    'contact_address_1', 'contact_address_2', 'contact_address_3', 'contact_address_4', 'contact_country',
-                    'credit_term_days', 'is_active',
-                ],
-                translationModelClass: VendorTranslation::class,
-                translationForeignKey: 'vendor_id',
-                fkLookups: ['currency_id' => ['model' => Currency::class, 'inputColumn' => 'currency_code']],
-            ),
+            // vendors ไม่อยู่ที่นี่ — ใช้ VendorRowImporter/Exporter (คอลัมน์ ERP Vendor Master) ดู importer()
             // ไม่มีคอลัมน์ is_active เลย (ต่างจากอีก 8 ตัว)
             'currencies' => new MasterEntityDefinition(
                 modelClass: Currency::class,
@@ -150,6 +135,11 @@ class ImportExportRegistry
      */
     public static function importer(string $type, ?User $user = null, ?int $jobTrackerId = null, ?string $familyCode = null): RowImporterInterface
     {
+        // เวนเดอร์ใช้คอลัมน์ของ ERP Vendor Master ตรงๆ (VendId …) แทน definition generic ด้านล่าง
+        if ($type === 'vendors') {
+            return new VendorRowImporter();
+        }
+
         $masterDefinitions = self::masterEntityDefinitions();
         if (isset($masterDefinitions[$type])) {
             return new MasterEntityRowImporter($masterDefinitions[$type]);
@@ -170,6 +160,10 @@ class ImportExportRegistry
      */
     public static function exporter(string $type, ?User $user = null): RowExporterInterface
     {
+        if ($type === 'vendors') {
+            return new VendorRowExporter();
+        }
+
         $masterDefinitions = self::masterEntityDefinitions();
         if (isset($masterDefinitions[$type])) {
             return new MasterEntityRowExporter($masterDefinitions[$type]);

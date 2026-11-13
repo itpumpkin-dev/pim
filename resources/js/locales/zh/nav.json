@@ -11,6 +11,7 @@
     "attributeFamilies": "属性族",
     "attributeApiSources": "API 数据源",
     "system": "系统",
+    "queueMonitor": "队列监控",
     "users": "用户",
     "userGroups": "用户组",
     "departments": "部门",

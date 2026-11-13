@@ -96,23 +96,55 @@ test('importRow() for commission_groups writes p_group_name directly with no tra
     expect((float) $group->divisor_start)->toBe(2.0);
 });
 
-test('importRow() for vendors resolves currency_id from a currency_code column', function () {
+// vendors ใช้ VendorRowImporter (คอลัมน์ ERP Vendor Master: VendId, VendName, CurrId …) แทน importer generic
+test('importRow() for vendors resolves currency_id from the ERP CurrId column', function () {
     $currency = Currency::create(['code' => 'met_thb', 'name' => 'Test Baht', 'exchange_rate' => 1]);
 
     $importer = ImportExportRegistry::importer('vendors');
-    $importer->importRow(['code' => 'met_vendor_1', 'name' => 'Test Vendor', 'currency_code' => 'met_thb', 'is_active' => '1'], metImportConfig('vendors'));
+    $importer->importRow(['VendId' => 'met_vendor_1', 'VendName' => 'Test Vendor', 'CurrId' => 'met_thb', 'VendStatus' => 'Active'], metImportConfig('vendors'));
 
     $vendor = Vendor::where('code', 'met_vendor_1')->first();
     expect($vendor->currency_id)->toBe($currency->id);
 });
 
-test('importRow() for vendors rejects an unknown currency_code', function () {
+test('importRow() for vendors rejects an unknown CurrId', function () {
     $importer = ImportExportRegistry::importer('vendors');
 
     expect(fn () => $importer->importRow(
-        ['code' => 'met_vendor_2', 'name' => 'Test Vendor', 'currency_code' => 'no_such_currency'],
+        ['VendId' => 'met_vendor_2', 'VendName' => 'Test Vendor', 'CurrId' => 'no_such_currency'],
         metImportConfig('vendors')
     ))->toThrow(RowImportException::class);
+});
+
+test('importRow() for vendors maps ERP status, business type, address and English name', function () {
+    $importer = ImportExportRegistry::importer('vendors');
+    $importer->importRow([
+        'VendId' => 'met_vendor_3', 'VendName' => 'บริษัท ทดสอบ จำกัด', 'VendEName' => 'Test Co., Ltd.',
+        'VendStatus' => 'Inactive', 'VendType' => 'LocalVend', 'BusinessTypeName' => 'ในประเทศ',
+        'InvAddr1' => '17 ซอยเอกชัย 55', 'InvSubDistrict' => 'แขวงบางบอน', 'InvDistrict' => 'เขตบางบอน',
+        'InvProvince' => 'กรุงเทพมหานคร', 'InvZipcode' => '10150', 'InvCountry' => 'Thailand',
+        'VendLat' => '0', 'CreditLimit' => '1,500.50', 'CreateOn' => '2026-09-11 17:09:01.953051', 'RevisionNo' => '2',
+    ], metImportConfig('vendors'));
+
+    $vendor = Vendor::where('code', 'met_vendor_3')->first();
+    expect($vendor->is_active)->toBeFalse();
+    expect($vendor->vendor_group)->toBe('domestic');
+    expect($vendor->vendor_type)->toBe('LocalVend');
+    expect($vendor->tax_invoice_address_3)->toBe('แขวงบางบอน เขตบางบอน');
+    expect($vendor->tax_invoice_address_4)->toBe('กรุงเทพมหานคร 10150');
+    expect($vendor->invoice_zipcode)->toBe('10150');
+    expect($vendor->latitude)->toBeNull();
+    expect((float) $vendor->credit_limit)->toBe(1500.5);
+    // CreateOn ของ ERP ไม่เก็บ (ข้ามไป) — ไม่ทำให้นำเข้าพัง
+    expect($vendor->erp_revision_no)->toBe(2);
+
+    $english = $vendor->translations->firstWhere('locale_id', Locale::idForCode('en'));
+    expect($english?->label)->toBe('Test Co., Ltd.');
+});
+
+test('vendors export uses the same ERP columns the importer reads', function () {
+    expect(ImportExportRegistry::exporter('vendors')->columns())->toBe(ImportExportRegistry::importer('vendors')->columns());
+    expect(ImportExportRegistry::importer('vendors')->requiredColumns())->toBe(['VendId', 'VendName']);
 });
 
 test('importRow() rejects a malformed date column', function () {

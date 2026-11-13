@@ -24,6 +24,7 @@ use App\Models\ProductTypeTranslation;
 use App\Models\Vendor;
 use App\Models\VendorTranslation;
 use App\Services\Catalog\MasterAttributeOptionSync;
+use App\Services\Queue\QueueWorkerHeartbeat;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
@@ -52,6 +53,9 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         Event::subscribe(AuditAuthEventSubscriber::class);
+
+        // queue:work รายงานตัวลง queue_worker_heartbeats — หน้า "สถานะคิวงาน" (/system/queue)
+        QueueWorkerHeartbeat::register();
 
         // Gap-closer vs. the old "someone has to click Push" flow — auto-queues
         // a marketplace sync whenever a product changes in a way that already

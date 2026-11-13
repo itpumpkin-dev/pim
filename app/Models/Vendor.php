@@ -51,6 +51,26 @@ class Vendor extends Model
         'contact_country',
         'credit_term_days',
         'is_active',
+        // ฟิลด์จาก ERP Vendor Master — ดู migration add_erp_fields_to_vendors_table / VendorRowImporter
+        'vendor_type',
+        'image',
+        'latitude',
+        'longitude',
+        'invoice_address_code',
+        'invoice_name',
+        'invoice_sub_district',
+        'invoice_district',
+        'invoice_province',
+        'invoice_zipcode',
+        'invoice_country',
+        'payment_code',
+        'credit_limit',
+        'line_discount_rate',
+        'doc_discount_rate',
+        'contact_code',
+        'ship_remark',
+        'business_type_code',
+        'erp_revision_no',
     ];
 
     protected function casts(): array
@@ -58,6 +78,10 @@ class Vendor extends Model
         return [
             'is_active' => 'boolean',
             'credit_term_days' => 'integer',
+            'latitude' => 'decimal:7',
+            'longitude' => 'decimal:7',
+            'credit_limit' => 'decimal:2',
+            'erp_revision_no' => 'integer',
         ];
     }
 

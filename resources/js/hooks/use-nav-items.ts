@@ -310,6 +310,12 @@ export function useMainNavItems(): NavItem[] {
                         permission: 'activity_logs.list_activity_logs',
                         icon: 'history',
                     },
+                    {
+                        title: t('queueMonitor'),
+                        url: '/system/queue',
+                        permission: 'queue_jobs.list_queue_jobs',
+                        icon: 'process',
+                    },
                 ],
             },
         ],

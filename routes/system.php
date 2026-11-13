@@ -5,6 +5,7 @@ use App\Http\Controllers\System\DepartmentController;
 use App\Http\Controllers\System\JobPositionController;
 use App\Http\Controllers\System\LocaleController;
 use App\Http\Controllers\System\LocaleTranslationController;
+use App\Http\Controllers\System\QueueMonitorController;
 use App\Http\Controllers\System\RoleController;
 use App\Http\Controllers\System\TranslationProviderController;
 use App\Http\Controllers\System\UserController;
@@ -13,6 +14,12 @@ use Illuminate\Support\Facades\Route;
 
 Route::middleware(['auth'])->prefix('system')->name('system.')->group(function () {
     Route::get('activity-logs', [ActivityLogController::class, 'index'])->name('activityLogs.index')->middleware('permission:activity_logs,list_activity_logs');
+
+    // สถานะคิวงาน — worker ทำงานอยู่ไหม / งานค้าง / งานที่ล้มเหลว (QueueMonitorController)
+    Route::get('queue', [QueueMonitorController::class, 'index'])->name('queue.index')->middleware('permission:queue_jobs,list_queue_jobs');
+    Route::delete('queue/jobs/{id}', [QueueMonitorController::class, 'destroyJob'])->whereNumber('id')->name('queue.destroyJob')->middleware('permission:queue_jobs,manage_queue_jobs');
+    Route::post('queue/failed/{uuid}/retry', [QueueMonitorController::class, 'retryFailed'])->name('queue.retryFailed')->middleware('permission:queue_jobs,manage_queue_jobs');
+    Route::delete('queue/failed/{uuid}', [QueueMonitorController::class, 'destroyFailed'])->name('queue.destroyFailed')->middleware('permission:queue_jobs,manage_queue_jobs');
 
     Route::get('user', [UserController::class, 'index'])->name('user.index')->middleware('permission:users,list_users');
     Route::get('user/summary', [UserController::class, 'summary'])->name('user.summary')->middleware('permission:users,list_users');

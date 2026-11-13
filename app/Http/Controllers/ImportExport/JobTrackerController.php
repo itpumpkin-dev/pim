@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
 use App\Models\JobTracker;
 use App\Services\Catalog\AttributeAccessPolicy;
+use App\Services\Queue\QueueWorkerHeartbeat;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -43,7 +44,7 @@ class JobTrackerController extends Controller
         $jobTracker->load('user:id,username,first_name,last_name');
 
         return Inertia::render('import-export/jobs/show', [
-            'job' => $jobTracker,
+            'job' => $jobTracker->toArray() + ['queue_worker_alive' => QueueWorkerHeartbeat::aliveWorkerCount() > 0],
         ]);
     }
 
@@ -65,6 +66,8 @@ class JobTrackerController extends Controller
             'completed_at' => $jobTracker->completed_at?->toIso8601String(),
             'cancel_requested_at' => $jobTracker->cancel_requested_at?->toIso8601String(),
             'error_log' => $jobTracker->error_log,
+            // หน้า show เตือน "ไม่มี queue worker" ตอนงานยังรอคิว — ดู QueueWorkerHeartbeat
+            'queue_worker_alive' => $jobTracker->status === 'pending' ? QueueWorkerHeartbeat::aliveWorkerCount() > 0 : null,
         ]);
     }
 
