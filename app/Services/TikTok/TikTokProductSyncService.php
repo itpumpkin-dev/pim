@@ -386,7 +386,7 @@ class TikTokProductSyncService
 
         DB::table('product_platform_shops')->updateOrInsert(
             ['product_id' => $product->id, 'sales_platform_shop_id' => $shop->id],
-            ['status' => $isLive ? 'live' : null, 'platform_item_id' => (string) $productId, 'last_synced_at' => now(), 'updated_at' => now()]
+            ['status' => $isLive ? 'live' : null, 'platform_status' => $status, 'platform_item_id' => (string) $productId, 'last_synced_at' => now(), 'updated_at' => now()]
         );
 
         return ['is_live' => $isLive, 'never_pushed' => false, 'status' => $status];

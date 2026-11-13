@@ -40,7 +40,7 @@ class PlatformPushController extends Controller
         $shopIds = $shops->pluck('id');
 
         $pivot = DB::table('product_platform_shops')->where('product_id', $product->id)->whereIn('sales_platform_shop_id', $shopIds)
-            ->get(['sales_platform_shop_id', 'status', 'platform_item_id', 'last_synced_at'])->keyBy('sales_platform_shop_id');
+            ->get(['sales_platform_shop_id', 'status', 'platform_status', 'platform_item_id', 'last_synced_at'])->keyBy('sales_platform_shop_id');
         $known = (new MarketplaceSyncGate)->knownShopIds($product, $shops);
         $jobs = ProductMarketplaceSyncJob::where('product_id', $product->id)->whereIn('sales_platform_shop_id', $shopIds)
             ->orderByDesc('id')->limit(50)->get(['id', 'sales_platform_shop_id', 'action', 'status', 'message', 'created_at', 'updated_at']);
@@ -70,6 +70,7 @@ class PlatformPushController extends Controller
                 'published' => $pivot->has($shop->id),
                 'is_live' => ($pivot->get($shop->id)?->status ?? null) === 'live',
                 'live_synced_at' => $pivot->get($shop->id)?->last_synced_at,
+                'platform_status' => $pivot->get($shop->id)?->platform_status,
                 'platform_item_id' => $pivot->get($shop->id)?->platform_item_id,
                 'known' => in_array($shop->id, $known, true),
                 'last_job' => ($j = $lastJob->get($shop->id)) ? $job($j) : null,

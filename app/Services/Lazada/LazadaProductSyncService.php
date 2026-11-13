@@ -598,7 +598,7 @@ class LazadaProductSyncService
             DB::table('product_platform_shops')
                 ->where('product_id', $product->id)
                 ->where('sales_platform_shop_id', $shop->id)
-                ->update(['status' => null, 'last_synced_at' => now()]);
+                ->update(['status' => null, 'platform_status' => null, 'last_synced_at' => now()]);
 
             return ['is_live' => false, 'never_pushed' => true, 'status' => null];
         }
@@ -608,7 +608,7 @@ class LazadaProductSyncService
 
         DB::table('product_platform_shops')->updateOrInsert(
             ['product_id' => $product->id, 'sales_platform_shop_id' => $shop->id],
-            ['status' => $isLive ? 'live' : null, 'platform_item_id' => (string) $match['item_id'], 'last_synced_at' => now(), 'updated_at' => now()]
+            ['status' => $isLive ? 'live' : null, 'platform_status' => $status, 'platform_item_id' => (string) $match['item_id'], 'last_synced_at' => now(), 'updated_at' => now()]
         );
 
         return ['is_live' => $isLive, 'never_pushed' => false, 'status' => $status];
@@ -707,7 +707,7 @@ class LazadaProductSyncService
             ->where('sales_platform_shop_id', $shop->id)
             ->where('status', 'live')
             ->whereNotIn('product_id', $productIdBySku->values())
-            ->update(['status' => null, 'last_synced_at' => $now]);
+            ->update(['status' => null, 'platform_status' => null, 'last_synced_at' => $now]);
 
         return ['matched' => $productIdBySku->count(), 'total_live' => count($liveItemIdBySku)];
     }

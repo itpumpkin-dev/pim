@@ -2667,6 +2667,10 @@ class ProductController extends Controller
             ->get(['sales_platform_shop_id', 'last_synced_at'])
             ->keyBy('sales_platform_shop_id');
 
+        // ร้านที่สินค้านี้จับคู่ (Product Matching) แล้ว — ชุดเดียวกับ step Push
+        // (PlatformPushController) แผง Sales Channels ใช้คัดให้เห็นแค่ร้านที่ขายจริง
+        $matchedShopIds = (new MarketplaceSyncGate)->knownShopIds($product);
+
         // Channels without a shop (plain "Website" channels) always show —
         // only marketplace shops are subject to the role's shop restriction
         // (see User::canAccessShop()). Filtered before map() so a restricted
@@ -2680,7 +2684,7 @@ class ProductController extends Controller
 
                 return ! $shop || ($currentUser?->canAccessShop($shop) ?? true);
             })
-            ->map(function ($channel) use ($shopByChannelId, $liveStatusByShopId) {
+            ->map(function ($channel) use ($shopByChannelId, $liveStatusByShopId, $matchedShopIds) {
                 $shop = $shopByChannelId->get($channel['id']);
                 $liveStatus = $shop ? $liveStatusByShopId->get($shop->id) : null;
 
@@ -2692,6 +2696,7 @@ class ProductController extends Controller
                     'platform' => $shop?->platform?->name ?? 'Website',
                     'is_live' => $liveStatus !== null,
                     'live_synced_at' => $liveStatus?->last_synced_at,
+                    'matched' => $shop !== null && in_array($shop->id, $matchedShopIds, true),
                 ];
             })
             ->groupBy('platform')

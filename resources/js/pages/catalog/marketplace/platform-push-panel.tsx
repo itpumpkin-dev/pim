@@ -5,6 +5,7 @@ import { FioriResponsiveTable, type FioriResponsiveColumn } from '@/components/f
 import '@ui5/webcomponents-icons/dist/delete.js';
 import '@ui5/webcomponents-icons/dist/hide.js';
 import '@ui5/webcomponents-icons/dist/refresh.js';
+import '@ui5/webcomponents-icons/dist/show.js';
 import '@ui5/webcomponents-icons/dist/upload-to-cloud.js';
 import { Button, CheckBox, Link, ObjectStatus, Text, Toolbar, ToolbarSpacer } from '@ui5/webcomponents-react';
 import { useCallback, useEffect, useState } from 'react';
@@ -27,6 +28,8 @@ interface ShopRow {
     published: boolean;
     is_live: boolean;
     live_synced_at: string | null;
+    /** สถานะดิบจาก platform ที่ได้จากการกด "เช็คสถานะบนร้าน" ล่าสุด เช่น inactive / UNLIST / draft */
+    platform_status: string | null;
     platform_item_id: string | null;
     known: boolean;
     last_job: SyncJob | null;
@@ -89,6 +92,9 @@ export function PlatformPushPanel({
     const fs = useFullscreenPanel(`Push ไป ${platformLabel}`);
     const [loading, setLoading] = useState(false);
     const [busyShop, setBusyShop] = useState<number | null>(null);
+    // แยกจาก busyShop เพื่อให้ spinner ขึ้นที่ปุ่มเช็คสถานะ ไม่ใช่ปุ่ม Push
+    const [checkingShop, setCheckingShop] = useState<number | null>(null);
+    const [showAllShops, setShowAllShops] = useState(false);
     const [message, setMessage] = useState<{ severity: 'success' | 'error' | 'information'; text: string } | null>(null);
     const [reviewReady, setReviewReady] = useState(!isReviewablePlatform(platform));
     const [activated, setActivated] = useState(active);
@@ -101,7 +107,7 @@ export function PlatformPushPanel({
 
     const load = useCallback(() => {
         setLoading(true);
-        fetch(`/catalog/marketplace/products/${productId}/push/${platform}`, { headers: { Accept: 'application/json' } })
+        return fetch(`/catalog/marketplace/products/${productId}/push/${platform}`, { headers: { Accept: 'application/json' } })
             .then(async (res) => {
                 const body = await res.json();
                 if (!res.ok) throw new Error(body.message || 'โหลดสถานะไม่สำเร็จ');
@@ -210,6 +216,7 @@ export function PlatformPushPanel({
 
     const checkStatus = (shop: ShopRow) => {
         setBusyShop(shop.id);
+        setCheckingShop(shop.id);
         setMessage(null);
         fetch(`/catalog/products/${productId}/${routes.status}/${shop.id}`, { headers: { Accept: 'application/json' } })
             .then(async (res) => {
@@ -227,7 +234,8 @@ export function PlatformPushPanel({
             .catch((e: Error) => setMessage({ severity: 'error', text: e.message }))
             .finally(() => {
                 setBusyShop(null);
-                load();
+                // ปิด spinner หลังโหลดตารางใหม่เสร็จ ไม่งั้นค่าเก่าจะโผล่แวบหนึ่ง
+                load().finally(() => setCheckingShop(null));
             });
     };
 
@@ -306,9 +314,15 @@ export function PlatformPushPanel({
             priority: 'high',
             minWidth: 140,
             render: (shop) =>
-                shop.is_live ? (
+                checkingShop === shop.id ? (
+                    <ObjectStatus state="Information">กำลังเช็คสถานะ…</ObjectStatus>
+                ) : shop.is_live ? (
                     <ObjectStatus state="Positive" showDefaultIcon title={shop.live_synced_at ? `ยืนยัน ณ ${when(shop.live_synced_at)}` : undefined}>
                         Live
+                    </ObjectStatus>
+                ) : shop.platform_status ? (
+                    <ObjectStatus state="Critical" showDefaultIcon title={shop.live_synced_at ? `เช็ค ณ ${when(shop.live_synced_at)}` : undefined}>
+                        {`ไม่ Live (${shop.platform_status})`}
                     </ObjectStatus>
                 ) : (
                     <ObjectStatus state="None">ยังไม่ Live</ObjectStatus>
@@ -356,7 +370,8 @@ export function PlatformPushPanel({
             align: 'right',
             minWidth: 260,
             render: (shop) => {
-                const busy = busyShop === shop.id;
+                const checking = checkingShop === shop.id;
+                const busy = busyShop === shop.id && !checking;
                 const writable = canWrite && shop.published && busyShop === null;
                 return (
                     <span style={{ display: 'inline-flex', gap: '0.25rem', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
@@ -374,9 +389,11 @@ export function PlatformPushPanel({
                         <Button
                             design="Transparent"
                             icon="refresh"
-                            tooltip="เช็คสถานะบนร้าน"
+                            tooltip={checking ? 'กำลังเช็คสถานะบนร้าน…' : 'เช็คสถานะบนร้าน'}
                             accessibleName="เช็คสถานะบนร้าน"
                             disabled={!data?.can_push || busyShop !== null}
+                            loading={checking}
+                            loadingDelay={0}
                             onClick={() => checkStatus(shop)}
                         />
                         {shop.is_live && (
@@ -405,6 +422,15 @@ export function PlatformPushPanel({
             },
         },
     ];
+
+    // ร้านที่สินค้านี้เกี่ยวข้องจริง (ติ๊กเผยแพร่ / จับคู่แล้ว / Live หรือเช็คสถานะแล้ว / เคยส่งงาน)
+    // แสดงแค่นี้เป็นค่าเริ่มต้น ไม่งั้นทุกร้านของ platform ขึ้นมาหมดจนสับสน — ร้านอื่นกดดูเพิ่มได้
+    // ถ้ายังไม่เกี่ยวกับร้านไหนเลย (สินค้าใหม่) ก็แสดงทุกร้านให้เลือก
+    const allShops = data?.shops ?? [];
+    const relevantShops = allShops.filter((s) => s.published || s.known || s.is_live || s.platform_status || s.last_job);
+    const otherShopCount = allShops.length - relevantShops.length;
+    const filtering = relevantShops.length > 0 && otherShopCount > 0;
+    const visibleShops = filtering && !showAllShops ? relevantShops : allShops;
 
     const historyColumns: FioriResponsiveColumn<SyncJob>[] = [
         { key: 'when', header: 'เวลา', priority: 'always', minWidth: 150, render: (j) => <Text>{when(j.created_at)}</Text> },
@@ -465,10 +491,28 @@ export function PlatformPushPanel({
                 </FioriFormGroup>
             )}
 
-            <FioriFormGroup title={`ร้าน ${platformLabel}`}>
+            <FioriFormGroup
+                title={`ร้าน ${platformLabel}`}
+                description={
+                    filtering
+                        ? showAllShops
+                            ? `แสดงทุกร้าน (${allShops.length}) — รวม ${otherShopCount} ร้านที่สินค้านี้ยังไม่ได้ขาย`
+                            : `แสดงเฉพาะร้านที่สินค้านี้ขาย / จับคู่ไว้ (${relevantShops.length} จาก ${allShops.length} ร้าน)`
+                        : allShops.length > 0 && relevantShops.length === 0
+                          ? 'สินค้านี้ยังไม่ได้ขายบนร้านไหน — ติ๊ก "เผยแพร่" ร้านที่จะขาย'
+                          : undefined
+                }
+                actions={
+                    filtering && (
+                        <Button design="Transparent" icon={showAllShops ? 'hide' : 'show'} onClick={() => setShowAllShops((v) => !v)}>
+                            {showAllShops ? 'ซ่อนร้านที่ไม่เกี่ยวข้อง' : `แสดงร้านอื่นอีก ${otherShopCount} ร้าน`}
+                        </Button>
+                    )
+                }
+            >
                 <FioriResponsiveTable
                     columns={columns}
-                    rows={data?.shops ?? []}
+                    rows={visibleShops}
                     getRowKey={(s) => s.id}
                     loading={loading}
                     variant="plain"

@@ -399,7 +399,7 @@ class ShopeeProductSyncService
         DB::table('product_platform_shops')
             ->where('product_id', $product->id)
             ->where('sales_platform_shop_id', $shop->id)
-            ->update(['platform_item_id' => null, 'status' => null, 'updated_at' => now()]);
+            ->update(['platform_item_id' => null, 'status' => null, 'platform_status' => null, 'updated_at' => now()]);
 
         return $result;
     }
@@ -431,7 +431,7 @@ class ShopeeProductSyncService
 
         DB::table('product_platform_shops')->updateOrInsert(
             ['product_id' => $product->id, 'sales_platform_shop_id' => $shop->id],
-            ['status' => $isLive ? 'live' : null, 'platform_item_id' => (string) $itemId, 'last_synced_at' => now(), 'updated_at' => now()]
+            ['status' => $isLive ? 'live' : null, 'platform_status' => $status, 'platform_item_id' => (string) $itemId, 'last_synced_at' => now(), 'updated_at' => now()]
         );
 
         return ['is_live' => $isLive, 'never_pushed' => false, 'status' => $status];
@@ -482,7 +482,7 @@ class ShopeeProductSyncService
             ->where('sales_platform_shop_id', $shop->id)
             ->where('status', 'live')
             ->whereNotIn('platform_item_id', $liveItemIds)
-            ->update(['status' => null, 'last_synced_at' => $now]);
+            ->update(['status' => null, 'platform_status' => null, 'last_synced_at' => $now]);
 
         return ['matched' => $matched, 'total_live' => count($liveItemIds)];
     }

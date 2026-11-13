@@ -387,7 +387,7 @@ class WooCommerceProductSyncService
             DB::table('product_platform_shops')
                 ->where('product_id', $product->id)
                 ->where('sales_platform_shop_id', $shop->id)
-                ->update(['status' => null, 'last_synced_at' => now()]);
+                ->update(['status' => null, 'platform_status' => null, 'last_synced_at' => now()]);
 
             return ['is_live' => false, 'never_pushed' => true, 'status' => null];
         }
@@ -396,7 +396,7 @@ class WooCommerceProductSyncService
 
         DB::table('product_platform_shops')->updateOrInsert(
             ['product_id' => $product->id, 'sales_platform_shop_id' => $shop->id],
-            ['status' => $isLive ? 'live' : null, 'platform_item_id' => (string) $existing['id'], 'last_synced_at' => now(), 'updated_at' => now()]
+            ['status' => $isLive ? 'live' : null, 'platform_status' => $existing['status'] ?? null, 'platform_item_id' => (string) $existing['id'], 'last_synced_at' => now(), 'updated_at' => now()]
         );
 
         return ['is_live' => $isLive, 'never_pushed' => false, 'status' => $existing['status'] ?? null];
@@ -419,7 +419,7 @@ class WooCommerceProductSyncService
 
         DB::table('product_platform_shops')->updateOrInsert(
             ['product_id' => $product->id, 'sales_platform_shop_id' => $shop->id],
-            ['status' => $isLive ? 'live' : null, 'platform_item_id' => (string) $id, 'last_synced_at' => now(), 'updated_at' => now()]
+            ['status' => $isLive ? 'live' : null, 'platform_status' => $result['status'] ?? null, 'platform_item_id' => (string) $id, 'last_synced_at' => now(), 'updated_at' => now()]
         );
     }
 }

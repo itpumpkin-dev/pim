@@ -192,6 +192,8 @@ interface ChannelOption {
     shop_id?: number | null;
     is_live?: boolean;
     live_synced_at?: string | null;
+    /** สินค้านี้จับคู่ (Product Matching) กับร้านนี้แล้ว — MarketplaceSyncGate::knownShopIds() */
+    matched?: boolean;
 }
 
 interface ChannelGroup {
@@ -512,6 +514,8 @@ export default function ProductEdit({
     // หน้าคือ "Default (All Channels)" (ดู activeChannelId ด้านบน) ซึ่งไม่ได้
     // อยู่ใน platform group ไหนเลย เลยไม่มีกลุ่มไหนที่ควรกางไว้เป็น "ตัวที่ active" อีกต่อไป
     const [expandedPlatforms, setExpandedPlatforms] = useState<Set<string>>(new Set());
+    // platform ที่กด "แสดงร้านอื่น" ไว้ — ปกติแสดงแค่ร้านที่จับคู่แล้ว (ดู visibleShops ในแผง Sales Channels)
+    const [showAllShopsFor, setShowAllShopsFor] = useState<Set<string>>(new Set());
     const togglePlatform = (platform: string) => {
         setExpandedPlatforms((prev) => {
             const next = new Set(prev);
@@ -2760,8 +2764,22 @@ export default function ProductEdit({
                                                 >
                                                     {channelGroups.map((group) => {
                                                         const isExpanded = expandedPlatforms.has(group.platform);
-                                                        const shops = group.channels.filter((ch) => ch.shop_id != null);
+                                                        const allShops = group.channels.filter((ch) => ch.shop_id != null);
+                                                        // แสดงเฉพาะร้านที่สินค้านี้จับคู่แล้ว (+ ร้านที่ติ๊กไว้ จะได้ไม่มีร้านที่ติ๊กแต่มองไม่เห็น)
+                                                        // ร้านอื่นกด "แสดงร้านอื่น" ได้ — ถ้ายังไม่จับคู่กับร้านไหนเลยก็แสดงทุกร้าน
+                                                        // นับทั้งที่บันทึกไว้ (publishedShopIds) ด้วย ไม่งั้นเอาติ๊กออกแล้วแถวหายไปทันที
+                                                        const relevantShops = allShops.filter(
+                                                            (ch) =>
+                                                                ch.matched ||
+                                                                data.published_shop_ids.includes(ch.shop_id as number) ||
+                                                                publishedShopIds.includes(ch.shop_id as number),
+                                                        );
+                                                        const hiddenShopCount = allShops.length - relevantShops.length;
+                                                        const filteringShops = allShops.some((ch) => ch.matched) && hiddenShopCount > 0;
+                                                        const showingAllShops = showAllShopsFor.has(group.platform);
+                                                        const shops = filteringShops && !showingAllShops ? relevantShops : allShops;
                                                         const groupShopIds = shops.map((ch) => ch.shop_id as number);
+                                                        const totalShopCount = allShops.length;
                                                         const checkedInGroup = groupShopIds.filter((id) =>
                                                             data.published_shop_ids.includes(id),
                                                         ).length;
@@ -2769,7 +2787,7 @@ export default function ProductEdit({
                                                         const someInGroupChecked = checkedInGroup > 0 && !allInGroupChecked;
                                                         // แผงนี้เหลือแค่ "ติ๊กร้านที่จะขาย + Push" แล้ว — แพลตฟอร์มที่ไม่มีร้านให้ติ๊ก
                                                         // เลย (channel ล้วนๆ) ไม่มีอะไรให้ทำในแผงนี้ (เลือกแก้ค่าได้ที่ dropdown บนแถบเครื่องมือ)
-                                                        if (groupShopIds.length === 0) return null;
+                                                        if (totalShopCount === 0) return null;
 
                                                         return (
                                                             <Panel
@@ -2819,8 +2837,10 @@ export default function ProductEdit({
                                                                             size="S"
                                                                         >
                                                                             {t('publishedCountLabel', {
-                                                                                checked: checkedInGroup,
-                                                                                total: groupShopIds.length,
+                                                                                checked: data.published_shop_ids.filter((id) =>
+                                                                                    allShops.some((ch) => ch.shop_id === id),
+                                                                                ).length,
+                                                                                total: totalShopCount,
                                                                             })}
                                                                         </Tag>
                                                                     </div>
@@ -2921,6 +2941,27 @@ export default function ProductEdit({
                                                                         );
                                                                     })}
                                                                 </List>
+                                                                {filteringShops && (
+                                                                    <div style={{ padding: '0.5rem 1rem', display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                                                                        <Label wrappingType="Normal" style={{ color: 'var(--sapContent_LabelColor)' }}>
+                                                                            {showingAllShops
+                                                                                ? `แสดงทุกร้าน (${totalShopCount})`
+                                                                                : `แสดงเฉพาะร้านที่จับคู่สินค้าแล้ว (${relevantShops.length} จาก ${totalShopCount} ร้าน)`}
+                                                                        </Label>
+                                                                        <Link
+                                                                            onClick={() =>
+                                                                                setShowAllShopsFor((prev) => {
+                                                                                    const next = new Set(prev);
+                                                                                    if (next.has(group.platform)) next.delete(group.platform);
+                                                                                    else next.add(group.platform);
+                                                                                    return next;
+                                                                                })
+                                                                            }
+                                                                        >
+                                                                            {showingAllShops ? 'ซ่อนร้านที่ยังไม่จับคู่' : `แสดงร้านอื่นอีก ${hiddenShopCount} ร้าน`}
+                                                                        </Link>
+                                                                    </div>
+                                                                )}
                                                             </Panel>
                                                         );
                                                     })}
