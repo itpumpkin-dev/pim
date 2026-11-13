@@ -22,6 +22,8 @@ import {
     Link,
     ObjectStatus,
     Option,
+    SegmentedButton,
+    SegmentedButtonItem,
     Select,
     Table,
     TableCell,
@@ -31,6 +33,7 @@ import {
     Text,
     Title,
 } from '@ui5/webcomponents-react';
+import { router } from '@inertiajs/react';
 import { forwardRef, useEffect, useState, type CSSProperties, type ReactNode } from 'react';
 
 import styles from './marketplace.module.css';
@@ -106,6 +109,64 @@ export function PageHeader({ title, subtitle, actions }: { title: ReactNode; sub
             </div>
             {actions}
         </div>
+    );
+}
+
+export type MappingPlatform = 'lazada' | 'shopee' | 'tiktok' | 'woocommerce';
+export const MAPPING_PLATFORM_LABEL: Record<MappingPlatform, string> = { lazada: 'Lazada', shopee: 'Shopee', tiktok: 'TikTok', woocommerce: 'WooCommerce' };
+const MAPPING_PLATFORM_ORDER: MappingPlatform[] = ['lazada', 'shopee', 'tiktok', 'woocommerce'];
+const LAST_MAPPING_PLATFORM_KEY = 'marketplace.productMapping.lastPlatform';
+
+/** platform ล่าสุดที่เปิดหน้า สินค้า (Product Mapping) — ปุ่มบน Product Master ("ทุก platform") พาเข้าตัวนี้ตรงๆ */
+export function lastMappingPlatform(): MappingPlatform {
+    try {
+        const v = localStorage.getItem(LAST_MAPPING_PLATFORM_KEY) as MappingPlatform | null;
+        if (v && MAPPING_PLATFORM_ORDER.includes(v)) return v;
+    } catch {
+        // storage ใช้ไม่ได้ (private window ฯลฯ) — ใช้ค่าเริ่มต้น
+    }
+    return 'lazada';
+}
+
+/**
+ * ตัวสลับ platform บนหัวหน้า สินค้า (Product Mapping) — 4 หน้าแยกกันต่อ platform อยู่แล้ว ตัวนี้แค่พาไปหน้า
+ * platform อื่นโดยพก ?ids= (PIM product id ที่เลือกมาจาก Product Master — ความหมายเดียวกันทุก platform)
+ * และ ?search= ติดไปด้วย จะได้ไม่ต้องเลือก platform ตั้งแต่หน้า Product Master
+ */
+export function MappingPlatformSwitch({ current }: { current: MappingPlatform }) {
+    useEffect(() => {
+        try {
+            localStorage.setItem(LAST_MAPPING_PLATFORM_KEY, current);
+        } catch {
+            // ไม่สำคัญ — แค่จำไว้ให้ครั้งหน้า
+        }
+    }, [current]);
+
+    const go = (platform: MappingPlatform) => {
+        if (platform === current) return;
+        const from = new URLSearchParams(window.location.search);
+        const params = new URLSearchParams();
+        for (const key of ['ids', 'search']) {
+            const v = from.get(key);
+            if (v) params.set(key, v);
+        }
+        router.visit(`/catalog/marketplace/${platform}/products${params.size ? `?${params}` : ''}`);
+    };
+
+    return (
+        <SegmentedButton
+            accessibleName="Platform"
+            onSelectionChange={(e) => {
+                const p = (e.detail.selectedItems[0] as HTMLElement | undefined)?.dataset.platform as MappingPlatform | undefined;
+                if (p) go(p);
+            }}
+        >
+            {MAPPING_PLATFORM_ORDER.map((p) => (
+                <SegmentedButtonItem key={p} data-platform={p} selected={p === current}>
+                    {MAPPING_PLATFORM_LABEL[p]}
+                </SegmentedButtonItem>
+            ))}
+        </SegmentedButton>
     );
 }
 

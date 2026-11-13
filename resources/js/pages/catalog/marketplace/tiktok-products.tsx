@@ -53,6 +53,7 @@ import {
     useMediaQuery,
     ValueRows,
     VStack,
+    MappingPlatformSwitch,
 } from './marketplace-ui';
 import styles from './marketplace.module.css';
 import { MatchedListingCell, type ProductMatching } from './matched-listing-cell';
@@ -1668,13 +1669,16 @@ export default function TikTokProductsMapping({ products, stats, filters }: Prop
                     title={`สินค้า (${products.total})`}
                     subtitle="จัดการการแมปหมวดหมู่และ Attributes ของ TikTok ตั้งแต่ระดับสินค้า"
                     actions={
-                        <Button
-                            design="Transparent"
-                            icon="nav-back"
-                            onClick={() => router.visit('/catalog/marketplace/product-master?platform=tiktok')}
-                        >
-                            TikTok Hub
-                        </Button>
+                        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                            <MappingPlatformSwitch current="tiktok" />
+                            <Button
+                                design="Transparent"
+                                icon="nav-back"
+                                onClick={() => router.visit('/catalog/marketplace/product-master?platform=tiktok')}
+                            >
+                                TikTok Hub
+                            </Button>
+                        </div>
                     }
                 />
 

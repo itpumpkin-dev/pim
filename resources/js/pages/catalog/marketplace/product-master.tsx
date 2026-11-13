@@ -9,7 +9,6 @@ import '@ui5/webcomponents-icons/dist/chain-link.js';
 import '@ui5/webcomponents-icons/dist/decline.js';
 import '@ui5/webcomponents-icons/dist/detail-view.js';
 import '@ui5/webcomponents-icons/dist/product.js';
-import '@ui5/webcomponents-icons/dist/slim-arrow-down.js';
 import '@ui5/webcomponents-icons/dist/status-positive.js';
 import {
     Avatar,
@@ -17,8 +16,6 @@ import {
     Icon,
     Label,
     Link,
-    Menu,
-    MenuItem,
     ObjectStatus,
     Option,
     SegmentedButton,
@@ -28,7 +25,7 @@ import {
 } from '@ui5/webcomponents-react';
 import { useEffect, useRef, useState } from 'react';
 
-import { PageHeader, Pager, SearchField } from './marketplace-ui';
+import { PageHeader, Pager, SearchField, lastMappingPlatform } from './marketplace-ui';
 import styles from './marketplace.module.css';
 import { ProductMatchingDetailDialog } from './product-matching-detail-dialog';
 
@@ -102,7 +99,6 @@ export default function ProductMaster({ platforms, shops, rows, stats, filters }
     const { auth } = usePage<SharedData>().props;
     const canEdit = (auth.permissions || []).includes('products.edit_products');
     const pageUrl = '/catalog/marketplace/product-master';
-    const [mappingMenuOpener, setMappingMenuOpener] = useState<HTMLElement | null>(null);
     // แถวที่ติ๊กไว้ (คงไว้ข้ามหน้า/ข้ามการกรอง) — เก็บ platform + PIM product ids ไว้ด้วย เพราะแถวจาก
     // หน้าอื่นไม่อยู่ใน rows.data แล้ว ปุ่ม จับคู่สินค้า / Product Mapping ส่งเป็น ?ids= ให้หน้าปลายทาง
     // กรองเฉพาะสินค้านั้นทันที ไม่ต้องค้นหาซ้ำ (ไม่ติ๊กอะไร = เปิดแบบแสดงทั้งหมดตามปกติ)
@@ -115,20 +111,22 @@ export default function ProductMaster({ platforms, shops, rows, stats, filters }
                 .flatMap((s) => s.mapping_ids),
         ),
     ];
-    // ติ๊กไว้ → เมนู Product Mapping เหลือแค่ platform ของแถวที่เลือก (ที่มีสินค้าใน PIM)
-    const selectedPlatforms = [
-        ...new Set(
-            Object.values(selected)
-                .filter((s) => s.mapping_ids.length > 0)
-                .map((s) => s.platform),
-        ),
-    ];
-    const mappingPlatforms: Platform[] =
-        selectedIds.length > 0
-            ? MAPPING_PLATFORMS.filter((p) => selectedPlatforms.includes(p))
-            : filters.platform
-              ? [filters.platform]
-              : MAPPING_PLATFORMS;
+    // ปุ่ม Product Mapping พาเข้าหน้าเลยไม่ต้องเลือก platform ก่อน (สลับ platform ได้ที่หัวหน้านั้น —
+    // MappingPlatformSwitch): ติ๊กไว้ → platform ที่มีแถวที่เลือกมากสุด / กรอง platform อยู่ → ตัวนั้น /
+    // "ทุก platform" → ตัวที่เปิดล่าสุด ส่ง ids ของทุกแถวที่ติ๊กไป (เป็น PIM product id ใช้ได้ทุก platform)
+    const targetMappingPlatform = (): Platform => {
+        if (selectedIds.length > 0) {
+            const counts = new Map<Platform, number>();
+            Object.values(selected).forEach((s) => {
+                const p = s.platform as Platform;
+                if (s.mapping_ids.length > 0 && MAPPING_PLATFORMS.includes(p)) counts.set(p, (counts.get(p) ?? 0) + 1);
+            });
+            const best = [...counts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0];
+            if (best) return best;
+        }
+        if (filters.platform && MAPPING_PLATFORMS.includes(filters.platform)) return filters.platform;
+        return lastMappingPlatform();
+    };
 
     const onSelectionChange = (keys: string[]) => {
         setSelected((prev) => {
@@ -149,7 +147,7 @@ export default function ProductMaster({ platforms, shops, rows, stats, filters }
         router.visit(`/catalog/marketplace/product-matching${params.size ? `?${params}` : ''}`);
     };
     const goToMapping = (platform: Platform) => {
-        const ids = selectedMappingIds(platform);
+        const ids = selectedMappingIds();
         router.visit(`/catalog/marketplace/${platform}/products${selectedIds.length > 0 && ids.length > 0 ? `?ids=${ids.join(',')}` : ''}`);
     };
 
@@ -352,44 +350,18 @@ export default function ProductMaster({ platforms, shops, rows, stats, filters }
                             <Button
                                 design="Emphasized"
                                 icon="product"
-                                endIcon={mappingPlatforms.length === 1 ? undefined : 'slim-arrow-down'}
                                 disabled={selectedIds.length > 0 && selectedMappingIds().length === 0}
                                 tooltip={
                                     selectedIds.length > 0 && selectedMappingIds().length === 0
                                         ? 'สินค้าที่เลือกยังไม่ได้จับคู่กับ PIM — ไม่มีสินค้าให้แมพ (จับคู่ก่อน)'
-                                        : undefined
+                                        : 'สลับ platform ได้ที่หน้าถัดไป'
                                 }
-                                onClick={(e) =>
-                                    mappingPlatforms.length === 1
-                                        ? goToMapping(mappingPlatforms[0])
-                                        : setMappingMenuOpener(e.currentTarget as HTMLElement)
-                                }
+                                onClick={() => goToMapping(targetMappingPlatform())}
                             >
                                 สินค้า (Product Mapping)
-                                {mappingPlatforms.length === 1 ? ` · ${PLATFORM_LABEL[mappingPlatforms[0]]}` : ''}
+                                {filters.platform ? ` · ${PLATFORM_LABEL[filters.platform]}` : ''}
                                 {selectedIds.length > 0 && selectedMappingIds().length > 0 ? ` (${number(selectedMappingIds().length)})` : ''}
                             </Button>
-                            <Menu
-                                open={mappingMenuOpener !== null}
-                                opener={mappingMenuOpener ?? undefined}
-                                headerText="สินค้า (Product Mapping) — เลือก platform"
-                                horizontalAlign="End"
-                                onClose={() => setMappingMenuOpener(null)}
-                                onItemClick={(e) => {
-                                    const p = (e.detail.item as HTMLElement).dataset.platform as Platform | undefined;
-                                    setMappingMenuOpener(null);
-                                    if (p) goToMapping(p);
-                                }}
-                            >
-                                {mappingPlatforms.map((p) => (
-                                    <MenuItem
-                                        key={p}
-                                        data-platform={p}
-                                        text={PLATFORM_LABEL[p]}
-                                        additionalText={selectedIds.length > 0 ? `${number(selectedMappingIds(p).length)} สินค้า` : undefined}
-                                    />
-                                ))}
-                            </Menu>
                         </div>
                     }
                 />
