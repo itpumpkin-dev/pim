@@ -10,7 +10,6 @@ use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Middleware\AddLinkHeadersForPreloadedAssets;
-use Illuminate\Http\Middleware\TrustProxies;
 use Illuminate\Http\Request;
 use Sentry\Laravel\Integration;
 use Symfony\Component\HttpFoundation\Response;
@@ -38,7 +37,11 @@ return Application::configure(basePath: dirname(__DIR__))
             SetLocale::class,
             EnsureFreshPermissions::class,
             HandleInertiaRequests::class,
-            AddLinkHeadersForPreloadedAssets::class,
+            // capped: a full page load of a chunk-heavy page (product edit: 60+ chunks) made one `Link`
+            // header > 8 KB, which Apache's proxy_fcgi can't parse — "Premature end of script headers" →
+            // empty 500 (2026-11-13). Every chunk is still preloaded by the <link rel="modulepreload">
+            // tags @vite writes into the HTML; the header only hints the first ones early.
+            AddLinkHeadersForPreloadedAssets::using(20),
         ]);
 
         $middleware->alias([
