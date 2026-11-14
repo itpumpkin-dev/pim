@@ -1568,33 +1568,32 @@ class ProductController extends Controller
 
                     $childProduct->applySmartDefaults();
 
+                    // updateOrCreate (ไม่ใช่ create) — applySmartDefaults() เขียน pid/pname ไปแล้ว และ
+                    // attributes ของ combination อาจซ้ำกับ price/qty ได้ ถ้า create ซ้ำ scope เดิมจะชน
+                    // uq_product_values_scope เป็น 500
+                    $variantScope = fn ($attributeId) => [
+                        'product_id' => $childProduct->id,
+                        'attribute_id' => $attributeId,
+                        'attribute_group_id' => null,
+                        'channel_id' => null,
+                        'locale_id' => null,
+                    ];
+
                     // บันทึกราคา
                     if ($priceAttr && isset($variantData['price']) && $variantData['price'] !== '') {
-                        ProductValue::create([
-                            'product_id' => $childProduct->id,
-                            'attribute_id' => $priceAttr->id,
-                            'value' => (string) $variantData['price'],
-                        ]);
+                        ProductValue::updateOrCreate($variantScope($priceAttr->id), ['value' => (string) $variantData['price']]);
                     }
 
                     // บันทึกจำนวน
                     if ($qtyAttr && isset($variantData['qty']) && $variantData['qty'] !== '') {
-                        ProductValue::create([
-                            'product_id' => $childProduct->id,
-                            'attribute_id' => $qtyAttr->id,
-                            'value' => (string) $variantData['qty'],
-                        ]);
+                        ProductValue::updateOrCreate($variantScope($qtyAttr->id), ['value' => (string) $variantData['qty']]);
                     }
 
                     // บันทึก attribute ของ combination (เช่น รหัส/ID ของสี, ไซซ์)
                     if (! empty($variantData['attributes'])) {
                         foreach ($variantData['attributes'] as $attrId => $attrVal) {
                             if ($attrVal !== null && $attrVal !== '') {
-                                ProductValue::create([
-                                    'product_id' => $childProduct->id,
-                                    'attribute_id' => $attrId,
-                                    'value' => (string) $attrVal,
-                                ]);
+                                ProductValue::updateOrCreate($variantScope($attrId), ['value' => (string) $attrVal]);
                             }
                         }
                     }

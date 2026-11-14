@@ -131,6 +131,8 @@ class BackfillProductValueAttributeGroupsCommand extends Command
             $map[$row->attribute_id][] = $row->attribute_group_id;
         }
 
-        return $map;
+        // group เดียวกันต้องได้แถวเดียว — group ซ้ำในลิสต์ทำให้ copy แถวเข้า group เดิมซ้ำๆ
+        // (ต้นเหตุแถวซ้ำที่ pim:dedupe-product-values ต้องตามล้าง และตอนนี้ชน uq_product_values_scope)
+        return array_map(fn (array $groupIds) => array_values(array_unique($groupIds)), $map);
     }
 }
