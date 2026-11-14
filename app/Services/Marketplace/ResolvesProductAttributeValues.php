@@ -44,21 +44,33 @@ trait ResolvesProductAttributeValues
         $resolver = app(EffectiveFamilyAttributeResolver::class);
         $groupId = $resolver->primaryGroupIdFor($attribute->id, $resolver->effectiveFamilyIds($product));
 
-        $lookup = fn (?int $forChannelId) => ProductValue::where('product_id', $product->id)
+        $lookup = fn (?int $forChannelId, ?int $forLocaleId) => ProductValue::where('product_id', $product->id)
             ->where('attribute_id', $attribute->id)
             ->where('attribute_group_id', $groupId)
             ->where('channel_id', $forChannelId)
-            ->where('locale_id', $localeId)
+            ->where('locale_id', $forLocaleId)
             ->value('value');
 
-        $raw = $lookup($attribute->is_channel_based ? $channelId : null);
+        $raw = $lookup($attribute->is_channel_based ? $channelId : null, $localeId);
 
         // A channel with no value of its own falls back to the product's
         // Default (channel_id = null) — set via the Edit Product page's
         // "Default (All Channels)" scope, so it actually acts as a default
         // instead of just being data nobody reads.
         if ($raw === null && $attribute->is_channel_based && $channelId !== null) {
-            $raw = $lookup(null);
+            $raw = $lookup(null, $localeId);
+        }
+
+        // แถว locale_id = NULL คือเนื้อหาภาษาไทย (bulk import เขียนลงแถวนี้เสมอ — ดู
+        // ProductController::foldGlobalValueIntoThai()) ถ้าไม่มีแถว th ของตัวเองให้ใช้แถวนี้แทน
+        // ไม่งั้นสินค้าที่ import มาจะ push ชื่อ/รายละเอียดว่าง ภาษาอื่น (en ฯลฯ) ไม่ fallback
+        // ไม่งั้นจะส่งข้อความไทยไปในช่องภาษาอังกฤษ
+        if ($raw === null && $localeId !== null && $localeCode === 'th') {
+            $raw = $lookup($attribute->is_channel_based ? $channelId : null, null);
+
+            if ($raw === null && $attribute->is_channel_based && $channelId !== null) {
+                $raw = $lookup(null, null);
+            }
         }
 
         return AttributeValueFormatter::format($attribute, $raw);

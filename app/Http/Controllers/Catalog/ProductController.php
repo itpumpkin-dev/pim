@@ -4024,7 +4024,7 @@ class ProductController extends Controller
                         }
 
                         foreach ($localeValues as $localeKey => $val) {
-                            $localeId = $localeKey === 'default' ? null : $localeKey;
+                            $localeId = $localeKey === 'default' || ! $attribute->is_locale_based ? null : $localeKey;
                             $isEmpty = $val === null || $val === '' || (is_array($val) && empty($val));
 
                             if ($attribute->is_required && $isEmpty) {
@@ -4124,7 +4124,9 @@ class ProductController extends Controller
                         }
 
                         foreach ($localeValues as $localeKey => $val) {
-                            $localeId = $localeKey === 'default' ? null : $localeKey;
+                            // attribute ที่ไม่แยกภาษาเก็บแถว NULL แถวเดียวเสมอ — กันแท็บที่เปิดค้างไว้ก่อนปิด
+                            // is_locale_based (pim:normalize-locale-values) ส่งค่ามาใต้ key ภาษาแล้วสร้างแถวรายภาษากลับมา
+                            $localeId = $localeKey === 'default' || ! $attribute->is_locale_based ? null : $localeKey;
 
                             // เมื่อก่อนไฟล์อัปโหลดที่ถูกแทนที่จะค้างอยู่บน disk ตลอดไป —
                             // เก็บค่าที่บันทึกไว้ก่อนหน้าการเขียนครั้งนี้ไว้ก่อน เพื่อจะได้
