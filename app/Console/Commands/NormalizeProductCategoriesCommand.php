@@ -5,7 +5,6 @@ namespace App\Console\Commands;
 use App\Models\Attribute;
 use App\Models\Category;
 use App\Models\Product;
-use App\Services\Catalog\ProductCategoryLinker;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -83,7 +82,10 @@ class NormalizeProductCategoriesCommand extends Command
         $codeOf = array_flip($this->attributeIds);
         $changedProductIds = [];
 
-        Product::query()->orderBy('id')->chunkById(500, function ($products) use ($categoryIdByCode, $codeOf, &$changedProductIds) {
+        $progress = $this->output->createProgressBar(Product::count());
+        $progress->start();
+
+        Product::query()->orderBy('id')->chunkById(500, function ($products) use ($categoryIdByCode, $codeOf, &$changedProductIds, $progress) {
             $links = DB::table('product_category')->whereIn('product_id', $products->pluck('id'))->get()
                 ->groupBy('product_id')->map(fn ($rows) => $rows->pluck('category_id')->map(fn ($id) => (int) $id)->all());
             $values = DB::table('product_values')->whereIn('product_id', $products->pluck('id'))
@@ -112,7 +114,11 @@ class NormalizeProductCategoriesCommand extends Command
             };
 
             $this->dryRun ? $apply() : DB::transaction($apply);
+            $progress->advance($products->count());
         });
+
+        $progress->finish();
+        $this->newLine(2);
 
         $this->report();
 
@@ -254,7 +260,10 @@ class NormalizeProductCategoriesCommand extends Command
             return;
         }
 
-        $expected = ProductCategoryLinker::legacyCodesFromCategories($target);
+        // เหมือน ProductCategoryLinker::legacyCodesFromCategories() แต่ใช้หมวดที่โหลดไว้แล้ว — ตัวนั้นโหลด
+        // categories ทั้งตารางใหม่ทุกครั้งที่เรียก (ต่อสินค้า 1 ตัว) ทำให้คำสั่งช้ามากบนสินค้าหลายพันตัว
+        $levelCode = fn (int $level) => isset($target[$level]) ? strtolower(trim($this->categoriesById[$target[$level]]->code)) : null;
+        $expected = ['pcatid' => $levelCode(0), 'pcatname' => $levelCode(0), 'psubcatname' => $levelCode(1), 'productgroupname' => $levelCode(2)];
         $changed = false;
 
         foreach (self::CODE_ATTRIBUTES as $code) {
