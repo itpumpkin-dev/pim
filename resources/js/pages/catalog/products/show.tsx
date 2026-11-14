@@ -1,4 +1,3 @@
-import { FioriFormGroup } from '@/components/fiori-form';
 import { FioriPdfViewer } from '@/components/fiori-pdf-viewer';
 import { FioriResponsiveColumn, FioriResponsiveTable } from '@/components/fiori-responsive-table';
 import { HistoryPanel } from '@/components/history-panel';
@@ -11,19 +10,35 @@ import { isProductStatus, PRODUCT_STATUS_LABEL_KEYS, PRODUCT_STATUS_TONES } from
 import { type BreadcrumbItem } from '@/types';
 import { Head, router } from '@inertiajs/react';
 import '@ui5/webcomponents-icons/dist/action-settings.js';
-import '@ui5/webcomponents-icons/dist/calendar.js';
 import '@ui5/webcomponents-icons/dist/edit.js';
 import '@ui5/webcomponents-icons/dist/nav-back.js';
 import '@ui5/webcomponents-icons/dist/popup-window.js';
+import '@ui5/webcomponents-icons/dist/product.js';
 import '@ui5/webcomponents-icons/dist/slim-arrow-down.js';
-import '@ui5/webcomponents-icons/dist/slim-arrow-right.js';
-import { Button, Icon, Menu, MenuItem, MenuItemGroup, Tab, TabContainer, Tag, Title } from '@ui5/webcomponents-react';
-import { type ReactNode, useEffect, useRef, useState } from 'react';
+import {
+    Avatar,
+    Button,
+    Form,
+    FormItem,
+    Label,
+    Menu,
+    MenuItem,
+    MenuItemGroup,
+    ObjectPage,
+    ObjectPageHeader,
+    ObjectPageSection,
+    type ObjectPageSectionPropTypes,
+    ObjectPageTitle,
+    Tag,
+    Text,
+    Title,
+    Toolbar,
+    ToolbarButton,
+} from '@ui5/webcomponents-react';
+import { type ReactElement, type ReactNode, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import styles from './show.module.css';
-
-const LOCALE_BUTTON_ID = 'product-show-locale-button';
 
 interface AttributeOption {
     id: number;
@@ -282,33 +297,41 @@ function RenderAttributeValue({ attr, value }: { attr: AttributeItem; value: str
     return <span className={styles.bodyText}>{value}</span>;
 }
 
-// ระยะเว้นด้านบนของแต่ละ section ตอนเลื่อนไปหา — เท่ากับหน้าแก้ไข (edit.tsx)
-const GROUP_SECTION_SCROLL_MARGIN = 80;
+/**
+ * แอตทริบิวต์ที่ค่ายาว/เป็นสื่อ — แยกไปอยู่ฟอร์มคอลัมน์เดียวใต้ฟอร์มหลัก เพราะ UI5 Form ที่ไม่มี
+ * FormGroup จัดวางด้วย CSS column-count และไม่สน FormItem.columnSpan เลย (ใช้ได้เฉพาะกับ FormGroup)
+ * ถ้าอยู่ฟอร์มเดียวกัน rich text / gallery / PDF จะถูกอัดอยู่ในคอลัมน์แคบๆ คอลัมน์เดียว
+ */
+const WIDE_ATTRIBUTE_TYPES = new Set(['textarea', 'gallery', 'video', 'file']);
 
-/** แถว "ป้าย + ค่า" ของแผงข้อมูลสินค้าด้านขวา */
-function InfoRow({ label, children }: { label: ReactNode; children: ReactNode }) {
+// ฟอร์มแบบแสดงผล (Display) ของ Fiori: ป้ายอยู่เหนือค่า, 2–3 คอลัมน์บนจอกว้าง
+const FORM_LAYOUT = 'S1 M2 L2 XL3';
+const WIDE_FORM_LAYOUT = 'S1 M1 L1 XL1';
+const FORM_LABEL_SPAN = 'S12 M12 L12 XL12';
+
+const HISTORY_SECTION_ID = 'section-history';
+
+/** "ป้าย + ค่า" หนึ่งชุดในพื้นที่ header ของ Object Page (Fiori: header facet แบบ key-value) */
+function HeaderFact({ label, children }: { label: ReactNode; children: ReactNode }) {
     return (
-        <div>
-            <span className={styles.infoLabel}>{label}</span>
-            {children}
+        <div className={styles.headerFact}>
+            <Label showColon>{label}</Label>
+            <div>{children}</div>
         </div>
     );
 }
 
-/** วันที่/เวลา + ไอคอนปฏิทิน (แถว "อัปเดตล่าสุด" / "สร้างเมื่อ") */
-function DateValue({ value }: { value: string }) {
-    return (
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
-            <Icon name="calendar" style={{ width: '1rem', height: '1rem', color: 'var(--sapContent_LabelColor)' }} />
-            <span className={styles.bodyText}>{formatLocalDateTime(value)}</span>
-        </div>
-    );
+/** FormItem แบบอ่านอย่างเดียว — ป้ายเป็น UI5 Label, ค่าเป็นอะไรก็ได้ */
+function DisplayItem({ label, children }: { label: string; children: ReactNode }) {
+    return <FormItem labelContent={<Label showColon>{label}</Label>}>{children}</FormItem>;
 }
 
 /**
- * หน้าดูสินค้า (อ่านอย่างเดียว) — โครงเดียวกับหน้าแก้ไข (edit.tsx): แท็บ ทั่วไป/ประวัติ แบบพื้นสี,
- * หัวเรื่อง + ปุ่มด้านขวา, แถบแท็บกลุ่มแอตทริบิวต์ที่ติดด้านบน (scroll-spy) และ sidebar เรียง
- * ข้อมูลสินค้า → ช่องทางขาย → หมวดหมู่ → ไทม์ไลน์
+ * หน้าดูสินค้า (อ่านอย่างเดียว) ตาม floorplan "Object Page" ของ SAP Fiori:
+ *  - Title: ชื่อ/SKU + ปุ่มคำสั่ง (แก้ไข · ภาษา · ดูหน้าร้าน)
+ *  - Header: รูปสินค้า + key facts (การเผยแพร่ สถานะ ประเภท หมวดหมู่ วันที่) ยุบเองตอนเลื่อน
+ *  - Anchor bar: 1 section ต่อกลุ่มแอตทริบิวต์ + ช่องทางขาย + ประวัติ (ObjectPage ทำ scroll-spy ให้เอง)
+ *  - เนื้อหาแต่ละกลุ่มเป็น UI5 Form แบบ Display
  */
 export default function ProductShow({
     product,
@@ -324,10 +347,9 @@ export default function ProductShow({
 }: Props) {
     const { locales, locale: currentLocaleCode, setLocale } = useLocale();
     const { t } = useTranslation('catalog');
-    const [tabIndex, setTabIndex] = useState(0);
-    const [collapsedGroupIds, setCollapsedGroupIds] = useState<Record<number, boolean>>({});
-    const toggleGroupCollapse = (groupId: number) => setCollapsedGroupIds((prev) => ({ ...prev, [groupId]: !prev[groupId] }));
-    const [localeMenuOpen, setLocaleMenuOpen] = useState(false);
+    const [localeMenuOpener, setLocaleMenuOpener] = useState<HTMLElement | null>(null);
+    // HistoryPanel ดึงข้อมูลทันทีที่ mount — รอให้ผู้ใช้ไปถึง section นั้นก่อนค่อยโหลด
+    const [historyRequested, setHistoryRequested] = useState(false);
 
     const defaultLocale = locales.find((l) => l.code === currentLocaleCode) || locales[0];
     const [activeLocaleId, setActiveLocaleId] = useState<number>(defaultLocale ? defaultLocale.id : 1);
@@ -351,42 +373,24 @@ export default function ProductShow({
         return scope?.[localeKey] ?? scope?.['default'] ?? '';
     };
 
-    // ---------------------------------------------------------------- scroll-spy ของแถบแท็บกลุ่ม (เหมือนหน้าแก้ไข)
-    const [groupTabIndex, setGroupTabIndex] = useState(0);
-    const groupSectionRefs = useRef<(HTMLElement | null)[]>([]);
-    const groupTabBarRef = useRef<HTMLDivElement | null>(null);
-    const scrollBodyRef = useRef<HTMLDivElement | null>(null);
-    const suppressScrollSpy = useRef(false);
+    const groupKeyOf = (group: GroupWithAttributes) => (group.id === 0 ? 'ungrouped' : String(group.id));
 
-    const scrollToGroup = (idx: number) => {
-        suppressScrollSpy.current = true;
-        setGroupTabIndex(idx);
-        groupSectionRefs.current[idx]?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        window.setTimeout(() => {
-            suppressScrollSpy.current = false;
-        }, 700);
-    };
-
-    useEffect(() => {
-        const scrollParent = scrollBodyRef.current;
-        if (!scrollParent) return;
-
-        const handleScroll = () => {
-            if (suppressScrollSpy.current) return;
-            const barBottom = groupTabBarRef.current ? groupTabBarRef.current.getBoundingClientRect().bottom : 0;
-            const threshold = barBottom + GROUP_SECTION_SCROLL_MARGIN + 16;
-            let activeIdx = 0;
-            for (let i = 0; i < groupSectionRefs.current.length; i++) {
-                const el = groupSectionRefs.current[i];
-                if (el && el.getBoundingClientRect().top <= threshold) activeIdx = i;
+    // รูปบน header: แอตทริบิวต์ image ตัวแรกที่มีค่า ไม่มีก็ใช้รูปแรกของ gallery
+    const headerImage = (() => {
+        let galleryFallback: string | null = null;
+        for (const group of assignedGroups) {
+            for (const attr of group.attributes) {
+                const value = getValue(attr, groupKeyOf(group));
+                if (!value) continue;
+                if (attr.type === 'image') return resolveStorageUrl(value);
+                if (attr.type === 'gallery' && !galleryFallback) {
+                    const first = parseGalleryPaths(value)[0];
+                    if (first) galleryFallback = resolveStorageUrl(first);
+                }
             }
-            setGroupTabIndex(activeIdx);
-        };
-
-        scrollParent.addEventListener('scroll', handleScroll, { passive: true });
-        handleScroll();
-        return () => scrollParent.removeEventListener('scroll', handleScroll);
-    }, [assignedGroups.length, tabIndex]);
+        }
+        return galleryFallback;
+    })();
 
     const publishedChannels = channelGroups
         .map((group) => ({
@@ -403,282 +407,254 @@ export default function ProductShow({
 
     const productTypeCode = productTypeAttribute ? getValue(productTypeAttribute) : '';
     const productTypeOption = productTypeAttribute?.options?.find((opt) => optionValue(opt) === productTypeCode);
+    const productTypeLabel = productTypeCode ? (productTypeOption ? optionLabel(productTypeOption) : productTypeCode) : '';
+
+    const title = t('viewProductHeading', { sku: product.sku });
+    const publishingStatus = (
+        <FioriStatus label={product.enabled ? t('published') : t('unpublished')} tone={product.enabled ? 'success' : 'neutral'} />
+    );
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title={t('viewProductHeading', { sku: product.sku })} />
-            <div className={styles.page}>
-                {/* แถบแท็บบนสุด */}
-                <div className={`${styles.topTabs} ${styles.gutter}`}>
-                    <TabContainer collapsed onTabSelect={(e) => setTabIndex(e.detail.tabIndex)}>
-                        <Tab text={t('generalTitle')} selected={tabIndex === 0} />
-                        {canViewHistory && <Tab text={t('historyTab')} selected={tabIndex === 1} />}
-                    </TabContainer>
-                </div>
-
-                {/* หัวเรื่อง + ปุ่ม — โครงเดียวกับหน้าแก้ไข */}
-                <div className={`${styles.header} ${styles.gutter}`}>
-                    <div className={styles.headerTitle}>
-                        <Button
-                            design="Transparent"
-                            icon="nav-back"
-                            tooltip={t('back')}
-                            accessibleName={t('back')}
-                            onClick={() => router.visit('/catalog/products')}
-                        />
-                        <Title level="H3" wrappingType="Normal">
-                            {t('viewProductHeading', { sku: product.sku })}
-                        </Title>
-                    </div>
-
-                    <div className={styles.headerActions}>
-                        {/* ภาษาที่แสดง — ปุ่มขนาดเดียวกับปุ่มอื่นในแถว (เหมือนปุ่ม "ภาษา · ช่องทาง" ของหน้าแก้ไข) */}
-                        <Button
-                            id={LOCALE_BUTTON_ID}
-                            icon="action-settings"
-                            endIcon="slim-arrow-down"
-                            tooltip={t('editingLocaleHelp')}
-                            onClick={() => setLocaleMenuOpen((prev) => !prev)}
-                        >
-                            {activeLocale ? activeLocale.display_name || activeLocale.code : ''}
-                        </Button>
-                        <Menu
-                            opener={LOCALE_BUTTON_ID}
-                            open={localeMenuOpen}
-                            onClose={() => setLocaleMenuOpen(false)}
-                            onItemClick={(e) => {
-                                const code = e.detail.item.dataset.code;
-                                setLocaleMenuOpen(false);
-                                if (code) setLocale(code);
-                            }}
-                        >
-                            <MenuItemGroup checkMode="Single">
-                                {locales.map((loc) => (
-                                    <MenuItem
-                                        key={loc.id}
-                                        data-code={loc.code}
-                                        text={loc.display_name || loc.code}
-                                        checked={loc.id === activeLocaleId}
-                                    />
-                                ))}
-                            </MenuItemGroup>
-                        </Menu>
-
-                        <Button
-                            icon="popup-window"
-                            tooltip={t('previewOnStorefront')}
-                            accessibleName={t('previewOnStorefront')}
-                            onClick={() => window.open(`/products/${product.id}`, '_blank', 'noreferrer')}
-                        />
-
-                        <Button design="Emphasized" icon="edit" onClick={() => router.visit(`/catalog/products/${product.id}/edit`)}>
-                            {t('editAction')}
-                        </Button>
-                    </div>
-                </div>
-
-                <div ref={scrollBodyRef} className={styles.scrollBody}>
-                    {tabIndex === 0 && (
-                        <div className={styles.gutter}>
-                            {/* แถบแท็บกลุ่มแอตทริบิวต์ — ติดด้านบนตอนเลื่อน กดแล้วเลื่อนไปที่กลุ่มนั้น */}
-                            {assignedGroups.length > 0 && (
-                                <div ref={groupTabBarRef} className={styles.groupTabBar}>
-                                    <TabContainer collapsed onTabSelect={(e) => scrollToGroup(e.detail.tabIndex)}>
-                                        {assignedGroups.map((group, idx) => (
-                                            <Tab key={group.id} text={localizedLabel(group, activeLocaleId)} selected={idx === groupTabIndex} />
-                                        ))}
-                                    </TabContainer>
-                                </div>
+            <Head title={title} />
+            <ObjectPage
+                className={styles.objectPage}
+                image={
+                    headerImage ? (
+                        <Avatar size="L" shape="Square">
+                            <img src={headerImage} alt={product.sku} />
+                        </Avatar>
+                    ) : (
+                        <Avatar size="L" shape="Square" icon="product" colorScheme="Placeholder" />
+                    )
+                }
+                onSelectedSectionChange={(e) => {
+                    if (e.detail.selectedSectionId === HISTORY_SECTION_ID) setHistoryRequested(true);
+                }}
+                titleArea={
+                    <ObjectPageTitle
+                        header={
+                            <Title level="H2" size="H3" wrappingType="Normal">
+                                {title}
+                            </Title>
+                        }
+                        snappedHeader={
+                            <Title level="H2" size="H5" wrappingType="Normal">
+                                {title}
+                            </Title>
+                        }
+                        subHeader={productTypeLabel ? <Text>{productTypeLabel}</Text> : undefined}
+                        snappedContent={publishingStatus}
+                        navigationBar={
+                            <Toolbar design="Transparent">
+                                <ToolbarButton
+                                    design="Transparent"
+                                    icon="nav-back"
+                                    tooltip={t('back')}
+                                    accessibleName={t('back')}
+                                    onClick={() => router.visit('/catalog/products')}
+                                />
+                            </Toolbar>
+                        }
+                        actionsBar={
+                            <Toolbar design="Transparent">
+                                <ToolbarButton
+                                    design="Emphasized"
+                                    icon="edit"
+                                    text={t('editAction')}
+                                    onClick={() => router.visit(`/catalog/products/${product.id}/edit`)}
+                                />
+                                <ToolbarButton
+                                    design="Transparent"
+                                    icon="action-settings"
+                                    endIcon="slim-arrow-down"
+                                    text={activeLocale ? activeLocale.display_name || activeLocale.code : ''}
+                                    tooltip={t('editingLocaleHelp')}
+                                    onClick={(e) => {
+                                        // UI5's typings resolve ToolbarButton's click detail to `never`;
+                                        // at runtime it is ToolbarItemEventDetail ({ targetRef }).
+                                        const target = (e.detail as unknown as { targetRef: HTMLElement }).targetRef;
+                                        setLocaleMenuOpener((prev) => (prev ? null : target));
+                                    }}
+                                />
+                                <ToolbarButton
+                                    design="Transparent"
+                                    icon="popup-window"
+                                    text={t('previewOnStorefront')}
+                                    onClick={() => window.open(`/products/${product.id}`, '_blank', 'noreferrer')}
+                                />
+                            </Toolbar>
+                        }
+                    />
+                }
+                headerArea={
+                    <ObjectPageHeader>
+                        <div className={styles.headerFacts}>
+                            <HeaderFact label={t('publishing')}>{publishingStatus}</HeaderFact>
+                            <HeaderFact label={t('productStatus')}>
+                                {isProductStatus(product.status) ? (
+                                    <FioriStatus label={t(PRODUCT_STATUS_LABEL_KEYS[product.status])} tone={PRODUCT_STATUS_TONES[product.status]} />
+                                ) : (
+                                    <EmptyValue />
+                                )}
+                            </HeaderFact>
+                            <HeaderFact label={t('showOnHome')}>
+                                <FioriStatus
+                                    label={product.show_on_home ? t('showOnHomeYes') : t('showOnHomeNo')}
+                                    tone={product.show_on_home ? 'success' : 'neutral'}
+                                />
+                            </HeaderFact>
+                            {productTypeAttribute && (
+                                <HeaderFact label={t('masterProductTypeFieldLabel')}>
+                                    {productTypeLabel ? <Text>{productTypeLabel}</Text> : <EmptyValue />}
+                                </HeaderFact>
                             )}
+                            {/* หมวดหมู่ / หมวดหมู่ย่อย / กลุ่มสินค้า — ค่าเก็บที่ 'ungrouped'/'default' เสมอ */}
+                            {masterCategoryAttributes.map((attr) => (
+                                <HeaderFact key={attr.id} label={localizedLabel(attr, activeLocaleId)}>
+                                    <RenderAttributeValue attr={attr} value={getValue(attr)} />
+                                </HeaderFact>
+                            ))}
+                            <HeaderFact label={t('updatedAt')}>
+                                <Text>{formatLocalDateTime(product.updated_at)}</Text>
+                            </HeaderFact>
+                            <HeaderFact label={t('createdAt')}>
+                                <Text>{formatLocalDateTime(product.created_at)}</Text>
+                            </HeaderFact>
+                        </div>
+                    </ObjectPageHeader>
+                }
+            >
+                {[
+                    ...assignedGroups.map((group) => {
+                        const isGeneral = group.code.toLowerCase() === 'general';
+                        const isSales = group.code.toLowerCase() === 'pricing_packaging';
+                        const groupKey = groupKeyOf(group);
+                        const families = group.families ?? [];
+                        const isEmpty = group.attributes.length === 0 && !isGeneral && !(isSales && variants.length > 0);
+                        const simpleAttributes = group.attributes.filter((attr) => !WIDE_ATTRIBUTE_TYPES.has(attr.type));
+                        const wideAttributes = group.attributes.filter((attr) => WIDE_ATTRIBUTE_TYPES.has(attr.type));
+                        const renderItem = (attr: AttributeItem) => (
+                            <DisplayItem key={attr.id} label={localizedLabel(attr, activeLocaleId)}>
+                                <RenderAttributeValue attr={attr} value={getValue(attr, groupKey)} />
+                            </DisplayItem>
+                        );
 
-                            <div className={styles.columns}>
-                                <div className={styles.stack}>
-                                    {assignedGroups.map((group, idx) => {
-                                        const isGeneral = group.code.toLowerCase() === 'general';
-                                        const isSales = group.code.toLowerCase() === 'pricing_packaging';
-                                        const groupKey = group.id === 0 ? 'ungrouped' : String(group.id);
-                                        const isGroupCollapsed = Boolean(collapsedGroupIds[group.id]);
-                                        const groupLabel = localizedLabel(group, activeLocaleId);
+                        return (
+                            <ObjectPageSection key={group.id} id={`group-${group.id}`} titleText={localizedLabel(group, activeLocaleId)}>
+                                {/* ตระกูลที่ฟิลด์ในกลุ่มนี้มาจาก — แบบเดียวกับหน้าแก้ไข */}
+                                {families.length > 0 && (
+                                    <div className={styles.familyRow}>
+                                        {families.map((family) => (
+                                            <Tag key={family.id} design="Information" hideStateIcon>
+                                                {family.name ?? family.code}
+                                            </Tag>
+                                        ))}
+                                    </div>
+                                )}
 
-                                        return (
-                                            <section
-                                                key={group.id}
-                                                ref={(el) => {
-                                                    groupSectionRefs.current[idx] = el;
-                                                }}
-                                                className={styles.card}
-                                                style={{ scrollMarginTop: `${GROUP_SECTION_SCROLL_MARGIN}px` }}
-                                            >
-                                                <div
-                                                    className={
-                                                        isGroupCollapsed ? styles.groupHeader : `${styles.groupHeader} ${styles.groupHeaderOpen}`
-                                                    }
-                                                    onClick={() => toggleGroupCollapse(group.id)}
-                                                >
-                                                    <Button
-                                                        design="Transparent"
-                                                        icon={isGroupCollapsed ? 'slim-arrow-right' : 'slim-arrow-down'}
-                                                        accessibleName={groupLabel}
-                                                    />
-                                                    <Title level="H5" wrappingType="Normal" style={{ flex: 1 }}>
-                                                        {groupLabel}
-                                                    </Title>
-                                                    {/* ตระกูลที่ฟิลด์ในกลุ่มนี้มาจาก — แบบเดียวกับหน้าแก้ไข */}
-                                                    {(group.families ?? []).map((family) => (
-                                                        <Tag key={family.id} design="Information" hideStateIcon>
-                                                            {family.name ?? family.code}
-                                                        </Tag>
-                                                    ))}
-                                                </div>
-                                                {!isGroupCollapsed && (
-                                                    <div className={styles.stack} style={{ gap: '1.25rem' }}>
-                                                        {isGeneral && (
-                                                            <InfoRow label={t('sku')}>
-                                                                <span className={styles.bodyText}>{product.sku}</span>
-                                                            </InfoRow>
-                                                        )}
+                                {isEmpty && <span className={styles.muted}>{t('noAttributesInGroup')}</span>}
 
-                                                        {group.attributes.length === 0 && !isGeneral && !(isSales && variants.length > 0) && (
-                                                            <span className={styles.muted}>{t('noAttributesInGroup')}</span>
-                                                        )}
-
-                                                        {group.attributes.map((attr) => (
-                                                            <InfoRow key={attr.id} label={localizedLabel(attr, activeLocaleId)}>
-                                                                <RenderAttributeValue attr={attr} value={getValue(attr, groupKey)} />
-                                                            </InfoRow>
-                                                        ))}
-
-                                                        {isSales && variants.length > 0 && (
-                                                            <div>
-                                                                <Title level="H6" style={{ marginBottom: '0.5rem' }}>
-                                                                    {t('variantsTitle')}
-                                                                </Title>
-                                                                <FioriResponsiveTable
-                                                                    variant="plain"
-                                                                    size="small"
-                                                                    columns={variantColumns}
-                                                                    rows={variants.map((v, index) => ({ v, index }))}
-                                                                    getRowKey={(row) => row.v.id ?? `new-${row.index}`}
-                                                                />
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                )}
-                                            </section>
-                                        );
-                                    })}
-                                </div>
-
-                                <div className={styles.stack}>
-                                    {/* ข้อมูลสินค้า — ชุดเดียวกับแผงของหน้าแก้ไข แบบอ่านอย่างเดียว */}
-                                    <FioriFormGroup title={t('productInfo')}>
-                                        <InfoRow label={t('publishing')}>
-                                            <FioriStatus
-                                                label={product.enabled ? t('published') : t('unpublished')}
-                                                tone={product.enabled ? 'success' : 'neutral'}
-                                            />
-                                        </InfoRow>
-                                        <InfoRow label={t('showOnHome')}>
-                                            <FioriStatus
-                                                label={product.show_on_home ? t('showOnHomeYes') : t('showOnHomeNo')}
-                                                tone={product.show_on_home ? 'success' : 'neutral'}
-                                            />
-                                        </InfoRow>
-                                        <InfoRow label={t('productStatus')}>
-                                            {isProductStatus(product.status) ? (
-                                                <FioriStatus
-                                                    label={t(PRODUCT_STATUS_LABEL_KEYS[product.status])}
-                                                    tone={PRODUCT_STATUS_TONES[product.status]}
-                                                />
-                                            ) : (
-                                                <EmptyValue />
-                                            )}
-                                        </InfoRow>
-                                        {productTypeAttribute && (
-                                            <InfoRow label={t('masterProductTypeFieldLabel')}>
-                                                {productTypeCode ? (
-                                                    <span className={styles.bodyText}>
-                                                        {productTypeOption ? optionLabel(productTypeOption) : productTypeCode}
-                                                    </span>
-                                                ) : (
-                                                    <EmptyValue />
-                                                )}
-                                            </InfoRow>
+                                {(isGeneral || simpleAttributes.length > 0) && (
+                                    <Form layout={FORM_LAYOUT} labelSpan={FORM_LABEL_SPAN}>
+                                        {isGeneral && (
+                                            <DisplayItem label={t('sku')}>
+                                                <Text>{product.sku}</Text>
+                                            </DisplayItem>
                                         )}
-                                        <InfoRow label={t('updatedAt')}>
-                                            <DateValue value={product.updated_at} />
-                                        </InfoRow>
-                                        <InfoRow label={t('createdAt')}>
-                                            <DateValue value={product.created_at} />
-                                        </InfoRow>
-                                    </FioriFormGroup>
+                                        {simpleAttributes.map(renderItem)}
+                                    </Form>
+                                )}
 
-                                    {/* ช่องทางขาย — มีสิทธิ์แยกของตัวเอง (sales_channels) ดู routes/catalog.php */}
-                                    {canViewSalesChannels && (
-                                        <section className={styles.card}>
-                                            <Title level="H5" wrappingType="Normal" className={styles.cardTitle}>
-                                                {t('salesChannels')}
-                                            </Title>
-                                            {publishedChannels.length > 0 ? (
-                                                <div className={styles.stack} style={{ gap: '0.75rem' }}>
-                                                    {publishedChannels.map((group) => (
-                                                        <InfoRow key={group.platform} label={group.platform}>
-                                                            <div className={styles.wrapRow}>
-                                                                {group.channels.map((ch) => (
-                                                                    <Tag key={ch.id} design={ch.is_live ? 'Positive' : 'Neutral'} hideStateIcon>
-                                                                        {ch.is_live
-                                                                            ? `${ch.name || ch.code} · ${t('liveLabel')}`
-                                                                            : ch.name || ch.code}
-                                                                    </Tag>
-                                                                ))}
-                                                            </div>
-                                                        </InfoRow>
-                                                    ))}
-                                                </div>
-                                            ) : (
-                                                <span className={styles.muted}>{t('noPublishedChannels')}</span>
-                                            )}
-                                        </section>
-                                    )}
+                                {wideAttributes.length > 0 && (
+                                    <Form layout={WIDE_FORM_LAYOUT} labelSpan={FORM_LABEL_SPAN}>
+                                        {wideAttributes.map(renderItem)}
+                                    </Form>
+                                )}
 
-                                    {/* หมวดหมู่ / หมวดหมู่ย่อย / กลุ่มสินค้า — ค่าเก็บที่ 'ungrouped'/'default' เสมอ */}
-                                    {masterCategoryAttributes.length > 0 && (
-                                        <section className={styles.card}>
-                                            <Title level="H5" wrappingType="Normal" className={styles.cardTitle}>
-                                                {t('masterCategoriesBlockTitle')}
-                                            </Title>
-                                            <div className={styles.stack} style={{ gap: '1rem' }}>
-                                                {masterCategoryAttributes.map((attr) => (
-                                                    <InfoRow key={attr.id} label={localizedLabel(attr, activeLocaleId)}>
-                                                        <RenderAttributeValue attr={attr} value={getValue(attr)} />
-                                                    </InfoRow>
+                                {/* ไม่ใช้ ObjectPageSubSection: ถ้า section มี subsection ปนกับเนื้อหาอื่น
+                                    แท็บของ section จะกลายเป็น dropdown ที่มีแค่ "ตัวเลือกสินค้า" ตัวเดียว */}
+                                {isSales && variants.length > 0 && (
+                                    <div className={styles.variants}>
+                                        <Title level="H4" size="H5" className={styles.variantsTitle}>
+                                            {t('variantsTitle')}
+                                        </Title>
+                                        <FioriResponsiveTable
+                                            variant="plain"
+                                            size="small"
+                                            columns={variantColumns}
+                                            rows={variants.map((v, index) => ({ v, index }))}
+                                            getRowKey={(row) => row.v.id ?? `new-${row.index}`}
+                                        />
+                                    </div>
+                                )}
+                            </ObjectPageSection>
+                        );
+                    }),
+
+                    // ช่องทางขาย — มีสิทธิ์แยกของตัวเอง (sales_channels) ดู routes/catalog.php
+                    canViewSalesChannels && (
+                        <ObjectPageSection key="sales-channels" id="section-sales-channels" titleText={t('salesChannels')}>
+                            {publishedChannels.length > 0 ? (
+                                <Form layout={FORM_LAYOUT} labelSpan={FORM_LABEL_SPAN}>
+                                    {publishedChannels.map((group) => (
+                                        <DisplayItem key={group.platform} label={group.platform}>
+                                            <div className={styles.wrapRow}>
+                                                {group.channels.map((ch) => (
+                                                    <Tag key={ch.id} design={ch.is_live ? 'Positive' : 'Neutral'} hideStateIcon>
+                                                        {ch.is_live ? `${ch.name || ch.code} · ${t('liveLabel')}` : ch.name || ch.code}
+                                                    </Tag>
                                                 ))}
                                             </div>
-                                        </section>
-                                    )}
+                                        </DisplayItem>
+                                    ))}
+                                </Form>
+                            ) : (
+                                <span className={styles.muted}>{t('noPublishedChannels')}</span>
+                            )}
+                        </ObjectPageSection>
+                    ),
 
-                                    {canViewHistory && (
-                                        <section className={styles.card}>
-                                            <Title level="H5" wrappingType="Normal" className={styles.cardTitle}>
-                                                {t('timelineTitle')}
-                                            </Title>
-                                            <div style={{ maxHeight: 480, overflowY: 'auto', paddingRight: '0.25rem' }}>
-                                                <TimelinePanel timelineUrl={`/catalog/products/${product.id}/timeline`} />
-                                            </div>
-                                        </section>
-                                    )}
-                                </div>
+                    canViewHistory && (
+                        <ObjectPageSection key="timeline" id="section-timeline" titleText={t('timelineTitle')}>
+                            <div className={styles.timeline}>
+                                <TimelinePanel timelineUrl={`/catalog/products/${product.id}/timeline`} />
                             </div>
-                        </div>
-                    )}
+                        </ObjectPageSection>
+                    ),
 
-                    {tabIndex === 1 && canViewHistory && (
-                        <div className={styles.gutter} style={{ paddingTop: '1rem' }}>
-                            <HistoryPanel historyUrl={`/catalog/products/${product.id}/history`} />
-                        </div>
-                    )}
-                </div>
-            </div>
+                    canViewHistory && (
+                        <ObjectPageSection key="history" id={HISTORY_SECTION_ID} titleText={t('historyTab')}>
+                            {historyRequested ? (
+                                <HistoryPanel historyUrl={`/catalog/products/${product.id}/history`} />
+                            ) : (
+                                <Button design="Transparent" onClick={() => setHistoryRequested(true)}>
+                                    {t('historyTab')}
+                                </Button>
+                            )}
+                        </ObjectPageSection>
+                    ),
+                    // ObjectPage นับจำนวน section ด้วย Children.count ซึ่งนับ `false` ด้วย —
+                    // ต้องกรองทิ้ง ไม่งั้นหน้าที่มี section เดียวจะได้แถบแท็บเกินมา
+                ].filter((section): section is ReactElement<ObjectPageSectionPropTypes> => section !== false)}
+            </ObjectPage>
+
+            <Menu
+                opener={localeMenuOpener}
+                open={localeMenuOpener !== null}
+                onClose={() => setLocaleMenuOpener(null)}
+                onItemClick={(e) => {
+                    const code = e.detail.item.dataset.code;
+                    setLocaleMenuOpener(null);
+                    if (code) setLocale(code);
+                }}
+            >
+                <MenuItemGroup checkMode="Single">
+                    {locales.map((loc) => (
+                        <MenuItem key={loc.id} data-code={loc.code} text={loc.display_name || loc.code} checked={loc.id === activeLocaleId} />
+                    ))}
+                </MenuItemGroup>
+            </Menu>
         </AppLayout>
     );
 }
