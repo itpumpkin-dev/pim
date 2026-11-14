@@ -36,7 +36,7 @@ use Illuminate\Console\Command;
  */
 class BackfillProductValueAttributeGroupsCommand extends Command
 {
-    protected $signature = 'pim:backfill-product-value-groups';
+    protected $signature = 'pim:backfill-product-value-groups {--product=* : เฉพาะสินค้า id เหล่านี้ (เช่นหลังหมวดหมู่ของสินค้าเปลี่ยน — pim:normalize-product-categories)}';
 
     protected $description = 'Backfill attribute_group_id on existing product_values rows so each attribute-group placement can hold an independent value.';
 
@@ -53,7 +53,10 @@ class BackfillProductValueAttributeGroupsCommand extends Command
         // product.
         $mapCache = [];
 
+        $productIds = array_map('intval', (array) $this->option('product'));
+
         Product::query()
+            ->when($productIds, fn ($query) => $query->whereIn('id', $productIds))
             ->orderBy('id')
             ->chunk(200, function ($products) use ($resolver, &$mapCache, &$processedProducts, &$updated, &$duplicated) {
                 $products->load('categories:id');
