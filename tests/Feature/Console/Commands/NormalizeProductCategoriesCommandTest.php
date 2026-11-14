@@ -89,16 +89,28 @@ test('a product on two chains keeps the one matching its codes', function () {
     expect(npcLinks($product))->toBe(['zw', 'zw01', 'zw01001']);
 });
 
-test('codes keep their exact case — an uppercase category is not confused with a lowercase one', function () {
-    npcChain('zv', 'zv01', 'zv01001');            // lowercase look-alike
-    [, , $upper] = npcChain('zv', 'ZV01', 'ZV01001'); // same root, uppercase sub/group
+test('a category whose code clashes with another when case is ignored is left untouched', function () {
+    npcChain('zv', 'zv01', 'zv01001');               // lowercase look-alike
+    [, , $upper] = npcChain('zv', 'ZV01', 'ZV01001'); // same codes, uppercase — options collapse to the same lowercase code
+    $attributes = npcAttributes();
     $product = npcProduct();
     $product->categories()->attach($upper->id);
+    ProductValue::create(['product_id' => $product->id, 'attribute_id' => $attributes['psubcatname']->id, 'value' => 'zv01']);
 
     $this->artisan('pim:normalize-product-categories')->assertSuccessful();
 
-    expect(npcCodes($product)['productgroupname'])->toBe('ZV01001');
-    expect(npcCodes($product)['psubcatname'])->toBe('ZV01');
+    expect(npcCodes($product))->toBe(['psubcatname' => 'zv01']); // not re-derived — it would point at the look-alike
+});
+
+test('codes match categories regardless of case', function () {
+    [, , $g] = npcChain('zr', 'ZR01', 'ZR01001');
+    $attributes = npcAttributes();
+    $product = npcProduct();
+    ProductValue::create(['product_id' => $product->id, 'attribute_id' => $attributes['productgroupname']->id, 'value' => 'zr01001']);
+
+    $this->artisan('pim:normalize-product-categories')->assertSuccessful();
+
+    expect(npcLinks($product))->toBe(['ZR01', 'ZR01001', 'zr']);
 });
 
 test('codes that match no category are left untouched', function () {

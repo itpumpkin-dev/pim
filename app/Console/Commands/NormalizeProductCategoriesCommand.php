@@ -16,7 +16,8 @@ use Illuminate\Support\Facades\Storage;
  * คำนวณจาก tree (ProductCategoryLinker::deriveLegacyCodesFromCategories)
  *
  * ต่อสินค้า:
- *   1. ไม่มีหมวดใน tree แต่มี code ใน attribute → ผูกหมวดที่ลึกที่สุดที่ code ตรงตัว (ตัวพิมพ์ต้องตรง)
+ *   1. ไม่มีหมวดใน tree แต่มี code ใน attribute → ผูกหมวดที่ลึกที่สุดที่ code ตรงกัน (ไม่สนตัวพิมพ์ —
+ *      option เก็บตัวพิมพ์เล็ก) หมวดที่ code ชนกันเมื่อไม่สนตัวพิมพ์ (L001/l001) → ไม่แตะ รายงานให้เปลี่ยน code
  *      code ที่ไม่มีหมวดจริง (เช่น category_2) → ไม่แตะ รายงานให้แก้เอง
  *   2. tree มีหลายสาย → เก็บสายที่ตรงกับ code ใน attribute ถ้าไม่มีสายไหนตรง → ไม่แตะ รายงานให้แก้เอง
  *   3. ผูกให้ครบทั้งสาย (เติมหมวดแม่ที่ขาด ถอดหมวดนอกสาย)
@@ -39,11 +40,14 @@ class NormalizeProductCategoriesCommand extends Command
     /** @var array<string, int> */
     private array $stats = [
         'linked_from_codes' => 0, 'unlinkable_codes' => 0, 'multi_resolved' => 0, 'multi_unresolved' => 0,
-        'parents_added' => 0, 'links_removed' => 0, 'values_changed' => 0, 'missing_option' => 0,
+        'parents_added' => 0, 'links_removed' => 0, 'values_changed' => 0, 'missing_option' => 0, 'case_clash' => 0,
     ];
 
     /** @var array<int, Category> */
     private array $categoriesById = [];
+
+    /** @var array<int, true> หมวดที่ code ชนกับหมวดอื่นเมื่อไม่สนตัวพิมพ์ */
+    private array $clashingCategoryIds = [];
 
     private bool $dryRun = false;
 
@@ -59,7 +63,19 @@ class NormalizeProductCategoriesCommand extends Command
         // (transaction เดียวทั้งหมด + updateOrCreate ที่เปิด savepoint ทุกแถว ทำ PostgreSQL หน่วยความจำ lock หมด)
         $this->dryRun = (bool) $this->option('dry-run');
         $this->categoriesById = Category::all(['id', 'code', 'parent_id'])->keyBy('id')->all();
-        $categoryIdByCode = collect($this->categoriesById)->mapWithKeys(fn (Category $c) => [$c->code => $c->id])->all();
+        // code ใน attribute/option เป็นตัวพิมพ์เล็กเสมอ (AttributeOptionMirror::normaliseCode) — จับคู่กับหมวดแบบไม่สน
+        // ตัวพิมพ์ หมวดที่ code ชนกันเมื่อไม่สนตัวพิมพ์ (เช่น L001 กับ l001) แยกไม่ออก → ไม่แตะ รายงานให้เปลี่ยน code ก่อน
+        $categoryIdByCode = [];
+        foreach ($this->categoriesById as $category) {
+            $categoryIdByCode[strtolower(trim($category->code))][] = (int) $category->id;
+        }
+        foreach ($categoryIdByCode as $lower => $ids) {
+            if (count($ids) > 1) {
+                foreach ($ids as $id) {
+                    $this->clashingCategoryIds[$id] = true;
+                }
+            }
+        }
         $this->attributeIds = Attribute::whereIn('code', self::CODE_ATTRIBUTES)->pluck('id', 'code')->map(fn ($id) => (int) $id)->all();
         foreach ($this->attributeIds as $attributeId) {
             $this->optionCodes[$attributeId] = DB::table('attribute_options')->where('attribute_id', $attributeId)->pluck('code')->flip()->map(fn () => true)->all();
@@ -123,7 +139,7 @@ class NormalizeProductCategoriesCommand extends Command
      *
      * @param  array<int, int>  $current
      * @param  array<string, string>  $codes
-     * @param  array<string, int>  $categoryIdByCode
+     * @param  array<string, array<int, int>>  $categoryIdByCode  code ตัวพิมพ์เล็ก => id หมวด
      * @return array<int, int>|null
      */
     private function targetChain(Product $product, array $current, array $codes, array $categoryIdByCode): ?array
@@ -136,11 +152,18 @@ class NormalizeProductCategoriesCommand extends Command
                 return null;
             }
             foreach ($wanted as $code) {
-                if (isset($categoryIdByCode[$code])) {
+                $ids = $categoryIdByCode[strtolower(trim($code))] ?? [];
+                if (count($ids) > 1) {
+                    $this->stats['case_clash']++;
+                    $this->log[] = ['case_clash', $product->sku, $code, '', implode('/', $wanted)];
+
+                    return null;
+                }
+                if (count($ids) === 1) {
                     $this->stats['linked_from_codes']++;
                     $this->log[] = ['link_from_codes', $product->sku, $code, '', implode('/', $wanted)];
 
-                    return $this->chainOf($categoryIdByCode[$code]);
+                    return $this->chainOf($ids[0]);
                 }
             }
             $this->stats['unlinkable_codes']++;
@@ -165,7 +188,8 @@ class NormalizeProductCategoriesCommand extends Command
         }
 
         // หลายสาย → สายที่ leaf ตรงกับ code ใน attribute ถ้าตรงหลายสาย เอาสายที่ลึกที่สุด (ลึกเท่ากัน = แก้เอง)
-        $matching = array_values(array_filter($leaves, fn (int $id) => in_array($this->categoriesById[$id]->code, $codes, true)));
+        $lowerCodes = array_map(fn ($code) => strtolower(trim((string) $code)), $codes);
+        $matching = array_values(array_filter($leaves, fn (int $id) => in_array(strtolower(trim($this->categoriesById[$id]->code)), $lowerCodes, true)));
         usort($matching, fn (int $a, int $b) => count($this->chainOf($b)) <=> count($this->chainOf($a)));
         if (count($matching) > 1 && count($this->chainOf($matching[0])) > count($this->chainOf($matching[1]))) {
             $matching = [$matching[0]];
@@ -222,6 +246,14 @@ class NormalizeProductCategoriesCommand extends Command
     {
         // เหมือน ProductCategoryLinker::deriveLegacyCodesFromCategories() — เขียนเฉพาะ code ที่เป็น option จริง
         // ไม่งั้นลบ — แต่เขียนตรงด้วย query builder (ไม่ใช้ updateOrCreate/savepoint)
+        $clashing = array_values(array_filter($target, fn (int $id) => isset($this->clashingCategoryIds[$id])));
+        if ($clashing) {
+            $this->stats['case_clash']++;
+            $this->log[] = ['case_clash', $product->sku, implode(', ', array_map(fn ($id) => $this->categoriesById[$id]->code, $clashing)), '', implode('/', $before)];
+
+            return;
+        }
+
         $expected = ProductCategoryLinker::legacyCodesFromCategories($target);
         $changed = false;
 
@@ -303,11 +335,14 @@ class NormalizeProductCategoriesCommand extends Command
         $this->line("2) multi-chain products: {$s['multi_resolved']} resolved to the chain matching their codes, {$s['multi_unresolved']} left as-is (no chain matches — fix by hand)");
         $this->line("3) {$s['parents_added']} missing parent link(s) added, {$s['links_removed']} off-chain link(s) removed");
         $this->line("4) {$s['values_changed']} product(s) had pcatid/pcatname/psubcatname/productgroupname re-derived from the tree");
+        if ($s['case_clash']) {
+            $this->warn("   {$s['case_clash']} product(s) skipped: their category code clashes with another category's when case is ignored (e.g. L001 vs l001) — give one of them a different code on the category page, then re-run");
+        }
         if ($s['missing_option']) {
             $this->warn("   {$s['missing_option']} value(s) skipped: their category has no attribute option yet — run `php artisan catalog:sync-master-options`, then re-run this command");
         }
 
-        foreach (['unlinkable_codes', 'multi_unresolved'] as $action) {
+        foreach (['unlinkable_codes', 'multi_unresolved', 'case_clash'] as $action) {
             $rows = array_values(array_filter($this->log, fn ($row) => $row[0] === $action));
             if ($rows) {
                 $this->warn("Needs a manual fix ({$action}):");
