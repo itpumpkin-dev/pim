@@ -5,13 +5,33 @@ import AppLayout from '@/layouts/app-layout';
 import { FioriStatus } from '@/lib/fiori-style';
 import { type BreadcrumbItem } from '@/types';
 import { Head, router } from '@inertiajs/react';
+import '@ui5/webcomponents-fiori/dist/illustrations/NoData.js';
+import '@ui5/webcomponents-fiori/dist/illustrations/SuccessScreen.js';
 import '@ui5/webcomponents-icons/dist/delete.js';
-import '@ui5/webcomponents-icons/dist/refresh.js';
+import '@ui5/webcomponents-icons/dist/error.js';
+import '@ui5/webcomponents-icons/dist/it-host.js';
+import '@ui5/webcomponents-icons/dist/list.js';
 import '@ui5/webcomponents-icons/dist/redo.js';
-import { Button, Text, Title } from '@ui5/webcomponents-react';
-import { useEffect, useState } from 'react';
+import '@ui5/webcomponents-icons/dist/refresh.js';
+import {
+    AnalyticalCardHeader,
+    Avatar,
+    Button,
+    Card,
+    CardHeader,
+    DynamicPage,
+    DynamicPageHeader,
+    DynamicPageTitle,
+    IllustratedMessage,
+    ObjectStatus,
+    Text,
+    Title,
+    Toolbar,
+    ToolbarButton,
+} from '@ui5/webcomponents-react';
+import { useEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
 import { useTranslation } from 'react-i18next';
-import styles from '../../import-export/import-export.module.css';
+import styles from './queue.module.css';
 
 interface Worker {
     worker_id: string;
@@ -67,7 +87,7 @@ function when(value: string | null): string {
     return value ? new Date(value).toLocaleString() : '—';
 }
 
-/** "3 นาทีที่แล้ว" แบบหยาบๆ — พอให้เห็นว่างานค้างมานานแค่ไหน */
+/** "3 นาที" แบบหยาบๆ — พอให้เห็นว่างานค้างมานานแค่ไหน */
 function ago(value: string | null, now: number): string {
     if (!value) return '—';
     const sec = Math.max(0, Math.round((now - new Date(value).getTime()) / 1000));
@@ -77,15 +97,58 @@ function ago(value: string | null, now: number): string {
     return `${Math.floor(sec / 86400)} วัน`;
 }
 
+/** การ์ดหนึ่งส่วนของหน้า (Fiori Card + CardHeader) — ว่างแล้วแสดง IllustratedMessage แทนตาราง */
+function SectionCard({
+    sectionRef,
+    title,
+    subtitle,
+    icon,
+    count,
+    empty,
+    children,
+}: {
+    sectionRef?: RefObject<HTMLDivElement | null>;
+    title: string;
+    subtitle: string;
+    icon: string;
+    count: string;
+    empty: { show: boolean; name: string; title: string; subtitle: string };
+    children: ReactNode;
+}) {
+    return (
+        <div ref={sectionRef} className={styles.section}>
+            <Card
+                header={
+                    <CardHeader
+                        titleText={title}
+                        subtitleText={subtitle}
+                        additionalText={count}
+                        avatar={<Avatar icon={icon} shape="Square" size="S" colorScheme="Accent6" />}
+                    />
+                }
+            >
+                {empty.show ? (
+                    <IllustratedMessage name={empty.name} design="Spot" titleText={empty.title} subtitleText={empty.subtitle} />
+                ) : (
+                    children
+                )}
+            </Card>
+        </div>
+    );
+}
+
 /**
- * สถานะคิวงาน (QueueMonitorController) — มี queue worker ทำงานอยู่ไหม, งานไหนค้างในคิว, งานไหนล้มเหลว
- * รีเฟรชเองทุก 5 วินาที (partial reload) เพื่อเห็น worker หยิบงานไปทำแบบสดๆ
+ * สถานะคิวงาน (QueueMonitorController) — Fiori Dynamic Page: หัวหน้า = สถานะรวม + KPI (ยุบได้ตอนเลื่อน),
+ * เนื้อหา = การ์ด Worker / งานในคิว / งานที่ล้มเหลว รีเฟรชเองทุก 5 วินาที (partial reload)
  */
 export default function QueueMonitor({ workers, jobs, jobsTotal, failed, failedTotal, aliveWorkers, queueConnection, retryAfter, canManage }: Props) {
     const { t: tNav } = useTranslation('nav');
     const { confirm, confirmElement } = useFioriConfirm();
     const [now, setNow] = useState(() => Date.now());
     const [busy, setBusy] = useState<string | null>(null);
+    const workersRef = useRef<HTMLDivElement>(null);
+    const jobsRef = useRef<HTMLDivElement>(null);
+    const failedRef = useRef<HTMLDivElement>(null);
 
     const breadcrumbs: BreadcrumbItem[] = [
         { title: tNav('system'), href: '#' },
@@ -106,7 +169,10 @@ export default function QueueMonitor({ workers, jobs, jobsTotal, failed, failedT
         run(() => setBusy(null));
     };
 
+    const scrollTo = (ref: RefObject<HTMLDivElement | null>) => ref.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
     const stuckCount = jobs.filter((j) => j.stuck).length;
+    const runningCount = jobs.filter((j) => j.reserved_at && !j.stuck).length;
     const waitingCount = jobs.filter((j) => !j.reserved_at && !j.delayed).length;
 
     const workerColumns: FioriResponsiveColumn<Worker>[] = [
@@ -117,7 +183,7 @@ export default function QueueMonitor({ workers, jobs, jobsTotal, failed, failedT
             minWidth: 110,
             render: (w) => <FioriStatus label={w.alive ? 'ทำงานอยู่' : 'หยุดแล้ว'} tone={w.alive ? 'success' : 'neutral'} showIcon />,
         },
-        { key: 'worker', header: 'Worker', priority: 'always', minWidth: 180, render: (w) => <span className={styles.mono}>{w.worker_id}</span> },
+        { key: 'worker', header: 'Worker', priority: 'always', minWidth: 180, render: (w) => <Text className={styles.mono}>{w.worker_id}</Text> },
         {
             key: 'current',
             header: 'กำลังทำ',
@@ -125,29 +191,29 @@ export default function QueueMonitor({ workers, jobs, jobsTotal, failed, failedT
             minWidth: 180,
             render: (w) =>
                 w.alive && w.current_job ? (
-                    <span>
-                        {w.current_job} <span className={styles.secondaryText}>({ago(w.current_job_started_at, now)})</span>
-                    </span>
+                    <Text>
+                        {w.current_job} <span className={styles.muted}>({ago(w.current_job_started_at, now)})</span>
+                    </Text>
                 ) : (
-                    <span className={styles.secondaryText}>{w.alive ? 'ว่าง — รองาน' : '—'}</span>
+                    <Text className={styles.muted}>{w.alive ? 'ว่าง — รองาน' : '—'}</Text>
                 ),
         },
-        { key: 'done', header: 'ทำแล้ว / ล้มเหลว', priority: 'medium', render: (w) => `${w.jobs_processed} / ${w.jobs_failed}` },
-        { key: 'seen', header: 'รายงานตัวล่าสุด', priority: 'medium', minWidth: 150, render: (w) => `${ago(w.last_seen_at, now)}ที่แล้ว` },
-        { key: 'started', header: 'เริ่มเมื่อ', priority: 'low', minWidth: 160, render: (w) => when(w.started_at) },
+        { key: 'done', header: 'ทำแล้ว / ล้มเหลว', priority: 'medium', render: (w) => <Text>{`${w.jobs_processed} / ${w.jobs_failed}`}</Text> },
+        { key: 'seen', header: 'รายงานตัวล่าสุด', priority: 'medium', minWidth: 150, render: (w) => <Text>{`${ago(w.last_seen_at, now)}ที่แล้ว`}</Text> },
+        { key: 'started', header: 'เริ่มเมื่อ', priority: 'low', minWidth: 160, render: (w) => <Text>{when(w.started_at)}</Text> },
     ];
 
     const jobColumns: FioriResponsiveColumn<QueuedJob>[] = [
-        { key: 'id', header: 'ID', priority: 'low', render: (j) => j.id },
+        { key: 'id', header: 'ID', priority: 'low', render: (j) => <Text className={styles.mono}>{j.id}</Text> },
         {
             key: 'name',
             header: 'งาน',
             priority: 'always',
             minWidth: 200,
             render: (j) => (
-                <span title={j.full_name ?? undefined}>
-                    {j.name} <span className={styles.secondaryText}>· {j.queue}</span>
-                </span>
+                <Text title={j.full_name ?? undefined}>
+                    {j.name} <span className={styles.muted}>· {j.queue}</span>
+                </Text>
             ),
         },
         {
@@ -166,8 +232,8 @@ export default function QueueMonitor({ workers, jobs, jobsTotal, failed, failedT
                     <FioriStatus label="รอคิว" tone="warning" />
                 ),
         },
-        { key: 'waiting', header: 'อยู่ในคิวมา', priority: 'medium', render: (j) => ago(j.created_at, now) },
-        { key: 'attempts', header: 'ลองแล้ว', priority: 'medium', render: (j) => `${j.attempts} ครั้ง` },
+        { key: 'waiting', header: 'อยู่ในคิวมา', priority: 'medium', render: (j) => <Text>{ago(j.created_at, now)}</Text> },
+        { key: 'attempts', header: 'ลองแล้ว', priority: 'medium', render: (j) => <Text>{`${j.attempts} ครั้ง`}</Text> },
         ...(canManage
             ? [
                   {
@@ -206,8 +272,8 @@ export default function QueueMonitor({ workers, jobs, jobsTotal, failed, failedT
     ];
 
     const failedColumns: FioriResponsiveColumn<FailedJob>[] = [
-        { key: 'name', header: 'งาน', priority: 'always', minWidth: 180, render: (f) => f.name },
-        { key: 'failed', header: 'ล้มเหลวเมื่อ', priority: 'high', minWidth: 160, render: (f) => when(f.failed_at) },
+        { key: 'name', header: 'งาน', priority: 'always', minWidth: 180, render: (f) => <Text>{f.name}</Text> },
+        { key: 'failed', header: 'ล้มเหลวเมื่อ', priority: 'high', minWidth: 160, render: (f) => <Text>{when(f.failed_at)}</Text> },
         {
             key: 'error',
             header: 'สาเหตุ',
@@ -265,92 +331,133 @@ export default function QueueMonitor({ workers, jobs, jobsTotal, failed, failedT
             : []),
     ];
 
+    const overall =
+        aliveWorkers === 0 ? (
+            <ObjectStatus state="Negative" showDefaultIcon>
+                ไม่มี worker ทำงาน
+            </ObjectStatus>
+        ) : stuckCount > 0 ? (
+            <ObjectStatus state="Critical" showDefaultIcon>
+                {`มีงานค้าง ${stuckCount} งาน`}
+            </ObjectStatus>
+        ) : (
+            <ObjectStatus state="Positive" showDefaultIcon>
+                ทำงานปกติ
+            </ObjectStatus>
+        );
+
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={tNav('queueMonitor')} />
             {confirmElement}
-            <div className={styles.page}>
-                <div className={styles.header}>
-                    <div>
-                        <Title level="H3" size="H3" wrappingType="Normal">
-                            {tNav('queueMonitor')}
-                        </Title>
-                        <div className={styles.secondaryText} style={{ marginTop: '0.125rem' }}>
-                            คิวแบบ {queueConnection} — รีเฟรชเองทุก {POLL_MS / 1000} วินาที
+            <DynamicPage
+                className={styles.dynamicPage}
+                titleArea={
+                    <DynamicPageTitle
+                        heading={
+                            <Title level="H2" size="H3" wrappingType="Normal">
+                                {tNav('queueMonitor')}
+                            </Title>
+                        }
+                        snappedHeading={
+                            <Title level="H2" size="H5" wrappingType="Normal">
+                                {tNav('queueMonitor')}
+                            </Title>
+                        }
+                        subheading={<Text>{`คิวแบบ ${queueConnection} · รีเฟรชเองทุก ${POLL_MS / 1000} วินาที`}</Text>}
+                        snappedSubheading={overall}
+                        actionsBar={
+                            <Toolbar design="Transparent">
+                                <ToolbarButton design="Transparent" icon="refresh" text="รีเฟรช" onClick={() => router.reload()} />
+                            </Toolbar>
+                        }
+                    >
+                        {overall}
+                    </DynamicPageTitle>
+                }
+                headerArea={
+                    <DynamicPageHeader>
+                        <div className={styles.kpiGrid}>
+                            <Card className={styles.kpiCard}>
+                                <AnalyticalCardHeader
+                                    titleText="Worker ที่ทำงานอยู่"
+                                    subtitleText={`รายงานตัวภายใน 90 วินาที`}
+                                    value={String(aliveWorkers)}
+                                    state={aliveWorkers > 0 ? 'Good' : 'Error'}
+                                    description={aliveWorkers > 0 ? 'queue:work ทำงานอยู่' : 'ต้องรัน php artisan queue:work'}
+                                    onClick={() => scrollTo(workersRef)}
+                                />
+                            </Card>
+                            <Card className={styles.kpiCard}>
+                                <AnalyticalCardHeader
+                                    titleText="งานในคิว"
+                                    subtitleText={`${waitingCount} รอ · ${runningCount} กำลังทำ · ${stuckCount} ค้าง`}
+                                    value={String(jobsTotal)}
+                                    state={stuckCount > 0 ? 'Error' : waitingCount > 0 && aliveWorkers === 0 ? 'Critical' : 'Neutral'}
+                                    description="ตาราง jobs"
+                                    onClick={() => scrollTo(jobsRef)}
+                                />
+                            </Card>
+                            <Card className={styles.kpiCard}>
+                                <AnalyticalCardHeader
+                                    titleText="งานที่ล้มเหลว"
+                                    subtitleText="ลองใหม่หรือลบได้"
+                                    value={String(failedTotal)}
+                                    state={failedTotal > 0 ? 'Error' : 'Good'}
+                                    description="ตาราง failed_jobs"
+                                    onClick={() => scrollTo(failedRef)}
+                                />
+                            </Card>
                         </div>
-                    </div>
-                    <div className={styles.actions}>
-                        <Button icon="refresh" onClick={() => router.reload()}>
-                            รีเฟรช
-                        </Button>
-                    </div>
-                </div>
+                    </DynamicPageHeader>
+                }
+            >
+                <div className={styles.content}>
+                    {aliveWorkers === 0 ? (
+                        <FioriMessageStrip severity="error">
+                            ไม่มี queue worker ทำงานอยู่ — งานนำเข้า/ส่งออก/sync ทั้งหมดจะค้างที่ "รอดำเนินการ" จนกว่าจะรัน{' '}
+                            <code>php artisan queue:work</code> บนเซิร์ฟเวอร์
+                        </FioriMessageStrip>
+                    ) : stuckCount > 0 ? (
+                        <FioriMessageStrip severity="warning">
+                            มี {stuckCount} งานค้าง — worker ที่หยิบไปน่าจะหยุดกลางทาง (จะถูกลองใหม่อัตโนมัติ หรือลบทิ้งได้)
+                        </FioriMessageStrip>
+                    ) : null}
 
-                {aliveWorkers === 0 ? (
-                    <FioriMessageStrip severity="error" style={{ marginBottom: '1.5rem' }}>
-                        ไม่มี queue worker ทำงานอยู่ — งานนำเข้า/ส่งออก/sync ทั้งหมดจะค้างที่ "รอดำเนินการ" จนกว่าจะรัน{' '}
-                        <code>php artisan queue:work</code> บนเซิร์ฟเวอร์
-                    </FioriMessageStrip>
-                ) : stuckCount > 0 ? (
-                    <FioriMessageStrip severity="warning" style={{ marginBottom: '1.5rem' }}>
-                        มี {stuckCount} งานค้าง — worker ที่หยิบไปน่าจะหยุดกลางทาง (จะถูกลองใหม่อัตโนมัติ หรือลบทิ้งได้)
-                    </FioriMessageStrip>
-                ) : null}
+                    <SectionCard
+                        sectionRef={workersRef}
+                        title="Worker"
+                        subtitle="queue:work ที่รายงานตัวใน 6 ชั่วโมงที่ผ่านมา"
+                        icon="it-host"
+                        count={`${aliveWorkers} / ${workers.length}`}
+                        empty={{ show: workers.length === 0, name: 'NoData', title: 'ยังไม่มี worker', subtitle: 'ยังไม่มี queue:work รายงานตัวใน 6 ชั่วโมงที่ผ่านมา' }}
+                    >
+                        <FioriResponsiveTable variant="plain" columns={workerColumns} rows={workers} getRowKey={(w) => w.worker_id} />
+                    </SectionCard>
 
-                <div className={styles.statGrid}>
-                    <div className={styles.cardPadded} style={{ padding: '1.25rem', textAlign: 'center' }}>
-                        <span className={styles.statValue} style={{ color: aliveWorkers > 0 ? 'var(--sapPositiveColor)' : 'var(--sapNegativeColor)' }}>
-                            {aliveWorkers}
-                        </span>
-                        <span className={styles.secondaryText}>Worker ที่ทำงานอยู่</span>
-                    </div>
-                    <div className={styles.cardPadded} style={{ padding: '1.25rem', textAlign: 'center' }}>
-                        <span className={styles.statValue}>{jobsTotal}</span>
-                        <span className={styles.secondaryText}>
-                            งานในคิว ({waitingCount} รอ{stuckCount > 0 ? ` · ${stuckCount} ค้าง` : ''})
-                        </span>
-                    </div>
-                    <div className={styles.cardPadded} style={{ padding: '1.25rem', textAlign: 'center' }}>
-                        <span className={styles.statValue} style={{ color: failedTotal > 0 ? 'var(--sapNegativeColor)' : undefined }}>
-                            {failedTotal}
-                        </span>
-                        <span className={styles.secondaryText}>งานที่ล้มเหลว</span>
-                    </div>
-                </div>
+                    <SectionCard
+                        sectionRef={jobsRef}
+                        title="งานในคิว"
+                        subtitle={jobsTotal > jobs.length ? `แสดง ${jobs.length} จาก ${jobsTotal} งาน` : 'งานที่รอ worker หยิบไปทำ'}
+                        icon="list"
+                        count={String(jobsTotal)}
+                        empty={{ show: jobs.length === 0, name: 'SuccessScreen', title: 'คิวว่าง', subtitle: 'ไม่มีงานค้างในคิว' }}
+                    >
+                        <FioriResponsiveTable variant="plain" columns={jobColumns} rows={jobs} getRowKey={(j) => j.id} />
+                    </SectionCard>
 
-                <div className={styles.card} style={{ marginBottom: '1.5rem' }}>
-                    <div className={styles.toolbar}>
-                        <Title level="H5" size="H5">
-                            Worker
-                        </Title>
-                    </div>
-                    <FioriResponsiveTable
-                        variant="plain"
-                        columns={workerColumns}
-                        rows={workers}
-                        getRowKey={(w) => w.worker_id}
-                        emptyMessage="ยังไม่มี worker รายงานตัวใน 6 ชั่วโมงที่ผ่านมา"
-                    />
+                    <SectionCard
+                        sectionRef={failedRef}
+                        title="งานที่ล้มเหลว"
+                        subtitle={failedTotal > failed.length ? `ล่าสุด ${failed.length} จาก ${failedTotal} งาน` : 'งานที่ลองครบแล้วยังไม่สำเร็จ'}
+                        icon="error"
+                        count={String(failedTotal)}
+                        empty={{ show: failed.length === 0, name: 'SuccessScreen', title: 'ไม่มีงานที่ล้มเหลว', subtitle: 'ทุกงานทำสำเร็จ' }}
+                    >
+                        <FioriResponsiveTable variant="plain" columns={failedColumns} rows={failed} getRowKey={(f) => f.uuid} />
+                    </SectionCard>
                 </div>
-
-                <div className={styles.card} style={{ marginBottom: '1.5rem' }}>
-                    <div className={styles.toolbar}>
-                        <Title level="H5" size="H5">
-                            งานในคิว{jobsTotal > jobs.length ? ` (แสดง ${jobs.length} จาก ${jobsTotal})` : ''}
-                        </Title>
-                    </div>
-                    <FioriResponsiveTable variant="plain" columns={jobColumns} rows={jobs} getRowKey={(j) => j.id} emptyMessage="คิวว่าง — ไม่มีงานค้าง" />
-                </div>
-
-                <div className={styles.card}>
-                    <div className={styles.toolbar}>
-                        <Title level="H5" size="H5">
-                            งานที่ล้มเหลว{failedTotal > failed.length ? ` (ล่าสุด ${failed.length} จาก ${failedTotal})` : ''}
-                        </Title>
-                    </div>
-                    <FioriResponsiveTable variant="plain" columns={failedColumns} rows={failed} getRowKey={(f) => f.uuid} emptyMessage="ไม่มีงานที่ล้มเหลว" />
-                </div>
-            </div>
+            </DynamicPage>
         </AppLayout>
     );
 }
