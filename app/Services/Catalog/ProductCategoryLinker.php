@@ -177,7 +177,10 @@ class ProductCategoryLinker
         $result = [];
         foreach (self::LEGACY_CODE_LEVELS as $attributeCode => $level) {
             $category = $chain[$level] ?? null;
-            $result[$attributeCode] = $category ? strtolower(trim($category->code)) : null;
+            // code ตามตัวพิมพ์จริง — option ของ master หมวดหมู่เก็บ code ตรงตัว (MasterAttributeOptionSync)
+            // เดิม strtolower ทำให้ 'L001' (ปั้มจุ่ม) กลายเป็น 'l001' ซึ่งเป็นอีกหมวด (ปั้มหอยโข่ง) แล้วถูกเขียนเป็น
+            // หมวดผิดของสินค้า
+            $result[$attributeCode] = $category ? trim($category->code) : null;
         }
 
         return $result;
