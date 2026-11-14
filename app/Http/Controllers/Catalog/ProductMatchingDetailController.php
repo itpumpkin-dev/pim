@@ -3,8 +3,6 @@
 namespace App\Http\Controllers\Catalog;
 
 use App\Http\Controllers\Controller;
-use App\Models\Attribute;
-use App\Models\Locale;
 use App\Models\MarketplaceListing;
 use App\Models\MarketplaceListingDetail;
 use App\Services\Catalog\AttributeValueFormatter;
@@ -141,20 +139,7 @@ class ProductMatchingDetailController extends Controller
     /** @return array<int, string> */
     private function names(array $ids): array
     {
-        $nameId = Attribute::idForCode('pname');
-        if (! $nameId) {
-            return [];
-        }
-        $th = Locale::idForCode('th');
-        $names = [];
-        foreach (DB::table('product_values')->whereIn('product_id', $ids)->where('attribute_id', $nameId)->whereNull('channel_id')
-            ->whereNotNull('value')->where('value', '<>', '')->get(['product_id', 'locale_id', 'value']) as $v) {
-            if (! isset($names[$v->product_id]) || ($th && (int) $v->locale_id === $th)) {
-                $names[$v->product_id] = $v->value;
-            }
-        }
-
-        return $names;
+        return \App\Services\Catalog\ProductNameLookup::names($ids, \App\Services\Catalog\LocaleFallback::baseLocaleId());
     }
 
     /** @return array<int, string> first non-empty value of an image-type attribute */

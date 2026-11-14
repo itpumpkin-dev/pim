@@ -59,11 +59,8 @@ class ProductPresenter
         // ข้อความที่ hardcode ไว้ในคลาสนี้
         $labelsByCode = $attributesByCode->values()->pluck('name', 'code');
 
-        // Attribute ที่แยกตาม locale (pname, spec_*, ...) จะเก็บ ProductValue หนึ่งแถว
-        // ต่อ locale โชว์แค่ $localeCode เท่านั้น และเรียงให้แถวแบบ null-locale
-        // (global) มาก่อนแถวที่ระบุ locale ชัดเจน เพื่อให้แถวเฉพาะ locale ชนะเสมอ
-        // เวลามีทั้งสองแบบสำหรับ attribute เดียวกัน — ไม่งั้นจะกลายเป็นว่า DB
-        // คืนแถวไหนมาทีหลังก็ชนะแบบสุ่มๆ
+        // Attribute ที่แยกตาม locale (pname, spec_*, ...) เก็บ ProductValue หนึ่งแถวต่อ locale —
+        // โชว์ $localeCode ถ้าไม่มีค่อยใช้ภาษาไทย (th) แล้วแถว NULL ตามกติกา LocaleFallback
         $defaultLocaleId = Locale::where('code', $localeCode)->value('id');
 
         // ตั้งแต่ 1 attribute อยู่ได้หลาย attribute_group_id พร้อมกัน (ดู migration
@@ -78,20 +75,19 @@ class ProductPresenter
         $values = ProductValue::whereIn('product_id', $products->pluck('id'))
             ->whereIn('attribute_id', $attributesByCode->keys())
             ->whereNull('channel_id')
-            ->where(function ($query) use ($defaultLocaleId) {
-                $query->whereNull('locale_id');
-                if ($defaultLocaleId) {
-                    $query->orWhere('locale_id', $defaultLocaleId);
-                }
-            })
-            ->orderByRaw('CASE WHEN locale_id IS NULL THEN 0 ELSE 1 END ASC')
-            ->orderByRaw('COALESCE(attribute_group_id, -1) DESC')
-            ->get(['product_id', 'attribute_id', 'locale_id', 'value']);
+            ->inLocale($defaultLocaleId)
+            ->get(['product_id', 'attribute_id', 'attribute_group_id', 'locale_id', 'value']);
 
+        // ต่อ attribute: ภาษาที่ขอ → th → แถว NULL (LocaleFallback ข้ามค่าว่าง) ภายในภาษาเดียวกันแถว
+        // "หลัก" ชนะ (ไม่มี group ก่อน แล้วค่อย group id ต่ำสุด) — pick() เก็บแถวแรกเมื่ออันดับเท่ากัน
         $valuesByProduct = $values->groupBy('product_id')->map(
-            fn (Collection $rows) => $rows->mapWithKeys(
-                fn (ProductValue $row) => [$attributesByCode[$row->attribute_id]->code => $row->value]
-            )
+            fn (Collection $rows) => $rows->groupBy('attribute_id')
+                ->map(fn (Collection $attributeRows) => LocaleFallback::pick(
+                    $attributeRows->sortBy(fn ($row) => $row->attribute_group_id ?? -1),
+                    $defaultLocaleId,
+                )?->value)
+                ->filter(fn ($value) => $value !== null)
+                ->mapWithKeys(fn ($value, $attributeId) => [$attributesByCode[$attributeId]->code => $value])
         );
 
         $valuesByProduct = self::resolveSelectOptionLabels($valuesByProduct, $attributesByCode);

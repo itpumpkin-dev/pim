@@ -3,11 +3,8 @@
 namespace App\Http\Controllers\Catalog;
 
 use App\Http\Controllers\Controller;
-use App\Models\Attribute;
-use App\Models\Locale;
 use App\Models\MarketplaceListing;
 use App\Models\MarketplaceListingDetail;
-use App\Models\ProductValue;
 use App\Models\SalesPlatformShop;
 use App\Services\Marketplace\Listings\MarketplaceListingFetcherResolver;
 use Illuminate\Database\Eloquent\Builder;
@@ -159,20 +156,6 @@ class MarketplaceProductMasterController extends Controller
     /** @return array<int, string> product id => pname (active locale first, else locale-less) */
     private function productNames(Collection $productIds): array
     {
-        $nameAttrId = Attribute::idForCode('pname');
-        if (! $nameAttrId || $productIds->isEmpty()) {
-            return [];
-        }
-        $localeId = Locale::idForCode(app()->getLocale());
-        $names = [];
-        foreach (ProductValue::whereIn('product_id', $productIds)->where('attribute_id', $nameAttrId)->whereNull('channel_id')
-            ->where(fn ($q) => $q->whereNull('locale_id')->when($localeId, fn ($w) => $w->orWhere('locale_id', $localeId)))
-            ->get(['product_id', 'locale_id', 'value']) as $v) {
-            if (! isset($names[$v->product_id]) || $v->locale_id === $localeId) {
-                $names[$v->product_id] = $v->value;
-            }
-        }
-
-        return $names;
+        return \App\Services\Catalog\ProductNameLookup::names($productIds);
     }
 }

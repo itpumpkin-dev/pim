@@ -7,6 +7,7 @@ use App\Models\Category;
 use App\Models\Locale;
 use App\Models\Product;
 use App\Services\Catalog\AttributeValueFormatter;
+use App\Services\Catalog\LocaleFallback;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
@@ -57,7 +58,6 @@ class WooCommerceExporter
     /** @var array<int, Attribute> attribute id => Attribute, with options.translations loaded where relevant */
     private array $attributesById = [];
 
-    private ?int $thaiLocaleId = null;
 
     private ?int $localeId = null;
 
@@ -91,7 +91,6 @@ class WooCommerceExporter
         $this->categoryIdsByProduct = [];
 
         $this->localeId = Locale::idForCode($localeCode);
-        $this->thaiLocaleId = Locale::idForCode('th');
         $this->channelId = $channelId;
 
         $fixedAttributes = Attribute::whereIn('code', self::FIXED_ATTRIBUTE_CODES)->with('options.translations')->get();
@@ -192,13 +191,11 @@ class WooCommerceExporter
      * images, ...) always read the locale-less scope, same as
      * ProductRowExporter/quickExport.
      *
-     * For locale-based attributes: prefers a row explicitly tagged with the
-     * requested locale. Thai gets one deliberate exception — this catalog's
-     * content is overwhelmingly bulk-imported and never split per locale
-     * (see ProductRowImporter::sourceLocaleId()'s docblock: imported values
-     * always land in the global scope, treated as Thai by convention), so a
-     * Thai export falls back to that global value rather than coming back
-     * empty for content that's really just sitting one scope over.
+     * For locale-based attributes: the requested locale, then Thai (th — the
+     * base content locale), then the locale-less row (legacy data from before
+     * pim:move-base-locale-values), per LocaleFallback — an untranslated field
+     * exports its Thai text rather than coming back empty (product decision,
+     * DB cleanup Phase 2b).
      */
     private function resolveValue(Product $product, string $code): ?string
     {
@@ -223,18 +220,9 @@ class WooCommerceExporter
         }
 
         foreach ($channelCandidates as $channelId) {
-            $row = $rows->first(fn ($r) => $r->channel_id === $channelId && $r->locale_id === $this->localeId);
+            $row = LocaleFallback::pick($rows->filter(fn ($r) => $r->channel_id === $channelId), $this->localeId);
             if ($row !== null && trim((string) $row->value) !== '') {
                 return $this->formatted($attribute, $row->value);
-            }
-        }
-
-        if ($this->localeId !== null && $this->localeId === $this->thaiLocaleId) {
-            foreach ($channelCandidates as $channelId) {
-                $globalRow = $rows->first(fn ($r) => $r->channel_id === $channelId && $r->locale_id === null);
-                if ($globalRow !== null) {
-                    return $this->formatted($attribute, $globalRow->value);
-                }
             }
         }
 

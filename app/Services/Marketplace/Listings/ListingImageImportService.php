@@ -12,6 +12,7 @@ use App\Models\ProductValue;
 use App\Models\User;
 use App\Services\Catalog\AttributeAccessPolicy;
 use App\Services\Catalog\EffectiveFamilyAttributeResolver;
+use App\Services\Catalog\LocaleFallback;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
@@ -26,7 +27,7 @@ use Illuminate\Validation\ValidationException;
  * ProductController::uploadAttributeFile()) instead of storing the platform's
  * CDN URLs, which can expire / be hotlink-blocked and are what push re-uploads
  * anyway. Only URLs present in the cached detail are accepted (no arbitrary
- * fetches). Written as the global value (channel NULL, locale NULL) — that's
+ * fetches). Written as the base value (channel NULL, locale th for a locale-based attribute / NULL otherwise — LocaleFallback::baseLocaleIdFor()) — that's
  * how every existing gallery row is stored and what the push reads; `pimage`
  * (legacy single image) gets the first image when it is still empty. Same
  * audit / no-auto-sync behaviour as ListingImportService.
@@ -138,14 +139,14 @@ class ListingImageImportService
             $old = [self::GALLERY => $currentPaths === [] ? null : json_encode($currentPaths)];
             $new = [self::GALLERY => json_encode($newPaths)];
             ProductValue::updateOrCreate(
-                ['product_id' => $product->id, 'attribute_id' => $gallery->id, 'attribute_group_id' => $groupId, 'channel_id' => null, 'locale_id' => null],
+                ['product_id' => $product->id, 'attribute_id' => $gallery->id, 'attribute_group_id' => $groupId, 'channel_id' => null, 'locale_id' => LocaleFallback::baseLocaleIdFor($gallery)],
                 ['value' => json_encode($newPaths)],
             );
 
             // legacy single image — fill only when empty (never overwrite a chosen one)
             $single = Attribute::where('code', self::SINGLE)->first();
             if ($single && $this->access->canEditAttributeAcrossFamilies($user, $single)) {
-                $keys = ['product_id' => $product->id, 'attribute_id' => $single->id, 'attribute_group_id' => $this->families->primaryGroupIdFor($single->id, $familyIds), 'channel_id' => null, 'locale_id' => null];
+                $keys = ['product_id' => $product->id, 'attribute_id' => $single->id, 'attribute_group_id' => $this->families->primaryGroupIdFor($single->id, $familyIds), 'channel_id' => null, 'locale_id' => LocaleFallback::baseLocaleIdFor($single)];
                 if (trim((string) ProductValue::where($keys)->value('value')) === '') {
                     ProductValue::updateOrCreate($keys, ['value' => $newPaths[0]]);
                     $old[self::SINGLE] = null;
@@ -229,7 +230,7 @@ class ListingImageImportService
         DB::transaction(function () use ($product, $gallery, $groupId, $familyIds, $currentPaths, $newPaths, $user) {
             $old = [self::GALLERY => $currentPaths === [] ? null : json_encode($currentPaths)];
             $new = [self::GALLERY => $newPaths === [] ? null : json_encode($newPaths)];
-            $keys = ['product_id' => $product->id, 'attribute_id' => $gallery->id, 'attribute_group_id' => $groupId, 'channel_id' => null, 'locale_id' => null];
+            $keys = ['product_id' => $product->id, 'attribute_id' => $gallery->id, 'attribute_group_id' => $groupId, 'channel_id' => null, 'locale_id' => LocaleFallback::baseLocaleIdFor($gallery)];
             $newPaths === []
                 ? ProductValue::where($keys)->delete()
                 : ProductValue::updateOrCreate($keys, ['value' => json_encode($newPaths)]);
@@ -237,7 +238,7 @@ class ListingImageImportService
             // legacy single image — fill only when empty (never overwrite a chosen one), same as apply()
             $single = Attribute::where('code', self::SINGLE)->first();
             if ($newPaths !== [] && $single && $this->access->canEditAttributeAcrossFamilies($user, $single)) {
-                $singleKeys = ['product_id' => $product->id, 'attribute_id' => $single->id, 'attribute_group_id' => $this->families->primaryGroupIdFor($single->id, $familyIds), 'channel_id' => null, 'locale_id' => null];
+                $singleKeys = ['product_id' => $product->id, 'attribute_id' => $single->id, 'attribute_group_id' => $this->families->primaryGroupIdFor($single->id, $familyIds), 'channel_id' => null, 'locale_id' => LocaleFallback::baseLocaleIdFor($single)];
                 if (trim((string) ProductValue::where($singleKeys)->value('value')) === '') {
                     ProductValue::updateOrCreate($singleKeys, ['value' => $newPaths[0]]);
                     $old[self::SINGLE] = null;
@@ -301,8 +302,9 @@ class ListingImageImportService
     /** @return list<string> */
     private function currentPaths(Product $product, Attribute $gallery, ?int $groupId): array
     {
-        $raw = ProductValue::where('product_id', $product->id)->where('attribute_id', $gallery->id)
-            ->where('attribute_group_id', $groupId)->whereNull('channel_id')->whereNull('locale_id')
+        $query = ProductValue::where('product_id', $product->id)->where('attribute_id', $gallery->id)
+            ->where('attribute_group_id', $groupId)->whereNull('channel_id');
+        $raw = ($gallery->is_locale_based ? $query->inLocale(LocaleFallback::baseLocaleId()) : $query->whereNull('locale_id'))
             ->value('value');
         $paths = json_decode((string) $raw, true);
 

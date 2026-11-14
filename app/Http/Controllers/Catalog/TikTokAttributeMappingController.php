@@ -11,6 +11,7 @@ use App\Models\Locale;
 use App\Models\Product;
 use App\Models\ProductMarketplaceSyncJob;
 use App\Models\ProductValue;
+use App\Services\Catalog\ProductNameLookup;
 use App\Models\SalesPlatformShop;
 use App\Models\TikTokAttribute;
 use App\Models\TikTokAttributeMapping;
@@ -226,10 +227,7 @@ class TikTokAttributeMappingController extends Controller
             $pname = ProductValue::where('product_id', $product->id)
                 ->where('attribute_id', $nameAttrId)
                 ->whereNull('channel_id')
-                ->where(function ($q) use ($activeLocaleId) {
-                    $q->where('locale_id', $activeLocaleId)->orWhereNull('locale_id');
-                })
-                ->orderByRaw('locale_id IS NULL') // ตัวที่ตรง locale ปัจจุบันมาก่อน ตัว global (locale_id null) เป็น fallback
+                ->inLocale($activeLocaleId) // ภาษาที่เลือก → th → แถว NULL (LocaleFallback)
                 ->value('value');
         }
 
@@ -407,10 +405,7 @@ class TikTokAttributeMappingController extends Controller
             $productName = ProductValue::where('product_id', $product->id)
                 ->where('attribute_id', $nameAttrId)
                 ->whereNull('channel_id')
-                ->where(function ($q) use ($activeLocaleId) {
-                    $q->where('locale_id', $activeLocaleId)->orWhereNull('locale_id');
-                })
-                ->orderByRaw('locale_id IS NULL')
+                ->inLocale($activeLocaleId) // ภาษาที่เลือก → th → แถว NULL (LocaleFallback)
                 ->value('value');
         }
         $productName = $productName ?: $product->sku;
@@ -476,9 +471,8 @@ class TikTokAttributeMappingController extends Controller
 
         $localeId = $attribute->is_locale_based ? $activeLocaleId : null;
         $scopeToLocale = function ($query) use ($localeId) {
-            return $query->where(function ($q) use ($localeId) {
-                $q->where('locale_id', $localeId)->orWhereNull('locale_id');
-            })->orderByRaw('locale_id IS NULL'); // ตรง locale ปัจจุบันก่อน ตัว global (locale_id null) เป็น fallback
+            // ภาษาที่เลือก → th → แถว NULL (LocaleFallback) — attribute ไม่แยกภาษาใช้แถว NULL อย่างเดียว
+            return $localeId === null ? $query->whereNull('locale_id') : $query->inLocale($localeId);
         };
 
         $isVariantDefining = in_array($attribute->id, $product->configurable_attributes ?? [], true);
@@ -674,21 +668,7 @@ class TikTokAttributeMappingController extends Controller
 
         $pnames = [];
         if ($nameAttrId && $pageProductIds->isNotEmpty()) {
-            $values = ProductValue::whereIn('product_id', $pageProductIds)
-                ->where('attribute_id', $nameAttrId)
-                ->whereNull('channel_id')
-                ->where(function ($q) use ($activeLocaleId) {
-                    $q->whereNull('locale_id');
-                    if ($activeLocaleId) {
-                        $q->orWhere('locale_id', $activeLocaleId);
-                    }
-                })
-                ->get();
-            foreach ($values as $v) {
-                if (! isset($pnames[$v->product_id]) || $v->locale_id === $activeLocaleId) {
-                    $pnames[$v->product_id] = $v->value;
-                }
-            }
+            $pnames = ProductNameLookup::names($pageProductIds, $activeLocaleId);
         }
 
         $mappedAttrIds = TikTokAttributeMapping::whereNotNull('tiktok_attribute_id')->pluck('tiktok_attribute_id')->unique()->all();

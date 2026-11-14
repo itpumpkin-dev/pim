@@ -38,6 +38,7 @@ use App\Services\AppNotifier;
 use App\Services\Catalog\AttributeAccessPolicy;
 use App\Services\Catalog\AttributeValueFormatter;
 use App\Services\Catalog\EffectiveFamilyAttributeResolver;
+use App\Services\Catalog\LocaleFallback;
 use App\Services\Catalog\MasterAttributeOptionSync;
 use App\Services\Catalog\ProductCategoryLinker;
 use App\Services\CodeGenerator;
@@ -249,15 +250,12 @@ class ProductController extends Controller
 
         $values = ProductValue::whereIn('product_id', $productIds)
             ->whereNull('channel_id')
-            // ทุกภาษา แล้วเรียงลำดับความสำคัญ: ภาษาที่ใช้อยู่ → ไม่ระบุภาษา → ภาษาอื่น (id ต่ำสุด)
-            // เดิมดึงแค่ภาษาที่ใช้อยู่ + ไม่ระบุภาษา ค่าที่กรอกในหน้าแก้ไขเป็นภาษาไทยอย่างเดียว (เช่น
-            // แบรนด์/หน่วย) เลยโชว์ว่างทันทีที่ผู้ใช้สลับหน้าจอเป็นภาษาอื่น ข้ามค่าว่างด้วย
+            // ทุกภาษา แล้วเรียงลำดับความสำคัญตาม LocaleFallback: ภาษาที่ใช้อยู่ → th → ไม่ระบุภาษา →
+            // ภาษาอื่น (id ต่ำสุด) เดิมดึงแค่ภาษาที่ใช้อยู่ + ไม่ระบุภาษา ค่าที่กรอกในหน้าแก้ไขเป็นภาษาไทย
+            // อย่างเดียว (เช่น แบรนด์/หน่วย) เลยโชว์ว่างทันทีที่ผู้ใช้สลับหน้าจอเป็นภาษาอื่น ข้ามค่าว่างด้วย
             ->whereNotNull('value')
             ->where('value', '!=', '')
-            ->orderByRaw(
-                'CASE WHEN locale_id = ? THEN 0 WHEN locale_id IS NULL THEN 1 ELSE 2 END ASC, locale_id ASC',
-                [$activeLocaleId ?? 0],
-            )
+            ->orderByRaw(...LocaleFallback::orderBy($activeLocaleId))
             ->get(['product_id', 'attribute_id', 'value']);
 
         // ทำ index ด้วย "product_id-attribute_id" เพื่อให้แต่ละแถวด้านล่างเป็น
@@ -380,6 +378,8 @@ class ProductController extends Controller
 
             $product->updated_by_name = $lastEditorByProduct->get($product->id);
 
+            // เฉพาะ attribute ที่มีค่า — เดิมส่งครบทั้ง ~730 ตัวต่อแถว (ส่วนใหญ่เป็น null) ทำให้ payload
+            // ~11KB ต่อสินค้า frontend อ่าน `attribute_values?.[id]` อยู่แล้ว ค่าที่ไม่มีก็ได้ undefined → "-" เหมือน null
             $product->attribute_values = $allAttributes->mapWithKeys(function (Attribute $attribute) use ($product, $valueByKey, $optionLabelByKey) {
                 $rawValue = $valueByKey[$product->id.'-'.$attribute->id] ?? null;
                 if ($attribute->type === 'select' && is_string($rawValue) && $optionLabelByKey->has($attribute->id.'|'.$rawValue)) {
@@ -387,14 +387,17 @@ class ProductController extends Controller
                 }
 
                 return [$attribute->id => $this->formatAttributeValue($attribute, $rawValue)];
-            });
+            })->reject(fn ($value) => $value === null);
 
             return $product;
         });
         $gridData->setCollection($items);
 
+        // gridConfig/families/attributes/salesChannels ไม่เปลี่ยนตามการค้นหา/กรอง/เปลี่ยนหน้า — เป็น closure
+        // เพื่อให้ partial reload ของหน้านี้ (only: gridData, filters) ข้ามไปเลย ไม่ต้องคำนวณ/serialize ซ้ำ
+        // (families อย่างเดียว ~230KB และใช้เวลา serialize ~100ms ต่อ request)
         return Inertia::render('catalog/products/index', [
-            'gridConfig' => $grid->getConfig(),
+            'gridConfig' => fn () => $grid->getConfig(),
             'gridData' => $gridData,
             // ใช้ key แบบระบุตรงๆ (ไม่ใช้ $request->only() ที่จะข้าม key ที่ไม่มีค่าไป)
             // เพื่อให้ตรงนี้ serialize เป็น JSON object เสมอ ไม่มีทางกลายเป็น `[]`
@@ -411,15 +414,15 @@ class ProductController extends Controller
                 'category_id' => $request->input('category_id', ''),
                 'category_name' => $request->input('category_name', ''),
             ],
-            'families' => AttributeFamily::cachedList(),
-            'attributes' => $allAttributes->map(fn (Attribute $attribute) => [
+            'families' => fn () => AttributeFamily::cachedList(),
+            'attributes' => fn () => $allAttributes->map(fn (Attribute $attribute) => [
                 'id' => $attribute->id,
                 'code' => $attribute->code,
                 'label' => $attribute->name,
                 'type' => $attribute->type,
                 'is_filterable' => (bool) $attribute->is_filterable,
             ]),
-            'salesChannels' => SalesPlatformShop::cachedGroupedByPlatform(),
+            'salesChannels' => fn () => SalesPlatformShop::cachedGroupedByPlatform(),
         ]);
     }
 
@@ -548,26 +551,7 @@ class ProductController extends Controller
      */
     private function resolveProductNamesInCurrentLocale(Collection $productIds): array
     {
-        $nameAttributeId = Attribute::idForCode('pname');
-        if (! $nameAttributeId || $productIds->isEmpty()) {
-            return [];
-        }
-
-        $activeLocaleId = Locale::idForCode(app()->getLocale());
-
-        $rowsByProduct = ProductValue::whereIn('product_id', $productIds)
-            ->where('attribute_id', $nameAttributeId)
-            ->whereNull('channel_id')
-            ->get(['product_id', 'locale_id', 'value'])
-            ->groupBy('product_id');
-
-        $names = [];
-        foreach ($rowsByProduct as $productId => $rows) {
-            $match = $activeLocaleId ? $rows->firstWhere('locale_id', $activeLocaleId) : null;
-            $names[$productId] = ($match ?? $rows->firstWhere('locale_id', null))?->value;
-        }
-
-        return $names;
+        return \App\Services\Catalog\ProductNameLookup::names($productIds);
     }
 
     /**
@@ -1752,9 +1736,9 @@ class ProductController extends Controller
      */
     private function copyProductData(Product $source, Product $target, bool $copyValues = true): void
     {
-        $target->applySmartDefaults();
-
         if (! $copyValues) {
+            $target->applySmartDefaults();
+
             return;
         }
 
@@ -1776,6 +1760,11 @@ class ProductController extends Controller
         if ($categoryIds->isNotEmpty()) {
             $target->categories()->sync($categoryIds);
         }
+
+        // หลังคัดลอกค่า + หมวดหมู่ — group ของ pid/pname คำนวณจากหมวดหมู่จริงแล้ว และชื่อที่คัดลอกมา
+        // ไม่ถูกบังด้วยแถว "ชื่อ = SKU" ที่สร้างไว้ก่อนใน group อื่น
+        $target->unsetRelation('categories');
+        $target->applySmartDefaults();
     }
 
     /**
@@ -4736,9 +4725,8 @@ class ProductController extends Controller
                     // แปลแยกตาม locale ทีหลัง ถ้าไม่มี fallback นี้ ฟิลด์ที่ผูกกับ
                     // locale ซึ่งเพิ่ง import มาใหม่ๆ จะดูเหมือนว่างเปล่า
                     // ทั้งที่จริงๆ มันมีค่าอยู่
-                    $query->where(function ($q) use ($localeId) {
-                        $q->whereNull('locale_id')->orWhere('locale_id', $localeId);
-                    })->orderByRaw('CASE WHEN locale_id = ? THEN 0 ELSE 1 END ASC', [$localeId]);
+                    // ภาษาที่เลือก → th → แถว NULL (LocaleFallback)
+                    $query->inLocale($localeId);
                 } else {
                     $query->whereNull('locale_id');
                 }

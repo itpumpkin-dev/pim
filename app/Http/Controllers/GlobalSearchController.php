@@ -13,7 +13,6 @@ use App\Models\CommissionGroup;
 use App\Models\Currency;
 use App\Models\Department;
 use App\Models\JobPosition;
-use App\Models\Locale;
 use App\Models\Point;
 use App\Models\Product;
 use App\Models\ProductGrade;
@@ -182,17 +181,10 @@ class GlobalSearchController extends Controller
             return collect();
         }
 
-        $activeLocaleId = Locale::idForCode(app()->getLocale());
-        $namesByProduct = ProductValue::whereIn('product_id', $products->pluck('id'))
-            ->where('attribute_id', $nameAttributeId)
-            ->whereNull('channel_id')
-            ->get(['product_id', 'locale_id', 'value'])
-            ->groupBy('product_id');
+        $namesByProduct = \App\Services\Catalog\ProductNameLookup::names($products->pluck('id'));
 
-        return $products->map(function (Product $product) use ($namesByProduct, $activeLocaleId) {
-            $rows = $namesByProduct->get($product->id);
-            $match = $rows && $activeLocaleId ? $rows->firstWhere('locale_id', $activeLocaleId) : null;
-            $name = ($match ?? $rows?->firstWhere('locale_id', null))?->value;
+        return $products->map(function (Product $product) use ($namesByProduct) {
+            $name = $namesByProduct[$product->id] ?? null;
 
             return [
                 'id' => $product->id,

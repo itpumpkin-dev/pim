@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Models\Concerns\Auditable;
 use App\Services\Catalog\EffectiveFamilyAttributeResolver;
+use App\Services\Catalog\LocaleFallback;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -213,11 +214,12 @@ class Product extends Model
         $pidAttr = Attribute::where('code', 'pid')->first();
         if ($pidAttr) {
             $pidGroupId = $familyAttributeResolver->primaryGroupIdFor($pidAttr->id, $effectiveFamilyIds);
+            $pidLocaleId = LocaleFallback::baseLocaleIdFor($pidAttr);
             $exists = $this->values()
                 ->where('attribute_id', $pidAttr->id)
                 ->where('attribute_group_id', $pidGroupId)
                 ->whereNull('channel_id')
-                ->whereNull('locale_id')
+                ->where('locale_id', $pidLocaleId)
                 ->first();
             if (!$exists || $exists->value === null || $exists->value === '') {
                 $this->values()->updateOrCreate(
@@ -225,50 +227,40 @@ class Product extends Model
                         'attribute_id' => $pidAttr->id,
                         'attribute_group_id' => $pidGroupId,
                         'channel_id' => null,
-                        'locale_id' => null,
+                        'locale_id' => $pidLocaleId,
                     ],
                     ['value' => $this->sku]
                 );
             }
         }
 
-        // 2. Set `pname` = SKU for each locale if empty/not set — unless a
-        // locale-agnostic value already exists in the global (locale_id
-        // null) scope, which is where bulk import (see ProductRowImporter)
-        // always writes locale-based attributes since it has no per-locale
-        // columns. Without this, a freshly bulk-imported product's real
-        // name would get shadowed by the raw SKU in every locale, since
-        // read paths prefer the locale-specific row over the global one.
+        // 2. ชื่อสินค้า (pname) ภาษาไทยว่าง → ใส่ SKU ไว้ก่อน — เขียนแค่ภาษาหลัก (th) ภาษาอื่นไม่สร้าง
+        // (DB cleanup Phase 2b — เดิมสร้างครบทุกภาษาเป็น copy ของชื่อไทย ทำให้ AI แปลไม่รู้ว่ายังไม่แปล
+        // และ copy บังชื่อใหม่ที่ import มาทีหลัง) ภาษาที่ยังไม่แปลอ่านชื่อไทยผ่าน LocaleFallback อยู่แล้ว
+        // ถ้ามีชื่อในแถว NULL (ข้อมูลเก่าก่อน pim:move-base-locale-values) ใช้ชื่อนั้นแทน SKU
         $pnameAttr = Attribute::where('code', 'pname')->first();
-        if ($pnameAttr) {
+        $baseLocaleId = LocaleFallback::baseLocaleId();
+        if ($pnameAttr && $baseLocaleId) {
             $pnameGroupId = $familyAttributeResolver->primaryGroupIdFor($pnameAttr->id, $effectiveFamilyIds);
-            $globalName = $this->values()
+            $nameRows = $this->values()
                 ->where('attribute_id', $pnameAttr->id)
                 ->where('attribute_group_id', $pnameGroupId)
                 ->whereNull('channel_id')
-                ->whereNull('locale_id')
-                ->value('value');
-            $defaultName = ($globalName !== null && $globalName !== '') ? $globalName : $this->sku;
+                ->where(fn ($q) => $q->whereNull('locale_id')->orWhere('locale_id', $baseLocaleId))
+                ->get(['locale_id', 'value']);
+            $baseName = $nameRows->firstWhere('locale_id', $baseLocaleId)?->value;
+            $legacyName = $nameRows->firstWhere('locale_id', null)?->value;
 
-            $locales = Locale::all();
-            foreach ($locales as $locale) {
-                $exists = $this->values()
-                    ->where('attribute_id', $pnameAttr->id)
-                    ->where('attribute_group_id', $pnameGroupId)
-                    ->whereNull('channel_id')
-                    ->where('locale_id', $locale->id)
-                    ->first();
-                if (!$exists || $exists->value === null || $exists->value === '') {
-                    $this->values()->updateOrCreate(
-                        [
-                            'attribute_id' => $pnameAttr->id,
-                            'attribute_group_id' => $pnameGroupId,
-                            'channel_id' => null,
-                            'locale_id' => $locale->id,
-                        ],
-                        ['value' => $defaultName]
-                    );
-                }
+            if ($baseName === null || $baseName === '') {
+                $this->values()->updateOrCreate(
+                    [
+                        'attribute_id' => $pnameAttr->id,
+                        'attribute_group_id' => $pnameGroupId,
+                        'channel_id' => null,
+                        'locale_id' => $baseLocaleId,
+                    ],
+                    ['value' => ($legacyName !== null && $legacyName !== '') ? $legacyName : $this->sku]
+                );
             }
         }
     }

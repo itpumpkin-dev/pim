@@ -10,6 +10,7 @@ use App\Models\Locale;
 use App\Models\Product;
 use App\Models\ProductValue;
 use App\Services\Catalog\AttributeValueFormatter;
+use App\Services\Catalog\LocaleFallback;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -182,6 +183,33 @@ class ProductLookupController extends Controller
             }
         }
 
+        if ($attribute->is_locale_based) {
+            $result = $attribute->is_channel_based
+                ? array_map(fn ($byLocale) => is_array($byLocale) ? $this->aliasBaseLocale($byLocale, $locales) : $byLocale, $result)
+                : $this->aliasBaseLocale($result, $locales);
+        }
+
         return $result;
+    }
+
+    /**
+     * ภาษาไทยย้ายจากแถว locale NULL ('default') ไปแถว th แล้ว (DB cleanup Phase 2b) — ให้ response มีทั้ง
+     * 'th' และ 'default' เสมอ client เดิมที่อ่าน value.default หรือ value.th ยังได้ค่าภาษาไทยเหมือนเดิม
+     *
+     * @param  array<string, mixed>  $byLocale
+     * @return array<string, mixed>
+     */
+    private function aliasBaseLocale(array $byLocale, Collection $locales): array
+    {
+        $baseCode = $locales->get(LocaleFallback::baseLocaleId()) ?? LocaleFallback::BASE_LOCALE_CODE;
+
+        if (! array_key_exists($baseCode, $byLocale) && array_key_exists('default', $byLocale)) {
+            $byLocale[$baseCode] = $byLocale['default'];
+        }
+        if (! array_key_exists('default', $byLocale) && array_key_exists($baseCode, $byLocale)) {
+            $byLocale['default'] = $byLocale[$baseCode];
+        }
+
+        return $byLocale;
     }
 }
