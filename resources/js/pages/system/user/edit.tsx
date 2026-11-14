@@ -9,6 +9,7 @@ import { Head, router, useForm, usePage } from '@inertiajs/react';
 import '@ui5/webcomponents-icons/dist/decline.js';
 import '@ui5/webcomponents-icons/dist/hide.js';
 import '@ui5/webcomponents-icons/dist/picture.js';
+import '@ui5/webcomponents-icons/dist/search.js';
 import '@ui5/webcomponents-icons/dist/show.js';
 import {
     Bar,
@@ -27,7 +28,7 @@ import {
     Text,
     Title,
 } from '@ui5/webcomponents-react';
-import { ChangeEvent, FormEventHandler, useMemo, useRef, useState } from 'react';
+import { ChangeEvent, FormEventHandler, useDeferredValue, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 interface UserGroupOption {
@@ -141,6 +142,8 @@ interface UserForm {
 const TAB_KEYS = ['general', 'groupsAndRoles', 'permissions', 'timeline', 'password', 'interfaces'] as const;
 type TabKey = (typeof TAB_KEYS)[number];
 
+const PERMISSION_PAGE_SIZE = 50;
+
 function humanize(value: string): string {
     return value
         .split('_')
@@ -183,6 +186,7 @@ export default function UserEdit({
     const { t } = useTranslation('system');
     const { t: tNav } = useTranslation('nav');
     const { t: tCatalog } = useTranslation('catalog');
+    const { t: tCommon } = useTranslation('common');
 
     // Anyone can open their own account here (it's the "Settings" page from the
     // user menu), but the user list at /system/user is gated by
@@ -247,6 +251,18 @@ export default function UserEdit({
 
         return Array.from(rows.values()).sort((a, b) => a.resource.localeCompare(b.resource) || a.action.localeCompare(b.action));
     }, [permissions, t]);
+
+    const [permissionSearch, setPermissionSearch] = useState('');
+    const deferredPermissionSearch = useDeferredValue(permissionSearch);
+    const filteredPermissionRows = useMemo(() => {
+        const query = deferredPermissionSearch.trim().toLowerCase();
+        if (!query) return permissionRows;
+        return permissionRows.filter(
+            (row) =>
+                `${row.resource} ${row.action} ${humanize(row.resource)} ${humanize(row.action)}`.toLowerCase().includes(query) ||
+                row.sources.some((source) => source.toLowerCase().includes(query)),
+        );
+    }, [permissionRows, deferredPermissionSearch]);
 
     // Column pop-in priority (SAP Fiori responsive table): resource
     // identifies the row and always stays; action follows as space allows;
@@ -746,10 +762,21 @@ export default function UserEdit({
                             <Text style={{ display: 'block', color: 'var(--sapContent_LabelColor)', marginBottom: '1rem' }}>
                                 {t('permissionsDescription')}
                             </Text>
+                            <Input
+                                type="Search"
+                                icon={<Icon name="search" />}
+                                placeholder={tCommon('search')}
+                                value={permissionSearch}
+                                onInput={(e) => setPermissionSearch(e.target.value)}
+                                style={{ width: '100%', maxWidth: 360, marginBottom: '0.75rem' }}
+                            />
+                            {/* ผู้ดูแลระบบมีสิทธิ์ ~1,800 แถว (แต่ละแถวมี Tag อีกหลายตัว) — render ทีเดียวทั้งหมด
+                                ทำให้กดเข้าแท็บนี้แล้วค้างไปหลายวินาที เลยแสดงทีละหน้าแบบ Fiori growing */}
                             <FioriResponsiveTable
                                 size="small"
                                 columns={permissionColumns}
-                                rows={permissionRows}
+                                rows={filteredPermissionRows}
+                                growingPageSize={PERMISSION_PAGE_SIZE}
                                 getRowKey={(row: PermissionRow) => `${row.resource}.${row.action}`}
                                 emptyMessage={t('noPermissionsAssigned')}
                             />

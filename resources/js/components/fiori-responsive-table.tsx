@@ -1,5 +1,14 @@
-import { Table, TableCell, TableHeaderCell, TableHeaderRow, TableRow, TableSelectionMulti, type TablePropTypes } from '@ui5/webcomponents-react';
-import { memo, useCallback, useMemo, type CSSProperties, type ReactNode } from 'react';
+import {
+    Table,
+    TableCell,
+    TableGrowing,
+    TableHeaderCell,
+    TableHeaderRow,
+    TableRow,
+    TableSelectionMulti,
+    type TablePropTypes,
+} from '@ui5/webcomponents-react';
+import { memo, useCallback, useEffect, useMemo, useState, type CSSProperties, type ReactElement, type ReactNode } from 'react';
 
 import styles from './fiori-responsive-table.module.css';
 
@@ -81,8 +90,10 @@ export interface FioriResponsiveTableProps<Row> {
     stickyHeader?: boolean;
     /** Bounds the table's own height and makes it scroll internally — required for `stickyHeader` to actually stick (see above). */
     maxHeight?: number | string;
-    /** Shows UI5's busy state over the table (after UI5's own 1s delay). */
+    /** Shows UI5's busy state over the table (after `loadingDelay`). */
     loading?: boolean;
+    /** ms before the busy state appears — UI5's default is 1000, too late to notice for a ~0.5s server round-trip. */
+    loadingDelay?: number;
     /**
      * Native Fiori multi-selection (UI5 `TableSelectionMulti`): adds the
      * standard selection column with a select-all header checkbox and the
@@ -92,6 +103,14 @@ export interface FioriResponsiveTableProps<Row> {
      */
     selectedKeys?: Array<string | number>;
     onSelectionChange?: (keys: string[]) => void;
+    /**
+     * Fiori "growing" (UI5 `TableGrowing`, Button mode): renders only the first
+     * `growingPageSize` rows plus a "More [shown / total]" button that adds the
+     * next page. For long client-side lists where mounting every row at once
+     * (each a stack of UI5 web components) makes the page stall. Resets to the
+     * first page whenever `rows` changes (e.g. a filter was applied).
+     */
+    growingPageSize?: number;
     style?: CSSProperties;
     className?: string;
 }
@@ -115,11 +134,43 @@ function FioriResponsiveTableInner<Row>({
     stickyHeader = false,
     maxHeight,
     loading = false,
+    loadingDelay,
     selectedKeys,
     onSelectionChange,
+    growingPageSize,
     style,
     className,
 }: FioriResponsiveTableProps<Row>) {
+    const [visibleCount, setVisibleCount] = useState(growingPageSize ?? Infinity);
+    useEffect(() => {
+        setVisibleCount(growingPageSize ?? Infinity);
+    }, [rows, growingPageSize]);
+    const visibleRows = useMemo(() => (visibleCount < rows.length ? rows.slice(0, visibleCount) : rows), [rows, visibleCount]);
+    const canGrow = growingPageSize !== undefined && visibleRows.length < rows.length;
+
+    // Built as an element array (not a fragment) so tables using neither
+    // feature keep passing `undefined`, exactly as before growing existed.
+    const features: ReactElement[] = [];
+    if (onSelectionChange) {
+        features.push(
+            <TableSelectionMulti
+                key="selection"
+                selected={(selectedKeys ?? []).map(String).join(' ')}
+                onChange={(event) => onSelectionChange(Array.from(event.target.getSelectedAsSet()))}
+            />,
+        );
+    }
+    if (canGrow) {
+        features.push(
+            <TableGrowing
+                key="growing"
+                mode="Button"
+                subtext={`[ ${visibleRows.length} / ${rows.length} ]`}
+                onLoadMore={() => setVisibleCount((count) => count + growingPageSize)}
+            />,
+        );
+    }
+
     const rowsByKey = useMemo(() => new Map(rows.map((row) => [String(getRowKey(row)), row])), [rows, getRowKey]);
 
     const handleRowClick = useCallback<NonNullable<TablePropTypes['onRowClick']>>(
@@ -136,14 +187,8 @@ function FioriResponsiveTableInner<Row>({
             className={styles.table}
             overflowMode="Popin"
             loading={loading}
-            features={
-                onSelectionChange ? (
-                    <TableSelectionMulti
-                        selected={(selectedKeys ?? []).map(String).join(' ')}
-                        onChange={(event) => onSelectionChange(Array.from(event.target.getSelectedAsSet()))}
-                    />
-                ) : undefined
-            }
+            loadingDelay={loadingDelay}
+            features={features.length === 0 ? undefined : features.length === 1 ? features[0] : features}
             onRowClick={onRowClick ? handleRowClick : undefined}
             noData={<div className={styles.empty}>{emptyMessage}</div>}
             headerRow={
@@ -167,7 +212,7 @@ function FioriResponsiveTableInner<Row>({
                 </TableHeaderRow>
             }
         >
-            {rows.map((row) => {
+            {visibleRows.map((row) => {
                 const key = String(getRowKey(row));
                 const extraClass = rowClassName?.(row);
                 return (

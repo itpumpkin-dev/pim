@@ -560,17 +560,34 @@ export default function ProductIndex({ gridConfig, gridData, filters, attributes
     const columnsByKey = new Map(allColumns.map((col) => [col.key, col]));
     const visibleColumns = selectedColumnKeys.map((key) => columnsByKey.get(key)).filter((c): c is ColumnDef => !!c);
 
+    // การค้นหา/กรอง/เรียง/เปลี่ยนหน้า โหลดแค่ gridData + filters (ที่เหลือฝั่ง server เป็น lazy prop ไม่ถูกคำนวณซ้ำ)
+    // และโชว์ busy state ของตารางระหว่างรอ — visit ที่ถูก visit ใหม่ขัดจังหวะ (พิมพ์ค้นหาต่อเนื่อง) ไม่ปิด
+    // loading เพราะตัวใหม่ยังวิ่งอยู่
+    const [gridLoading, setGridLoading] = useState(false);
+    const reloadGrid = (params: Record<string, unknown>, options: { replace?: boolean } = {}) => {
+        router.get('/catalog/products', params as Parameters<typeof router.get>[1], {
+            preserveState: true,
+            replace: options.replace,
+            only: ['gridData', 'filters'],
+            onStart: () => setGridLoading(true),
+            onFinish: (visit) => {
+                if (!visit.interrupted) setGridLoading(false);
+            },
+        });
+    };
+
     useEffect(() => {
         if (firstRender.current) {
             firstRender.current = false;
             return;
         }
 
+        // โชว์ loading ตั้งแต่เริ่มพิมพ์ ไม่ต้องรอ debounce ครบ ผู้ใช้จะรู้ทันทีว่ากำลังค้นหา
+        setGridLoading(true);
         const timeout = setTimeout(() => {
-            router.get(
-                '/catalog/products',
+            reloadGrid(
                 { search, sort: sortField, dir: sortDir, filters: activeFilters, attribute_filters: activeAttributeFilters, category_id: categoryId },
-                { preserveState: true, replace: true },
+                { replace: true },
             );
         }, 300);
 
@@ -579,68 +596,48 @@ export default function ProductIndex({ gridConfig, gridData, filters, attributes
     }, [search]);
 
     const goToPage = (page: number) => {
-        router.get(
-            '/catalog/products',
-            {
-                search,
-                page,
-                per_page: perPage,
-                sort: sortField,
-                dir: sortDir,
-                filters: activeFilters,
-                attribute_filters: activeAttributeFilters,
-                category_id: categoryId,
-            },
-            { preserveState: true },
-        );
+        reloadGrid({
+            search,
+            page,
+            per_page: perPage,
+            sort: sortField,
+            dir: sortDir,
+            filters: activeFilters,
+            attribute_filters: activeAttributeFilters,
+            category_id: categoryId,
+        });
     };
 
     const handlePerPageChange = (value: number) => {
         setPerPage(value);
-        router.get(
-            '/catalog/products',
-            {
-                search,
-                page: 1,
-                per_page: value,
-                sort: sortField,
-                dir: sortDir,
-                filters: activeFilters,
-                attribute_filters: activeAttributeFilters,
-                category_id: categoryId,
-            },
-            { preserveState: true },
-        );
+        reloadGrid({
+            search,
+            page: 1,
+            per_page: value,
+            sort: sortField,
+            dir: sortDir,
+            filters: activeFilters,
+            attribute_filters: activeAttributeFilters,
+            category_id: categoryId,
+        });
     };
 
     const handleSort = (field: string) => {
         const nextDir: 'asc' | 'desc' = sortField === field && sortDir === 'asc' ? 'desc' : 'asc';
         setSortField(field);
         setSortDir(nextDir);
-        router.get(
-            '/catalog/products',
-            { search, sort: field, dir: nextDir, filters: activeFilters, attribute_filters: activeAttributeFilters, category_id: categoryId },
-            { preserveState: true },
-        );
+        reloadGrid({ search, sort: field, dir: nextDir, filters: activeFilters, attribute_filters: activeAttributeFilters, category_id: categoryId });
     };
 
     const applyFilters = (next: ProductFilters, nextAttributeFilters: AttributeFilterRow[]) => {
         setActiveFilters(next);
         setActiveAttributeFilters(nextAttributeFilters);
-        router.get(
-            '/catalog/products',
-            { search, sort: sortField, dir: sortDir, filters: next, attribute_filters: nextAttributeFilters, category_id: categoryId },
-            { preserveState: true },
-        );
+        reloadGrid({ search, sort: sortField, dir: sortDir, filters: next, attribute_filters: nextAttributeFilters, category_id: categoryId });
     };
 
     const clearCategoryFilter = () => {
         setCategoryId('');
-        router.get(
-            '/catalog/products',
-            { search, sort: sortField, dir: sortDir, filters: activeFilters, attribute_filters: activeAttributeFilters, category_id: '' },
-            { preserveState: true },
-        );
+        reloadGrid({ search, sort: sortField, dir: sortDir, filters: activeFilters, attribute_filters: activeAttributeFilters, category_id: '' });
     };
 
     // สร้างไฟล์ในคิว (QuickExportProductsJob) แล้วแจ้งที่กระดิ่งเมื่อพร้อม — เดิมดาวน์โหลดตรงๆ
@@ -879,6 +876,8 @@ export default function ProductIndex({ gridConfig, gridData, filters, attributes
                             selectedKeys={selectedIds}
                             onSelectionChange={(keys) => setSelectedIds(keys.map(Number))}
                             emptyMessage={t('noProductsFound')}
+                            loading={gridLoading}
+                            loadingDelay={150}
                         />
                     </div>
                 </div>
