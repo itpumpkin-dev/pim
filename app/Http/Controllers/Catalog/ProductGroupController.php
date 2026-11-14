@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Catalog;
 
+use App\Rules\UniqueCategoryCode;
 use Illuminate\Support\Facades\DB;
 use App\Services\Catalog\CategoryCodeRenamer;
 use App\Services\CodeRenameGuard;
@@ -359,7 +360,7 @@ class ProductGroupController extends Controller
 
         // `code` is accepted only when creating — it is fixed afterwards.
         if (!$category) {
-            $rules['code'] = ['nullable', 'string', 'max:100', Rule::unique('categories', 'code')];
+            $rules['code'] = ['nullable', 'string', 'max:100', new UniqueCategoryCode];
         }
 
         return $request->validate($rules);

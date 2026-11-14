@@ -4,7 +4,6 @@ namespace App\Services\ImportExport\Importers;
 
 use App\Models\Attribute;
 use App\Models\AttributeFamily;
-use App\Models\Category;
 use App\Models\FamilyAttribute;
 use App\Models\ImportConfig;
 use App\Models\JobTracker;
@@ -331,19 +330,24 @@ class ProductRowImporter implements RowImporterInterface
         // group เลยได้ attribute_group_id = NULL ทุกแถว ไม่โผล่ใน panel ของ group
         // ไหนในหน้า Edit เลย ต้อง import ซ้ำอีกรอบถึงจะเข้า group ถูก (และทิ้งแถว
         // NULL ค้างไว้เป็นแถวซ้ำ)
-        $categoryCodes = array_values(array_unique(array_filter(
-            [$row['pcatname'] ?? null, $row['psubcatname'] ?? null, $row['productgroupname'] ?? null],
-            fn ($code) => is_string($code) && $code !== ''
-        )));
-        ProductCategoryLinker::linkFromCodes($product, $categoryCodes);
-
-        // linkFromCodes() ข้าม code ที่ไม่มีใน categories แบบเงียบๆ — แจ้งเป็น
-        // warning ของแถวนั้นแทน ไม่งั้นพิมพ์ code ผิด (เช่น ตัวพิมพ์ใหญ่ หรือมี
-        // ช่องว่าง) สินค้าจะไม่ได้หมวดหมู่/ตระกูลโดยไม่มีใครรู้ตัว
-        $unmatchedCategoryCodes = array_values(array_diff(
-            $categoryCodes,
-            $categoryCodes === [] ? [] : Category::whereIn('code', $categoryCodes)->pluck('code')->all()
-        ));
+        // product_category คือที่เก็บหมวดที่เดียว และสินค้าอยู่ได้สายเดียว (DB cleanup Phase 3b) — คอลัมน์
+        // pcatname/psubcatname/productgroupname ใช้เลือกหมวด: หมวดลึกสุดที่ระบุชนะ แทนที่หมวดเดิมทั้งหมด (เดิม
+        // เพิ่มอย่างเดียว ไม่เคยถอดหมวดเก่า สินค้าเลยค้างหลายหมวด) code ทั้ง 4 ตัวคำนวณตามหมวด ไม่ได้เขียนจาก
+        // ไฟล์ตรงๆ (ดู loop ด้านล่าง) ไม่ระบุหมวดเลย = ไม่แตะหมวดเดิม
+        // code ที่ไม่มีหมวดจริง (พิมพ์ผิด) ถูกข้าม ใช้ระดับลึกสุดที่หาเจอแทน + เตือน
+        $unmatchedCategoryCodes = [];
+        $categoryError = null;
+        $chosenCategoryCodes = array_intersect_key($row, array_flip(self::CATEGORY_COLUMNS));
+        if (array_filter($chosenCategoryCodes, fn ($code) => is_string($code) && trim($code) !== '')) {
+            try {
+                $categoryId = ProductCategoryLinker::categoryIdFromCodes($chosenCategoryCodes, $unmatchedCategoryCodes);
+                if ($categoryId !== null) {
+                    ProductCategoryLinker::assignCategory($product, $categoryId);
+                }
+            } catch (\DomainException $e) {
+                $categoryError = $e->getMessage();
+            }
+        }
 
         $unknownColumns = [];
         $restrictedColumns = [];
@@ -368,6 +372,10 @@ class ProductRowImporter implements RowImporterInterface
 
         foreach ($row as $key => $value) {
             if (in_array($key, self::FIXED_COLUMNS, true) || $value === null || $value === '') {
+                continue;
+            }
+            // code หมวดคำนวณจากหมวดที่ผูก (ด้านบน) — ไม่เขียนค่าจากไฟล์ทับ
+            if (in_array($key, self::CATEGORY_COLUMNS, true) || $key === 'pcatid') {
                 continue;
             }
 
@@ -437,6 +445,10 @@ class ProductRowImporter implements RowImporterInterface
 
         if (!empty($unmatchedCategoryCodes)) {
             $warnings[] = 'Category code(s) not found, product not linked to them: '.implode(', ', $unmatchedCategoryCodes);
+        }
+
+        if ($categoryError !== null) {
+            $warnings[] = 'Category not changed: '.$categoryError;
         }
 
         if (empty($effectiveFamilyIds)) {

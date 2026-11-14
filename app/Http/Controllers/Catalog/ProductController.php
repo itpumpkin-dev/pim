@@ -1802,8 +1802,8 @@ class ProductController extends Controller
      * ตอนกดบันทึกแล้วค่า 3 ตัวนี้ต่างจากที่บันทึกไว้ เพื่อเตือนผู้ใช้ว่าตระกูลแอตทริบิวต์ (= ฟิลด์ที่
      * ต้องกรอก) จะเปลี่ยนอย่างไร ไม่บันทึกอะไร
      *
-     * หมวดหมู่หลังบันทึก = หมวดหมู่ตามรหัสที่เลือก + หมวดหมู่ที่ผูกอยู่แล้วซึ่งไม่ถูกถอด (ดู
-     * relinkMasterCategoryCodes()/ProductCategoryLinker::staleCategoryIds()) ไม่เลือกเลย = ถอดหมด
+     * หมวดหมู่หลังบันทึก = สายเดียว root → หมวดลึกสุดที่เลือก (ดู ProductCategoryLinker::assignCategory())
+     * ไม่เลือกเลย = ถอดหมด
      * ช่องที่ "จะถูกซ่อน" = attribute ของตระกูลที่ถูกเอาออกซึ่งไม่มีในตระกูลใหม่ และมีค่ากรอกไว้แล้ว
      * (ค่ายังอยู่ใน DB ไม่ได้ถูกลบ — เปลี่ยนกลับเมื่อไหร่ก็เห็นอีกครั้ง)
      */
@@ -1817,14 +1817,10 @@ class ProductController extends Controller
 
         $currentFamilyIds = $this->familyAttributeResolver->effectiveFamilyIds($product);
 
-        if (empty($codes)) {
-            $nextCategoryIds = [];
-        } else {
-            $linkedIds = $product->categories()->pluck('categories.id')->map(fn ($id) => (int) $id)->all();
-            $staleIds = ProductCategoryLinker::staleCategoryIds($product, $codes);
-            $chosenIds = Category::whereIn('code', $codes)->pluck('id')->map(fn ($id) => (int) $id)->all();
-            $nextCategoryIds = array_values(array_unique(array_merge(array_diff($linkedIds, $staleIds), $chosenIds)));
-        }
+        // เหมือนตอนบันทึกจริง (ProductCategoryLinker::assignCategory): สายเดียวของหมวดลึกสุดที่เลือก
+        $chains = Category::whereIn(DB::raw('lower(code)'), array_map('strtolower', $codes))->pluck('id')
+            ->map(fn ($id) => ProductCategoryLinker::chainIds((int) $id));
+        $nextCategoryIds = $chains->sortByDesc(fn (array $chain) => count($chain))->first() ?? [];
         $nextFamilyIds = $this->familyAttributeResolver->familyIdsForCategoryIds($nextCategoryIds);
 
         $removedFamilyIds = array_values(array_diff($currentFamilyIds, $nextFamilyIds));
@@ -2070,68 +2066,6 @@ class ProductController extends Controller
         return explode('|', $compositeKey, 2)[1] ?? 'ungrouped';
     }
 
-    /**
-     * pcatname/psubcatname/productgroupname (แผง "Master Categories") เป็น
-     * ฟิลด์แบบเลือกได้ค่าเดียวต่อระดับ (ไม่ใช่ multi-select เหมือน category_ids)
-     * — ProductCategoryLinker::linkFromCodes() เองตั้งใจให้เป็น additive-only
-     * (ใช้ร่วมกับตัว import ERP ที่อาจต้องสะสมหลายหมวดจากหลายรอบ import) เลย
-     * ไม่ล้างของเดิมทิ้งให้เอง ทำให้ถ้าสลับค่าของฟิลด์พวกนี้ (เช่น เปลี่ยนกลุ่ม
-     * สินค้า) หมวดหมู่เก่าจะค้างอยู่ในต้นไม้ categories ตลอดไป — effectiveFamilyIds()
-     * เลยยังเห็นตระกูลของกลุ่มเดิมปนอยู่กับกลุ่มใหม่ (ข้อมูล/ฟิลด์แอตทริบิวต์ของ
-     * กลุ่มเก่าไม่หายไปทั้งที่เปลี่ยนกลุ่มสินค้าไปแล้ว) เมธอดนี้แก้ตรงนั้นเฉพาะจุด
-     * ที่ผูกกับ 3 attribute นี้เท่านั้น (ไม่ได้ไปแก้ linkFromCodes() เอง เพื่อไม่ให้
-     * กระทบพฤติกรรม additive ที่ ERP import ต้องพึ่งอยู่) — ถอด (detach) หมวดหมู่
-     * ของ "ค่าเดิม" ที่ถูกแทนที่ในรอบ save นี้ออกก่อน แล้วค่อยเชื่อมค่าใหม่เข้าไป
-     *
-     * $protectedCategoryIds: id ที่ห้ามถอดออกแม้จะตรงกับโค้ดเดิมที่ถูกแทนที่ —
-     * ใช้ตอนถูกเรียกจาก update() เพื่อกันไม่ให้ไปถอด category ที่ผู้ใช้เพิ่งติ๊ก
-     * เลือกไว้ใน category_ids (picker หมวดหมู่หลัก แบบ multi-select) ในคำขอ
-     * เดียวกันนี้เอง โดยบังเอิญตรงกับโค้ดเดิมของฟิลด์พวกนี้ — updateMasterCategories()
-     * (แผงมุมขวา ไม่มี category_ids ในคำขอของตัวเอง) เรียกโดยไม่มี guard นี้ เพราะ
-     * ไม่มีข้อมูล category_ids ให้เทียบเลย เคสชนกันแบบนี้พบยากในทางปฏิบัติ (ต้อง
-     * ตั้งใจติ๊กหมวดหมู่เดียวกันไว้ทั้งสองกลไกพร้อมกัน)
-     */
-    private function relinkMasterCategoryCodes(Product $product, array $oldCodes, array $newCodes, array $protectedCategoryIds = []): void
-    {
-        // ผู้ใช้ล้าง Category/Subcategory/Product Group ออกหมดตั้งใจ (ทั้ง 3
-        // ช่องว่างพร้อมกัน) — ถอดหมวดหมู่ที่ผูกกับสินค้านี้อยู่ตอนนี้ *ทั้งหมด*
-        // ไม่ใช่แค่ตัวที่ตรงกับ $oldCodes (ค่าที่เคย save ไว้ "ล่าสุดครั้งเดียว")
-        // เท่านั้น เพราะ ProductCategoryLinker::linkFromCodes() เป็น additive-only
-        // มาตลอด (ดู docblock เมธอดนี้ด้านบน) การเทียบแค่ oldCodes vs newCodes
-        // ของรอบ save นี้รอบเดียวจะจับได้แค่ของที่เพิ่งถูกแทนที่ล่าสุด ส่วน
-        // หมวดหมู่ที่ตกค้างมาจากการเปลี่ยนกลุ่มสินค้าหลายรอบก่อนหน้า (หรือจาก
-        // import) จะไม่ถูกถอดออกเลย ทำให้ attribute family ของหมวดหมู่ตกค้าง
-        // เหล่านั้นยังโผล่ในหน้า Edit Product อยู่ ทั้งที่ล้าง Master Categories
-        // ไปหมดแล้วดูจากหน้าจอ — บั๊กจริงที่ผู้ใช้เจอ (ยืนยันจากข้อมูลจริง: สินค้า
-        // ตัวหนึ่งมี category เก่าค้างอยู่ 2 ตัวที่ pcatname/psubcatname/
-        // productgroupname ไม่มีตัวไหนอ้างถึงแล้ว แต่ยังผูก family อยู่)
-        if (empty($newCodes)) {
-            $categoryIds = $product->categories()->pluck('categories.id')->diff($protectedCategoryIds);
-            if ($categoryIds->isNotEmpty()) {
-                $product->categories()->detach($categoryIds);
-            }
-
-            return;
-        }
-
-        $removedCodes = array_diff($oldCodes, $newCodes);
-        if (! empty($removedCodes)) {
-            $removedCategoryIds = Category::whereIn('code', $removedCodes)->pluck('id')->diff($protectedCategoryIds);
-            if ($removedCategoryIds->isNotEmpty()) {
-                $product->categories()->detach($removedCategoryIds);
-            }
-        }
-
-        ProductCategoryLinker::linkFromCodes($product, $newCodes);
-
-        // ถอดหมวดหมู่ที่ค้างมาจากการเปลี่ยนหมวดหมู่รอบก่อนๆ ด้วย ไม่ใช่แค่ตัวที่ถูกแทนที่ในรอบนี้
-        // ($removedCodes ด้านบน) — ไม่งั้นสินค้าจะอยู่ 2 กลุ่มสินค้าพร้อมกัน และหน้าแก้ไขยังโชว์
-        // แอตทริบิวต์ของกลุ่มเก่าปนอยู่ (ดู ProductCategoryLinker::staleCategoryIds())
-        $staleCategoryIds = collect(ProductCategoryLinker::staleCategoryIds($product, $newCodes))->diff($protectedCategoryIds);
-        if ($staleCategoryIds->isNotEmpty()) {
-            $product->categories()->detach($staleCategoryIds->all());
-        }
-    }
 
     /**
      * A per-product platform-category override (products.{platform}_category_id
@@ -2152,7 +2086,7 @@ class ProductController extends Controller
      * Called from update()/updateMasterCategories() only once the PIM
      * category assignment has *actually* settled for this request — update()
      * mutates `categories` in two separate steps (the category_ids tree sync,
-     * then relinkMasterCategoryCodes() further down from the Master
+     * then ProductCategoryLinker::assignCategory() further down from the Master
      * Categories panel's own values), so this must run after both, against
      * $newCategoryIds as the truly final set, not an intermediate one.
      * $oldOverrides is captured (via $product->only([...])) BEFORE any of
@@ -3708,19 +3642,9 @@ class ProductController extends Controller
             // $request->file('values') ด้วย เพราะไฟล์ก็ซ้อนแบบเดียวกัน
             $values = $this->flattenGroupedValues($request->input('values', []));
 
-            // pcatname/psubcatname/productgroupname (แผง "Master Categories" มุมขวา
-            // ของหน้าแก้ไข — ดู buildProductFormProps()) เป็น attribute value
-            // ธรรมดาที่ผ่าน $values ตรงนี้ — เชื่อมเข้าต้นไม้ categories จริงให้
-            // ผ่าน relinkMasterCategoryCodes() (อ่านค่าเดิมจาก DB ก่อนที่ loop
-            // เขียนค่าใหม่ทับด้านล่าง แล้วถอดหมวดหมู่ของค่าเดิมที่ถูกแทนที่ออก ก่อน
-            // เชื่อมค่าใหม่เข้าไป — กัน category เก่าค้าง ดู docblock ของเมธอดนั้น)
+            // pcatname/psubcatname/productgroupname (แผง "Master Categories" มุมขวาของหน้าแก้ไข — ดู
+            // buildProductFormProps()) มากับ $values — ใช้เลือกหมวดเท่านั้น (ดู assignCategory ด้านล่าง)
             $masterCategoryAttributeIds = Attribute::whereIn('code', self::MASTER_CATEGORY_ATTRIBUTE_CODES)->pluck('id');
-            $oldMasterCategoryCodes = ProductValue::where('product_id', $product->id)
-                ->whereIn('attribute_id', $masterCategoryAttributeIds)
-                ->whereNull('channel_id')->whereNull('locale_id')
-                ->pluck('value')
-                ->filter(fn ($code) => is_string($code) && $code !== '')
-                ->all();
             // pcatname/psubcatname/productgroupname ไม่เคยอยู่ใน family_attributes
             // เลย (ไม่ได้ผูกกับ group ไหนทั้งนั้น) — groupKey ของฟิลด์พวกนี้เป็น
             // 'ungrouped' เสมอฝั่ง frontend (ดู renderMasterCategoryField())
@@ -3728,7 +3652,7 @@ class ProductController extends Controller
             // อ่าน 'default' ก่อน แล้ว fallback ไป locale ไหนก็ได้ที่มีค่า — ถ้า
             // attribute พวกนี้ถูกติ๊ก is_locale_based ไว้ (เป็นอยู่จริงใน DB) frontend
             // จะส่งค่ามาใต้ locale id (เช่น '1') ไม่ใช่ 'default' เดิมอ่านแค่ 'default'
-            // เลยได้ค่าว่างทั้ง 3 ตัว → relinkMasterCategoryCodes() เข้าใจว่าผู้ใช้ล้าง
+            // เลยได้ค่าว่างทั้ง 3 ตัว → เข้าใจว่าผู้ใช้ล้าง
             // ทิ้งหมด → detach category ทั้งหมดของสินค้า (บั๊กจริง: กด Save ของแผง
             // Master Categories แล้ว พอกด Save Product ตระกูลแอตทริบิวต์หายต้องกด
             // บันทึกแผงนี้ใหม่อีกรอบ)
@@ -3751,33 +3675,26 @@ class ProductController extends Controller
 
                     return collect($localeValues)->first(fn ($code) => is_string($code) && $code !== '');
                 });
-            $masterCategoryCodes = $masterCategoryCodeByAttribute
-                ->filter(fn ($code) => is_string($code) && $code !== '')
-                ->values()
-                ->all();
-            // ไม่ส่ง $newCategoryIds เป็น $protectedCategoryIds อีกต่อไป (ต่างจาก
-            // เดิม) — เหตุผลเดิมของ guard นี้คือกันไม่ให้ไปถอด category ที่ผู้ใช้
-            // เพิ่งติ๊กเลือกไว้ใน category_ids picker (แบบ multi-select) ใน
-            // คำขอเดียวกันนี้เอง แต่หน้า Edit Product นี้ไม่มี UI ให้แก้ไข
-            // category_ids เลยตั้งแต่เอาแผง "Categories" เดิมออก (ดู
-            // resources/js/Pages/catalog/products/edit.tsx — data.category_ids
-            // แค่ initialize จาก prop แล้วส่งกลับเดิมทุกครั้ง ไม่เคยถูก setData()
-            // เปลี่ยนเลย) — $newCategoryIds จึงเป็นแค่ค่าที่โหลดมาตอนเปิดหน้า
-            // สะท้อนกลับไปเฉยๆ ไม่ใช่การกระทำที่ตั้งใจของผู้ใช้ในคำขอนี้อีกต่อไป
-            // พอ Master Categories (pcatname/psubcatname/productgroupname)
-            // ถูกลบออกหมด $oldMasterCategoryCodes ทุกตัวจะตรงกับ category ใน
-            // $newCategoryIds นี้เป๊ะ (เพราะเป็นชุดเดียวกันมาตั้งแต่ต้น) ทำให้
-            // "protected" ครอบคลุมทุกตัวที่ควรจะถูกถอดออกพอดี — detach()
-            // กลายเป็น no-op เงียบๆ ทุกครั้ง หมวดหมู่เก่าเลยค้างอยู่ตลอด (บั๊กจริง
-            // ที่ผู้ใช้เจอ: ลบ Category/Subcategory/Product Group ออกหมดแล้ว
-            // กด Save Product แต่ field ที่ผูกกับ attribute family เดิมยังโชว์
-            // อยู่เหมือนเดิมทุกอย่าง) — updateMasterCategories() (ปุ่ม Save ของ
-            // แผงนี้เอง) ไม่มีปัญหานี้อยู่แล้ว เพราะไม่เคยส่ง protectedCategoryIds
-            // มาตั้งแต่แรก
-            $this->relinkMasterCategoryCodes($product, $oldMasterCategoryCodes, $masterCategoryCodes);
+            // แผง Master Categories อยู่ในคำขอนี้ → ตั้งหมวดใน product_category (ที่เก็บหมวดที่เดียว — DB cleanup
+            // Phase 3b) จากหมวดลึกสุดที่เลือก code ทั้ง 4 ตัวคำนวณตาม (ProductCategoryLinker::assignCategory) และ
+            // เอา 3 ฟิลด์นี้ออกจาก $values — ไม่ให้ loop บันทึกค่าทั่วไปด้านล่างเขียน code ที่ผู้ใช้ส่งมาทับค่าที่คำนวณ
+            if ($masterCategoryCodeByAttribute->isNotEmpty()) {
+                $codeOfAttribute = Attribute::whereIn('id', $masterCategoryCodeByAttribute->keys())->pluck('code', 'id');
+                try {
+                    $chosenCategoryId = ProductCategoryLinker::categoryIdFromCodes(
+                        $masterCategoryCodeByAttribute->mapWithKeys(fn ($code, $attributeId) => [$codeOfAttribute[$attributeId] => $code])->all()
+                    );
+                } catch (\DomainException $e) {
+                    throw ValidationException::withMessages(['productgroupname' => $e->getMessage()]);
+                }
+                ProductCategoryLinker::assignCategory($product, $chosenCategoryId);
+            }
+            foreach ($masterCategoryAttributeIds as $masterCategoryAttributeId) {
+                unset($values["{$masterCategoryAttributeId}|ungrouped"]);
+            }
 
             // Only NOW is the PIM category assignment truly settled for this
-            // request — categories()->sync() above and relinkMasterCategoryCodes()
+            // request — categories()->sync() above and ProductCategoryLinker::assignCategory()
             // just above can each independently change it (the tree picker vs.
             // the Master Categories panel's own values), so this has to read
             // the category set fresh rather than trust $newCategoryIds, which
@@ -3785,6 +3702,12 @@ class ProductController extends Controller
             $finalCategoryIds = $product->categories()->pluck('categories.id')->map(fn ($id) => (int) $id)->sort()->values()->all();
             if ($finalCategoryIds !== $oldCategoryIds) {
                 $lostPlatformMappings = $this->reconcilePlatformCategoryOverrides($product, $oldCategoryIds, $finalCategoryIds, $oldPlatformCategoryOverrides);
+                // หมวดเปลี่ยนจากแผง Master Categories — code หมวดไม่ผ่าน loop บันทึกค่าแล้ว ($valuesChanged ไม่จับ)
+                // ต้องตั้ง $categoryChanged เอง ไม่งั้น ProductDataChanged (auto-sync marketplace/cache หน้าร้าน) ไม่ยิง
+                if (! $categoryChanged) {
+                    $categoryChanged = true;
+                    AuditLog::record('categories_updated', $product, ['category_ids' => $oldCategoryIds], ['category_ids' => $finalCategoryIds]);
+                }
             }
 
             // เก็บ error แบบ "values.{attributeId}" => message ไว้ตรงนี้ ทั้งจาก
@@ -4170,23 +4093,6 @@ class ProductController extends Controller
                 }
             }
 
-            // หมวดหมู่/หมวดหมู่ย่อย/กลุ่มสินค้า ต้องมีค่าเดียว (แถว locale_id = NULL) — แถวที่ผูก
-            // ภาษาไว้เป็นของค้างจากหน้าแก้ไขรุ่นก่อน ที่เขียนค่าที่เลือกลงช่องภาษาที่กำลังแก้ (attribute
-            // ทั้ง 3 ตัวถูกติ๊ก is_locale_based) ขณะที่การผูกหมวดหมู่ด้านบนอ่านจากแถว NULL → หน้าจอ
-            // โชว์กลุ่มใหม่ แต่สินค้ายังผูกกลุ่มเก่า ลบทิ้งทุกครั้งที่บันทึก ให้เหลือค่าเดียวกับที่ผูกจริง
-            foreach ($masterCategoryCodeByAttribute as $attributeId => $code) {
-                $canonical = ['product_id' => $product->id, 'attribute_id' => $attributeId, 'attribute_group_id' => null, 'channel_id' => null, 'locale_id' => null];
-                if (is_string($code) && $code !== '') {
-                    ProductValue::updateOrCreate($canonical, ['value' => $code]);
-                } else {
-                    ProductValue::where($canonical)->delete();
-                }
-            }
-            ProductValue::where('product_id', $product->id)
-                ->whereIn('attribute_id', $masterCategoryCodeByAttribute->keys())
-                ->whereNotNull('locale_id')
-                ->delete();
-
             $newProductValues = $this->productValueSnapshot($product->id, $touchedAttributeIds);
             $valuesChanged = $this->recordProductValueChanges($product, $oldProductValues, $newProductValues);
 
@@ -4515,10 +4421,9 @@ class ProductController extends Controller
     /**
      * Per-panel save: หมวดหมู่/หมวดหมู่ย่อย/กลุ่มสินค้า (pcatname/psubcatname/
      * productgroupname — self::MASTER_CATEGORY_ATTRIBUTE_CODES) มีปุ่ม Save
-     * แยกของตัวเอง (ตามที่ user ขอ) เหมือน updateChannels() ด้านบน — ทำงาน
-     * เหมือนตอนบันทึกผ่านฟอร์มใหญ่ทุกอย่าง (เขียน ProductValue ของ 3 attribute
-     * นี้ + เรียก ProductCategoryLinker::linkFromCodes() sync เข้าต้นไม้
-     * categories จริง) แค่ scope เฉพาะ 3 ฟิลด์นี้เท่านั้น ไม่แตะ attribute อื่น
+     * แยกของตัวเอง (ตามที่ user ขอ) เหมือน updateChannels() ด้านบน — ตั้งหมวดใน
+     * product_category ผ่าน ProductCategoryLinker::assignCategory() (code ทั้ง 4 ตัวคำนวณตาม)
+     * แค่ scope เฉพาะ 3 ฟิลด์นี้เท่านั้น ไม่แตะ attribute อื่น
      */
     public function updateMasterCategories(Request $request, Product $product): RedirectResponse
     {
@@ -4534,71 +4439,34 @@ class ProductController extends Controller
         }
         $validated = $request->validate($rules);
 
+        // product_category คือที่เก็บหมวดที่เดียว (DB cleanup Phase 3b) — หมวดลึกสุดที่เลือกชนะ ผูกทั้งสาย
+        // แล้วคำนวณ pcatid/pcatname/psubcatname/productgroupname ตาม (ProductCategoryLinker::assignCategory)
+        try {
+            $categoryId = ProductCategoryLinker::categoryIdFromCodes($validated);
+        } catch (\DomainException $e) {
+            throw ValidationException::withMessages(['productgroupname' => $e->getMessage()]);
+        }
+
         $lostPlatformMappings = [];
 
-        DB::transaction(function () use ($validated, $attributeIdsByCode, $request, $product, &$lostPlatformMappings) {
+        DB::transaction(function () use ($categoryId, $request, $product, &$lostPlatformMappings) {
             $this->assertNotStale($request, Product::where('id', $product->id)->lockForUpdate()->firstOrFail());
 
             $oldCategoryIds = $product->categories()->pluck('categories.id')->map(fn ($id) => (int) $id)->sort()->values()->all();
 
-            $codes = [];
-            $oldCodes = [];
-
-            foreach (self::MASTER_CATEGORY_ATTRIBUTE_CODES as $code) {
-                $attributeId = $attributeIdsByCode->get($code);
-                if (! $attributeId) {
-                    continue;
-                }
-
-                $row = ProductValue::where('product_id', $product->id)
-                    ->where('attribute_id', $attributeId)
-                    ->whereNull('channel_id')->whereNull('locale_id');
-
-                // อ่านค่าเดิมไว้ก่อนที่จะเขียนทับ/ลบด้านล่าง — relinkMasterCategoryCodes()
-                // ต้องใช้ค่านี้เทียบกับค่าใหม่ เพื่อรู้ว่า category ไหนถูกแทนที่บ้าง
-                $oldValue = $row->value('value');
-                if (is_string($oldValue) && $oldValue !== '') {
-                    $oldCodes[] = $oldValue;
-                }
-
-                $value = trim((string) ($validated[$code] ?? ''));
-
-                if ($value !== '') {
-                    $row->exists()
-                        ? $row->update(['value' => $value])
-                        : ProductValue::create([
-                            'product_id' => $product->id,
-                            'attribute_id' => $attributeId,
-                            'channel_id' => null,
-                            'locale_id' => null,
-                            'value' => $value,
-                        ]);
-                    $codes[] = $value;
-                } else {
-                    $row->delete();
-                }
-            }
-
-            // ต้องอ่านค่า override เดิมไว้ก่อน relinkMasterCategoryCodes() —
-            // ฟอร์มนี้ไม่มีฟิลด์ override พวกนี้ให้กรอกเลย เพราะฉะนั้นค่าที่
-            // $product ถืออยู่ตอนนี้ ("old") กับตอนหลัง ("new") จะเหมือนกันเป๊ะ
-            // เสมอ — ทำให้ reconcilePlatformCategoryOverrides() (ที่ปกติจะ
-            // แยกแยะ "แอดมินเพิ่งตั้งใจแก้ override เอง" ออกจาก "ค่าเดิมที่ค้าง
-            // มาจากก่อนหน้า") เคลียร์ override เก่าทิ้งแบบไม่มีเงื่อนไข ถูกต้อง
-            // แล้วสำหรับ endpoint นี้โดยเฉพาะ
+            // ต้องอ่านค่า override เดิมไว้ก่อนเปลี่ยนหมวด — ฟอร์มนี้ไม่มีฟิลด์ override พวกนี้ให้กรอกเลย ค่า
+            // "old" กับ "new" จึงเหมือนกันเสมอ ทำให้ reconcilePlatformCategoryOverrides() เคลียร์ override เก่าทิ้ง
+            // แบบไม่มีเงื่อนไข ถูกต้องแล้วสำหรับ endpoint นี้โดยเฉพาะ
             $oldPlatformCategoryOverrides = $product->only([
                 'shopee_category_id', 'lazada_category_id', 'tiktok_category_id', 'woocommerce_category_id',
             ]);
 
-            $this->relinkMasterCategoryCodes($product, $oldCodes, $codes);
+            $newCategoryIds = collect(ProductCategoryLinker::assignCategory($product, $categoryId))->sort()->values()->all();
 
-            // เหตุผลเดียวกับ updateChannels() ด้านบน — ProductValue::update()/
-            // create()/delete() ในลูปข้างบนไม่ได้ทำให้ products.updated_at ขยับ
-            // เองเลย (คนละแถว/ตาราง) ต้อง touch() ให้ OCC check เห็นว่าแผงนี้
-            // เพิ่งเปลี่ยนแปลงไปแล้วจริงๆ
-            if ($oldCodes !== $codes) {
-                $newCategoryIds = $product->categories()->pluck('categories.id')->map(fn ($id) => (int) $id)->sort()->values()->all();
+            if ($newCategoryIds !== $oldCategoryIds) {
                 $lostPlatformMappings = $this->reconcilePlatformCategoryOverrides($product, $oldCategoryIds, $newCategoryIds, $oldPlatformCategoryOverrides);
+                AuditLog::record('categories_updated', $product, ['category_ids' => $oldCategoryIds], ['category_ids' => $newCategoryIds]);
+                // pivot ไม่ทำให้ products.updated_at ขยับเอง — touch() ให้ OCC check เห็นว่าแผงนี้เพิ่งเปลี่ยน
                 $product->touch();
             }
         });
@@ -4656,9 +4524,8 @@ class ProductController extends Controller
         }
 
         DB::transaction(function () use ($validated, $product) {
-            $product->categories()->sync([$validated['category_id']]);
-            ProductCategoryLinker::deriveLegacyCodesFromCategories($product, [$validated['category_id']]);
-            AuditLog::record('categories_updated', $product, ['category_ids' => []], ['category_ids' => [$validated['category_id']]]);
+            $chain = ProductCategoryLinker::assignCategory($product, (int) $validated['category_id']);
+            AuditLog::record('categories_updated', $product, ['category_ids' => []], ['category_ids' => $chain]);
         });
 
         return response()->json(['success' => true]);

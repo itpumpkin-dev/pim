@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Catalog;
 
+use App\Rules\UniqueCategoryCode;
 use App\Services\Catalog\CategoryCodeRenamer;
 use App\Services\CodeRenameGuard;
 use App\Http\Controllers\Concerns\HasVersionHistory;
@@ -249,7 +250,7 @@ class CategoryController extends Controller
         $categoryFields = CategoryField::where('status', true)->get();
 
         $rules = [
-            'code' => ['nullable', 'string', 'max:100', Rule::unique('categories', 'code')],
+            'code' => ['nullable', 'string', 'max:100', new UniqueCategoryCode],
             'name' => ['nullable', 'string', 'max:255'],
             'translations' => ['nullable', 'array'],
             'translations.*' => ['nullable', 'string', 'max:255'],
