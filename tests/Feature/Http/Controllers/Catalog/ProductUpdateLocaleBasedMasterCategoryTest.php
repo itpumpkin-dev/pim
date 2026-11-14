@@ -62,9 +62,9 @@ test('update() keeps the product group when master category values arrive under 
  * three under 'default'; stale locale rows are dropped on every save.
  */
 test('changing the product group via the main save moves the product to the new group and drops stale locale rows', function () {
-    $pcatname = Attribute::create(['code' => 'pcatname', 'type' => 'select', 'is_locale_based' => true]);
-    $psubcatname = Attribute::create(['code' => 'psubcatname', 'type' => 'select', 'is_locale_based' => true]);
-    $productgroupname = Attribute::create(['code' => 'productgroupname', 'type' => 'select', 'is_locale_based' => true]);
+    $pcatname = Attribute::create(['code' => 'pcatname', 'type' => 'select', 'is_locale_based' => true, 'master_source' => 'categories']); // options mirror the categories, as in production
+    $psubcatname = Attribute::create(['code' => 'psubcatname', 'type' => 'select', 'is_locale_based' => true, 'master_source' => 'subcategories']); // options mirror the categories, as in production
+    $productgroupname = Attribute::create(['code' => 'productgroupname', 'type' => 'select', 'is_locale_based' => true, 'master_source' => 'product_groups']); // options mirror the categories, as in production
 
     $root = Category::create(['code' => 'pulb2_root', 'name' => 'Root']);
     $sub = Category::create(['code' => 'pulb2_sub', 'name' => 'Sub', 'parent_id' => $root->id]);

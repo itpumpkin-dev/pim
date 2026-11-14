@@ -27,6 +27,108 @@ class ProductCategoryLinker
         'productgroupname' => 2,
     ];
 
+    /** attribute ที่ผู้ใช้/ไฟล์ import ใช้เลือกหมวด เรียงจากลึกสุด (หมวดลึกสุดที่เลือกไว้ชนะ) */
+    public const CHOOSER_CODES = ['productgroupname', 'psubcatname', 'pcatname'];
+
+    /**
+     * ตั้งหมวดหมู่ของสินค้า — product_category คือที่เก็บหมวดที่เดียว และสินค้า 1 ตัวอยู่ได้สายเดียว
+     * (DB cleanup Phase 3b): ผูก root → … → $categoryId ครบทั้งสาย ถอดหมวดอื่นทั้งหมด แล้วคำนวณ
+     * pcatid/pcatname/psubcatname/productgroupname ตาม null = ล้างหมวดของสินค้า
+     *
+     * ทุกจุดที่เปลี่ยนหมวดของสินค้า (หน้าแก้ไข, import, แผง marketplace) ต้องผ่านเมธอดนี้
+     *
+     * @return array<int, int> id ของสาย root → leaf
+     */
+    public static function assignCategory(Product $product, ?int $categoryId): array
+    {
+        $chain = $categoryId ? self::chainIds($categoryId) : [];
+        $product->categories()->sync($chain);
+        self::deriveLegacyCodesFromCategories($product, $chain);
+
+        return $chain;
+    }
+
+    /**
+     * หมวดลึกสุดจาก code ที่เลือก (productgroupname > psubcatname > pcatname) — code ใน attribute/option
+     * เป็นตัวพิมพ์เล็กเสมอ จึงเทียบกับ categories.code แบบไม่สนตัวพิมพ์ null = ไม่ได้เลือกหมวดเลย
+     *
+     * @param  array<string, string|null>  $codesByAttribute  attribute code => code ที่เลือก
+     * @param  array<int, string>|null  $unknownCodes  ส่ง array มา = code ที่ไม่มีหมวดจริงถูกข้ามแล้วเก็บไว้ในนี้
+     *                                                  (import: ใช้ระดับลึกสุดที่หาเจอ + เตือน) ไม่ส่ง = throw
+     *
+     * @throws \DomainException code ชนกันหลายหมวดเมื่อไม่สนตัวพิมพ์ หรือ code ไม่มีหมวดจริง (เมื่อไม่ส่ง $unknownCodes)
+     */
+    public static function categoryIdFromCodes(array $codesByAttribute, ?array &$unknownCodes = null): ?int
+    {
+        foreach (self::CHOOSER_CODES as $attributeCode) {
+            $code = trim((string) ($codesByAttribute[$attributeCode] ?? ''));
+            if ($code === '') {
+                continue;
+            }
+
+            $ids = Category::whereRaw('lower(code) = ?', [strtolower($code)])->pluck('id');
+            if ($ids->count() > 1) {
+                throw new \DomainException("Category code \"{$code}\" matches more than one category (codes differ only by upper/lower case) — give one of them a different code first.");
+            }
+            if ($ids->isEmpty()) {
+                if ($unknownCodes === null) {
+                    throw new \DomainException("Category code \"{$code}\" does not exist.");
+                }
+                $unknownCodes[] = $code;
+
+                continue;
+            }
+
+            return (int) $ids->first();
+        }
+
+        return null;
+    }
+
+    /**
+     * @return array<int, int> root → $categoryId
+     */
+    public static function chainIds(int $categoryId): array
+    {
+        $chain = [];
+        for ($id = $categoryId; $id !== null && ! in_array($id, $chain, true); ) {
+            $parentId = Category::whereKey($id)->value('parent_id');
+            array_unshift($chain, $id);
+            $id = $parentId !== null ? (int) $parentId : null;
+        }
+
+        return $chain;
+    }
+
+    /**
+     * หลังย้าย (parent เปลี่ยน) หรือลบหมวด — ผูกสายของสินค้าในหมวดนั้นใหม่ตามหมวดลึกสุดที่ยังผูกอยู่ แล้ว
+     * คำนวณ code ใหม่ (ไม่งั้นสินค้ายังผูกหมวดแม่เดิม และ code ค้างเป็นหมวดที่ถูกลบ/ย้ายไปแล้ว)
+     *
+     * @param  iterable<int>  $productIds
+     */
+    public static function resyncProducts(iterable $productIds): void
+    {
+        foreach (Product::whereIn('id', collect($productIds)->unique()->values())->get() as $product) {
+            $leaf = self::deepestAncestorChain($product->categories()->pluck('categories.id')->all());
+            self::assignCategory($product, $leaf ? end($leaf)->id : null);
+        }
+    }
+
+    /**
+     * สินค้าที่ผูกกับหมวดนี้หรือหมวดลูกหลานของมัน
+     *
+     * @return array<int, int>
+     */
+    public static function productIdsUnder(int $categoryId): array
+    {
+        return array_map('intval', array_column(\Illuminate\Support\Facades\DB::select(<<<'SQL'
+            WITH RECURSIVE sub AS (
+                SELECT id FROM categories WHERE id = ?
+                UNION SELECT c.id FROM categories c JOIN sub ON c.parent_id = sub.id)
+            SELECT DISTINCT pc.product_id FROM product_category pc JOIN sub ON sub.id = pc.category_id
+            SQL, [$categoryId]), 'product_id'));
+    }
+
     /**
      * เพิ่มอย่างเดียว ไม่มีการลบ — จะไม่มีวันลบการเชื่อมโยงหมวดหมู่ทิ้ง เพราะแอดมิน
      * อาจจะจัดต้นไม้เอาไว้เองด้วยมือ (เช่น ตั้งใจให้อยู่หลายหมวดหมู่พร้อมกัน)
@@ -149,6 +251,8 @@ class ProductCategoryLinker
                     ['product_id' => $product->id, 'attribute_id' => $attributeId, 'channel_id' => null, 'locale_id' => null],
                     ['value' => $code]
                 );
+                // ไม่แยกภาษา — แถวรายภาษาที่ค้างจากหน้าแก้ไขรุ่นก่อนต้องไม่เหลือ (ตัวอ่านบางจุดเลือกแถวภาษาก่อน)
+                ProductValue::where('product_id', $product->id)->where('attribute_id', $attributeId)->whereNotNull('locale_id')->delete();
             } else {
                 ProductValue::where('product_id', $product->id)->where('attribute_id', $attributeId)->delete();
             }
@@ -187,7 +291,7 @@ class ProductCategoryLinker
 
     /**
      * จากหมวดหมู่ที่สินค้านี้ถูก assign ไว้ทั้งหมด เลือกหมวดหมู่ที่เจาะจงที่สุด
-     * (code ยาวที่สุด ถ้าเท่ากันให้ใช้ id น้อยสุดเพื่อให้ผลลัพธ์คงที่แน่นอน)
+     * (ลึกที่สุดใน tree ถ้าเท่ากันให้ใช้ id น้อยสุดเพื่อให้ผลลัพธ์คงที่แน่นอน)
      * แล้วคืนสายบรรพบุรุษของมันตั้งแต่ root ถึง leaf โดย index ตามความลึก
      * (0 = root) ต้นไม้นี้ลึกแค่ 3 level และมีขนาดเล็ก (~1,000 แถว) การโหลดมา
      * ทั้งหมดเลยง่ายกว่าการไล่ parent_id ทีละ query ต่อ level — เป็น tradeoff
@@ -203,10 +307,22 @@ class ProductCategoryLinker
 
         $categoriesById = Category::all(['id', 'code', 'parent_id'])->keyBy('id');
 
+        // ลึกสุดตามตำแหน่งจริงใน tree (จำนวนหมวดแม่) ไม่ใช่ความยาว code — code ไม่จำเป็นต้องไล่ตามระดับ
+        // (หมวดที่ถูกย้าย เช่น a024004 อยู่ใต้ a006 หรือ code ที่ตั้งเอง) ลึกเท่ากันใช้ id น้อยสุดให้ผลคงที่
+        $depthOf = function (Category $category) use ($categoriesById): int {
+            $depth = 0;
+            $seen = [];
+            for ($parentId = $category->parent_id; $parentId !== null && ! isset($seen[$parentId]); $parentId = $categoriesById->get($parentId)?->parent_id) {
+                $seen[$parentId] = true;
+                $depth++;
+            }
+
+            return $depth;
+        };
         $deepest = collect($categoryIds)
             ->map(fn ($id) => $categoriesById->get($id))
             ->filter()
-            ->sort(fn (Category $a, Category $b) => strlen($b->code) <=> strlen($a->code) ?: $a->id <=> $b->id)
+            ->sort(fn (Category $a, Category $b) => $depthOf($b) <=> $depthOf($a) ?: $a->id <=> $b->id)
             ->first();
 
         if (!$deepest) {

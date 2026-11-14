@@ -24,6 +24,7 @@ use App\Models\ProductTypeTranslation;
 use App\Models\Vendor;
 use App\Models\VendorTranslation;
 use App\Services\Catalog\MasterAttributeOptionSync;
+use App\Services\Catalog\ProductCategoryLinker;
 use App\Services\Queue\QueueWorkerHeartbeat;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Database\Eloquent\Model;
@@ -72,6 +73,23 @@ class AppServiceProvider extends ServiceProvider
             $modelClass::saved(fn (Model $model) => $sync()->syncModel($model));
             $modelClass::deleted(fn (Model $model) => $sync()->forgetModel($model));
         }
+        // product_category คือที่เก็บหมวดที่เดียว (DB cleanup Phase 3b) — ย้ายหมวด (parent เปลี่ยน) หรือลบหมวด
+        // → ผูกสายของสินค้าในหมวดนั้น (รวมหมวดลูกหลาน) ใหม่ และคำนวณ pcatid/pcatname/psubcatname/
+        // productgroupname ใหม่ ไม่งั้นสินค้ายังผูกหมวดแม่เดิม และ code ค้างเป็นหมวดที่ย้าย/ลบไปแล้ว
+        Category::updated(function (Category $category): void {
+            if ($category->wasChanged('parent_id')) {
+                ProductCategoryLinker::resyncProducts(ProductCategoryLinker::productIdsUnder($category->id));
+            }
+        });
+        $productsOfDeletedCategory = [];
+        Category::deleting(function (Category $category) use (&$productsOfDeletedCategory): void {
+            $productsOfDeletedCategory[$category->id] = ProductCategoryLinker::productIdsUnder($category->id);
+        });
+        Category::deleted(function (Category $category) use (&$productsOfDeletedCategory): void {
+            ProductCategoryLinker::resyncProducts($productsOfDeletedCategory[$category->id] ?? []);
+            unset($productsOfDeletedCategory[$category->id]);
+        });
+
         // Category names live on a sibling model — re-sync the parent category.
         $syncTranslationParent = function (CategoryTranslation $translation) use ($sync): void {
             if ($category = $translation->category) {

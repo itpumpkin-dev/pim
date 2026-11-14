@@ -161,7 +161,7 @@ class NormalizeProductCategoriesCommand extends Command
                 $ids = $categoryIdByCode[strtolower(trim($code))] ?? [];
                 if (count($ids) > 1) {
                     $this->stats['case_clash']++;
-                    $this->log[] = ['case_clash', $product->sku, $code, '', implode('/', $wanted)];
+                    $this->log[] = ['case_clash', $product->sku, '', $code, implode('/', $wanted)];
 
                     return null;
                 }
@@ -255,7 +255,7 @@ class NormalizeProductCategoriesCommand extends Command
         $clashing = array_values(array_filter($target, fn (int $id) => isset($this->clashingCategoryIds[$id])));
         if ($clashing) {
             $this->stats['case_clash']++;
-            $this->log[] = ['case_clash', $product->sku, implode(', ', array_map(fn ($id) => $this->categoriesById[$id]->code, $clashing)), '', implode('/', $before)];
+            $this->log[] = ['case_clash', $product->sku, '', implode(', ', array_map(fn ($id) => $this->categoriesById[$id]->code, $clashing)), implode('/', $before)];
 
             return;
         }
