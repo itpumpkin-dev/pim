@@ -5,12 +5,10 @@ namespace App\Http\Controllers\Catalog;
 use App\Http\Controllers\Controller;
 use App\Jobs\SyncMarketplaceListingsJob;
 use App\Models\Attribute;
-use App\Models\Locale;
 use App\Models\MarketplaceListing;
 use App\Models\MarketplaceListingDetail;
 use App\Models\MarketplaceListingSyncRun;
 use App\Models\Product;
-use App\Models\ProductValue;
 use App\Models\SalesPlatformShop;
 use App\Services\Marketplace\Listings\ListingMatchSuggester;
 use App\Services\Marketplace\Listings\ListingScoreSuggester;
@@ -439,30 +437,6 @@ class ProductMatchingController extends Controller
      */
     private function productNames(Collection $productIds): array
     {
-        $nameAttrId = Attribute::idForCode('pname');
-        if (! $nameAttrId || $productIds->isEmpty()) {
-            return [];
-        }
-
-        $activeLocaleId = Locale::idForCode(app()->getLocale());
-        $names = [];
-        $values = ProductValue::whereIn('product_id', $productIds)
-            ->where('attribute_id', $nameAttrId)
-            ->whereNull('channel_id')
-            ->where(function ($q) use ($activeLocaleId) {
-                $q->whereNull('locale_id');
-                if ($activeLocaleId) {
-                    $q->orWhere('locale_id', $activeLocaleId);
-                }
-            })
-            ->get(['product_id', 'locale_id', 'value']);
-
-        foreach ($values as $v) {
-            if (! isset($names[$v->product_id]) || $v->locale_id === $activeLocaleId) {
-                $names[$v->product_id] = $v->value;
-            }
-        }
-
-        return $names;
+        return \App\Services\Catalog\ProductNameLookup::names($productIds);
     }
 }

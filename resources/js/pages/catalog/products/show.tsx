@@ -370,7 +370,9 @@ export default function ProductShow({
     const getValue = (attr: AttributeItem, groupKey: string = 'ungrouped'): string => {
         const localeKey = attr.is_locale_based ? String(activeLocaleId) : 'default';
         const scope = productValues[attr.id]?.[groupKey]?.['global'];
-        return scope?.[localeKey] ?? scope?.['default'] ?? '';
+        // ภาษาที่เลือก → ภาษาไทย (th — ภาษาหลัก) → 'default' (ข้อมูลเก่า) ตามกติกา LocaleFallback ฝั่ง PHP
+        const baseLocaleKey = String(locales.find((l) => l.code === 'th')?.id ?? '');
+        return scope?.[localeKey] ?? (baseLocaleKey ? scope?.[baseLocaleKey] : undefined) ?? scope?.['default'] ?? '';
     };
 
     const groupKeyOf = (group: GroupWithAttributes) => (group.id === 0 ? 'ungrouped' : String(group.id));

@@ -394,7 +394,7 @@ class ProductRowImporter implements RowImporterInterface
             if ($attribute->is_unique) {
                 $takenBySku = ProductValue::where('product_values.attribute_id', $attribute->id)
                     ->whereNull('product_values.channel_id')
-                    ->whereNull('product_values.locale_id')
+                    ->where('product_values.locale_id', $attribute->is_locale_based && ! $attribute->is_unique ? $this->sourceLocaleId($config) : null)
                     ->where('product_values.value', (string) $value)
                     ->where('product_values.product_id', '!=', $product->id)
                     ->join('products', 'products.id', '=', 'product_values.product_id')
@@ -408,14 +408,15 @@ class ProductRowImporter implements RowImporterInterface
 
             $groupId = $familyAttributeResolver->primaryGroupIdFor($attribute->id, $effectiveFamilyIds);
 
+            // locale-based values land in the import's source locale (Thai by default) — every
+            // locale-based row carries a locale_id (DB cleanup Phase 2b, LocaleFallback); only
+            // non-locale and unique (code-like: pid, barcode_*) attributes use the locale-less row
             ProductValue::updateOrCreate(
-                ['product_id' => $product->id, 'attribute_id' => $attribute->id, 'attribute_group_id' => $groupId, 'channel_id' => null, 'locale_id' => null],
+                ['product_id' => $product->id, 'attribute_id' => $attribute->id, 'attribute_group_id' => $groupId, 'channel_id' => null, 'locale_id' => $attribute->is_locale_based && ! $attribute->is_unique ? $this->sourceLocaleId($config) : null],
                 ['value' => (string) $value]
             );
 
-            // Imported locale-based values always land in the untranslated/
-            // global bucket above (see importableAttributeCodes())
-            // — with "AI translate" on, fan that value out to every other
+            // With "AI translate" on, fan that value out to every other
             // enabled locale that doesn't already have one of its own, same
             // as ticking "AI translate" on an Attribute/Category label does.
             if ($config->ai_translate && $attribute->is_locale_based) {

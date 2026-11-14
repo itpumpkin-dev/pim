@@ -4,11 +4,11 @@ namespace App\Services\ImportExport\Exporters;
 
 use App\Models\Attribute;
 use App\Models\ExportConfig;
-use App\Models\Locale;
 use App\Models\Product;
 use App\Models\ProductValue;
 use App\Models\User;
 use App\Services\Catalog\AttributeAccessPolicy;
+use App\Services\Catalog\LocaleFallback;
 use App\Services\ImportExport\Importers\ProductRowImporter;
 use Illuminate\Support\Collection;
 
@@ -42,8 +42,8 @@ class ProductRowExporter implements RowExporterInterface, HasMediaFiles
     /**
      * ค่าของแต่ละ attribute (attribute_id => value) จากแถว product_values ของสินค้าหนึ่งตัว
      * (scope channel = global) — ไฟล์มีคอลัมน์เดียวต่อ attribute เลยต้องเลือก "ค่าหลัก" ตัวเดียว:
-     *   1. ไม่ระบุภาษา (locale_id NULL — ค่าที่ importer เขียนและทุก read path ใช้เป็น fallback)
-     *   2. ภาษาตั้งต้นของระบบ (config app.locale) 3. ภาษาอื่นที่ id ต่ำสุด
+     *   ตามกติกา LocaleFallback ของภาษาหลัก: ภาษาไทย (th) → ไม่ระบุภาษา (locale_id NULL — ข้อมูลเก่า
+     *   และ attribute ไม่แยกภาษา) → ภาษาอื่นที่ id ต่ำสุด
      * แล้วภายในภาษาเดียวกัน: ไม่มี group ก่อน แล้วค่อย group id ต่ำสุด (เหมือน primaryGroupIdFor())
      * ข้ามค่าว่าง ไม่งั้นแถวว่างของภาษาหนึ่งจะบังค่าจริงของอีกภาษา
      *
@@ -56,7 +56,7 @@ class ProductRowExporter implements RowExporterInterface, HasMediaFiles
             ->filter(fn ($r) => $r->value !== null && $r->value !== '')
             ->sortBy(fn ($r) => sprintf(
                 '%d|%d|%010d|%010d',
-                $r->locale_id === null ? 0 : ((int) $r->locale_id === $defaultLocaleId ? 1 : 2),
+                LocaleFallback::rank($r->locale_id === null ? null : (int) $r->locale_id, $defaultLocaleId),
                 $r->attribute_group_id === null ? 0 : 1,
                 (int) ($r->attribute_group_id ?? 0),
                 (int) ($r->locale_id ?? 0),
@@ -65,11 +65,12 @@ class ProductRowExporter implements RowExporterInterface, HasMediaFiles
             ->map(fn (Collection $group) => (string) $group->first()->value);
     }
 
+    /**
+     * ไฟล์ export/import เป็นเนื้อหาภาษาหลัก (ภาษาไทย) — ไม่ใช่ภาษาหน้าจอ (config app.locale)
+     */
     public static function defaultLocaleId(): ?int
     {
-        $id = Locale::where('code', config('app.locale'))->value('id');
-
-        return $id !== null ? (int) $id : null;
+        return LocaleFallback::baseLocaleId();
     }
 
     public function rows(ExportConfig $config): \Generator

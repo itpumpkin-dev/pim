@@ -76,7 +76,7 @@ class ProductMatchIndexBuilder
         $insert = [];
         foreach ($rows as $r) {
             $nameTh = $r->name_th ?: $r->name_any;
-            $nameEn = $r->name_en ?: $r->name_any;
+            $nameEn = $r->name_en ?: $nameTh; // ยังไม่แปล → ชื่อไทย (LocaleFallback: en → th → แถว NULL)
             $normTh = MatchText::normalizeName($nameTh, $aliases);
             $normEn = MatchText::normalizeName($nameEn, $aliases);
 

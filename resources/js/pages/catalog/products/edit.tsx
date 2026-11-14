@@ -363,6 +363,8 @@ export default function ProductEdit({
     platformContext = null,
 }: Props) {
     const { locales, locale: currentLocaleCode, setLocale } = useLocale();
+    // ภาษาหลักของเนื้อหา (ภาษาไทย) — ช่องภาษาอื่นที่ยังไม่แปล fallback มาที่ค่านี้ (ดู LocaleFallback ฝั่ง PHP)
+    const baseLocaleKey = String(locales.find((l) => l.code === 'th')?.id ?? '');
     const { t } = useTranslation('catalog');
     const { auth } = usePage<SharedData>().props;
     // แยกออกมาจาก attributes.edit_attributes แล้ว (ดู migration
@@ -2410,13 +2412,13 @@ export default function ProductEdit({
 
                                                             {visibleAttrs.map((attr) => {
                                                                 const { channelKey, localeKey } = getValueKeys(attr);
-                                                                // ถ้า locale นี้ยังไม่มีค่าของตัวเอง จะ fallback ไปใช้ bucket
-                                                                // global ('default') แทน — ฟิลด์ที่เป็น locale-based ที่ import
-                                                                // เข้ามาจะไปตกอยู่ตรงนั้นก่อน จนกว่าจะมีคนแปลทีละ locale
-                                                                // (ดู ProductRowImporter) ถ้าไม่มี fallback นี้ ฟิลด์ที่เพิ่ง
-                                                                // import มาจะดูเหมือนว่างเปล่า
+                                                                // ถ้า locale นี้ยังไม่มีค่าของตัวเอง fallback ตามกติกาเดียวกับ backend
+                                                                // (LocaleFallback): ภาษาไทย (th — ภาษาหลัก) → bucket global ('default'
+                                                                // ข้อมูลเก่าก่อนย้ายเข้า th) แสดงอย่างเดียว ไม่เขียนลง data.values —
+                                                                // บันทึกจะไม่สร้างแถว copy ถ้าผู้ใช้ไม่ได้แก้ช่องนี้
                                                                 const val =
                                                                     data.values[attr.id]?.[groupKey]?.[channelKey]?.[localeKey] ??
+                                                                    (baseLocaleKey ? data.values[attr.id]?.[groupKey]?.[channelKey]?.[baseLocaleKey] : undefined) ??
                                                                     data.values[attr.id]?.[groupKey]?.[channelKey]?.['default'] ??
                                                                     '';
                                                                 const activeLocaleCode = locales.find((l) => l.id === activeLocaleId)?.code || 'en';

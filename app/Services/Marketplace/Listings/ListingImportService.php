@@ -343,10 +343,11 @@ class ListingImportService
             return ['status' => 'not_in_family', 'reason' => 'attribute นี้ไม่อยู่ในตระกูล (family) ของสินค้า'] + $base;
         }
 
+        // ค่าปัจจุบันใน PIM: attribute แยกภาษาใช้ th → แถว NULL (ข้อมูลเก่า) ตาม LocaleFallback
         $lookup = fn (?int $channelId) => ProductValue::where('product_id', $context['product_id'])
             ->where('attribute_id', $attribute->id)->where('attribute_group_id', $groupId)
             ->where('channel_id', $channelId)
-            ->where('locale_id', $attribute->is_locale_based ? $context['locale_id'] : null)
+            ->when($attribute->is_locale_based, fn ($q) => $q->inLocale($context['locale_id']), fn ($q) => $q->whereNull('locale_id'))
             ->value('value');
         $current = $base['scope'] === 'channel' ? ($lookup($context['channel_id']) ?? $lookup(null)) : $lookup(null);
         $base['current'] = $current;

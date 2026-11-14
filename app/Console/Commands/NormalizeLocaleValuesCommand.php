@@ -12,7 +12,8 @@ use Illuminate\Support\Facades\Storage;
  * นั่นคือ Phase 2b เพราะ applySmartDefaults()/ตัวอ่านหลายจุดยังพึ่งแถวพวกนั้นอยู่)
  *
  * 1. attribute type ที่ไม่ขึ้นกับภาษา (ตัวเลข/ราคา/วันที่/boolean/select/multiselect — select เก็บ code
- *    ส่วนชื่อ option แปลใน attribute_option_translations อยู่แล้ว) → is_locale_based = false และย้าย
+ *    ส่วนชื่อ option แปลใน attribute_option_translations อยู่แล้ว) และ attribute ที่ต้องไม่ซ้ำ (pid,
+ *    barcode_* — รหัส) → is_locale_based = false และย้าย
  *    แถวรายภาษาไปเป็นแถว locale_id = NULL (หน้าแก้ไขสินค้าอ่าน/เขียนแถว 'default' สำหรับ attribute ที่ไม่
  *    แยกภาษา เลยต้องทำพร้อมกันใน transaction เดียว ไม่งั้นค่าจะหายจากหน้าจอ)
  *    - ค่าที่ชนะ: แถว th (เป็นค่าที่หน้าแก้ไขแสดงอยู่ตอนนี้) > แถว NULL > ภาษาที่ id ต่ำสุด ยกเว้น
@@ -43,7 +44,9 @@ class NormalizeLocaleValuesCommand extends Command
         $enabledLocaleIds = DB::table('locales')->where('enabled', true)->pluck('id')->all();
 
         // รวม attribute ที่ปิด is_locale_based ไปแล้วด้วย — บางตัว (เช่น pbrand) ยังมีแถวรายภาษาค้างจากตอนที่เคยเปิดอยู่
-        $attributes = Attribute::whereIn('type', self::LANGUAGE_NEUTRAL_TYPES)->get(['id', 'code', 'type', 'is_locale_based']);
+        // + attribute ที่ต้องไม่ซ้ำ (pid, barcode_*) — เป็นรหัส ไม่ขึ้นกับภาษา และการเช็คค่าซ้ำดูแถว NULL
+        $attributes = Attribute::where(fn ($q) => $q->whereIn('type', self::LANGUAGE_NEUTRAL_TYPES)->orWhere('is_unique', true))
+            ->get(['id', 'code', 'type', 'is_locale_based']);
 
         DB::beginTransaction();
         try {
@@ -52,7 +55,7 @@ class NormalizeLocaleValuesCommand extends Command
             Attribute::whereIn('id', $flipped->pluck('id'))->update(['is_locale_based' => false]);
             $copied = $thId ? $this->copyThaiIntoBaseRow($thId) : 0;
 
-            $this->line(sprintf('1) %d attribute(s) of type %s → is_locale_based = false', $flipped->count(), implode('/', self::LANGUAGE_NEUTRAL_TYPES)));
+            $this->line(sprintf('1) %d attribute(s) of type %s or unique → is_locale_based = false', $flipped->count(), implode('/', self::LANGUAGE_NEUTRAL_TYPES)));
             $this->line("   {$moved} locale row(s) moved to the NULL-locale row, {$dropped} locale row(s) removed");
             $this->line("2) {$copied} NULL-locale row(s) overwritten with their th value");
 

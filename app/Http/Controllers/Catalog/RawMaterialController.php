@@ -4,7 +4,6 @@ namespace App\Http\Controllers\Catalog;
 
 use App\Http\Controllers\Controller;
 use App\Models\Attribute;
-use App\Models\Locale;
 use App\Models\Product;
 use App\Models\ProductValue;
 use Illuminate\Http\RedirectResponse;
@@ -118,25 +117,6 @@ class RawMaterialController extends Controller
      */
     private function resolveProductNamesInCurrentLocale(Collection $productIds): array
     {
-        $nameAttributeId = Attribute::idForCode('pname');
-        if (! $nameAttributeId || $productIds->isEmpty()) {
-            return [];
-        }
-
-        $activeLocaleId = Locale::idForCode(app()->getLocale());
-
-        $rowsByProduct = ProductValue::whereIn('product_id', $productIds)
-            ->where('attribute_id', $nameAttributeId)
-            ->whereNull('channel_id')
-            ->get(['product_id', 'locale_id', 'value'])
-            ->groupBy('product_id');
-
-        $names = [];
-        foreach ($rowsByProduct as $productId => $rows) {
-            $match = $activeLocaleId ? $rows->firstWhere('locale_id', $activeLocaleId) : null;
-            $names[$productId] = ($match ?? $rows->firstWhere('locale_id', null))?->value;
-        }
-
-        return $names;
+        return \App\Services\Catalog\ProductNameLookup::names($productIds);
     }
 }

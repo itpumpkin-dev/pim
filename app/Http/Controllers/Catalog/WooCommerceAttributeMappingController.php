@@ -9,6 +9,7 @@ use App\Models\Category;
 use App\Models\Locale;
 use App\Models\Product;
 use App\Models\ProductValue;
+use App\Services\Catalog\ProductNameLookup;
 use App\Models\WooCommerceAttribute;
 use App\Models\WooCommerceAttributeMapping;
 use App\Models\WooCommerceCategory;
@@ -223,21 +224,7 @@ class WooCommerceAttributeMappingController extends Controller
 
         $pnames = [];
         if ($nameAttrId && $pageProductIds->isNotEmpty()) {
-            $values = ProductValue::whereIn('product_id', $pageProductIds)
-                ->where('attribute_id', $nameAttrId)
-                ->whereNull('channel_id')
-                ->where(function ($q) use ($activeLocaleId) {
-                    $q->whereNull('locale_id');
-                    if ($activeLocaleId) {
-                        $q->orWhere('locale_id', $activeLocaleId);
-                    }
-                })
-                ->get();
-            foreach ($values as $v) {
-                if (! isset($pnames[$v->product_id]) || $v->locale_id === $activeLocaleId) {
-                    $pnames[$v->product_id] = $v->value;
-                }
-            }
+            $pnames = ProductNameLookup::names($pageProductIds, $activeLocaleId);
         }
 
         // "จับคู่แล้ว" (Product Matching) — มี listing บนร้าน WooCommerce ที่ผูกกับสินค้านี้
